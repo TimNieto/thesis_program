@@ -97,6 +97,8 @@ const LIVESTREAMS = ["Mommypoko", "Sofy"];
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
+  const [isLoading, setIsLoading] = useState(true);
+
   const [requests, setRequests] = useState<Request[]>([
     {
       id: "1",
@@ -177,15 +179,20 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employeeDayOffs, setEmployeeDayOffs] = useState<EmployeeDayOff[]>([]);
 
   const fetchEmployees = () => {
+    setIsLoading(true);
+
     fetch("https://thesisprogram-production.up.railway.app/employees")
       .then(res => res.json())
       .then(data => setEmployees(data))
-      .catch(() => console.log("Failed to load employees"));
+      .catch(() => console.log("Failed to load employees"))
+      .finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    if (currentUser.role.toLowerCase() === "admin") {
+      fetchEmployees();
+    }
+  }, [currentUser.role]);
 
 
   // Add Employee
@@ -366,11 +373,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
   const totalAssignments = assignments.length;
   const totalSlots = DAYS.length * SHIFTS.length * LIVESTREAMS.length * 2; // 2 roles per shift
-  const isAdmin = (employee: Employee) => employee.role === "Team Leader";
-
-  const currentEmployee = employees.find(
-    (e) => e.id === currentUser.id
-  );
 
   const getRequestTypeColor = (type: string) => {
     const colors = {
@@ -409,16 +411,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     return SHIFTS.find((s) => s.code === code);
   };
 
-    if (employees.length === 0) {
-      return <div className="p-6">Loading...</div>;
-    }
-
-    console.log("currentUser:", currentUser);
-    console.log("employees:", employees);
-    console.log("matched employee:", currentEmployee);
-    console.log("role:", currentEmployee?.role);
-
-    if (!currentEmployee || !isAdmin(currentEmployee)) {
+    if (currentUser.role.toLowerCase() !== "admin") {
       return (
         <div className="p-6">
           <p className="text-red-500 text-lg font-semibold">
@@ -427,6 +420,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         </div>
       );
     }
+
+    // 🟡 THEN: handle loading
+    if (isLoading) {
+      return <div className="p-6">Loading...</div>;
+    }
+
+    // (optional logs after checks)
+    console.log("currentUser:", currentUser);
+    console.log("employees:", employees);
 
   return (
     <div className="space-y-6">
@@ -533,65 +535,73 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {[...employees]
-                    .sort((a, b) => {
-                      const rolePriority: Record<string, number> = {
-                        "Team Leader": 1,
-                        "Host": 2,
-                        "Operator": 3,
-                        "Both": 4
-                      };
-
-                      return (rolePriority[a.role] || 99) - (rolePriority[b.role] || 99);
-                    })
-                    .map((employee) => (
-                      <TableRow key={employee.id}>
-                        <TableCell className="font-medium">{employee.name}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={employee.role}
-                            onValueChange={(value) =>
-                              updateEmployeeRole(employee.id, value as "Host" | "Operator" | "Both" | "Team Leader")
-                            }
-                          >
-                            <SelectTrigger className="w-[180px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Team Leader">Team Leader</SelectItem>
-                              <SelectItem value="Host">Host</SelectItem>
-                              <SelectItem value="Operator">Operator</SelectItem>
-                              <SelectItem value="Both">Both</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={employee.status === "Active" ? "default" : "secondary"}
-                            className="cursor-pointer"
-                            onClick={() => toggleEmployeeStatus(employee.id)}
-                          >
-                            {employee.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{employee.totalShifts}</TableCell>
-                        <TableCell>{new Date(employee.joinedDate).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              setEmployeeToDelete(employee.id);
-                              setIsConfirmDeleteOpen(true);
-                            }}
-                            className="gap-2"
-                          >
-                            <UserMinus className="size-4" />
-                            Deactivate
-                          </Button>
+                    {employees.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-gray-500 py-6">
+                          No employees found. Click "Add Employee" to get started.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      [...employees]
+                        .sort((a, b) => {
+                          const rolePriority: Record<string, number> = {
+                            "Team Leader": 1,
+                            "Host": 2,
+                            "Operator": 3,
+                            "Both": 4
+                          };
+
+                          return (rolePriority[a.role] || 99) - (rolePriority[b.role] || 99);
+                        })
+                        .map((employee) => (
+                          <TableRow key={employee.id}>
+                            <TableCell className="font-medium">{employee.name}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={employee.role}
+                                onValueChange={(value) =>
+                                  updateEmployeeRole(employee.id, value as "Host" | "Operator" | "Both" | "Team Leader")
+                                }
+                              >
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Team Leader">Team Leader</SelectItem>
+                                  <SelectItem value="Host">Host</SelectItem>
+                                  <SelectItem value="Operator">Operator</SelectItem>
+                                  <SelectItem value="Both">Both</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={employee.status === "Active" ? "default" : "secondary"}
+                                className="cursor-pointer"
+                                onClick={() => toggleEmployeeStatus(employee.id)}
+                              >
+                                {employee.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{employee.totalShifts}</TableCell>
+                            <TableCell>{new Date(employee.joinedDate).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  setEmployeeToDelete(employee.id);
+                                  setIsConfirmDeleteOpen(true);
+                                }}
+                                className="gap-2"
+                              >
+                                <UserMinus className="size-4" />
+                                Deactivate
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -776,13 +786,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         </TabsContent>
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
-          {currentEmployee && (
-            <EmployeeProfile
-              userId={currentEmployee.id}
-              role={currentEmployee.role}
-              onProfileUpdated={fetchEmployees}
-            />
-          )}
+          <EmployeeProfile
+            userId={currentUser.id}
+            role={currentUser.displayRole}
+            onProfileUpdated={fetchEmployees}
+          />
         </TabsContent>
       </Tabs>
 

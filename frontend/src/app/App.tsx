@@ -1,3 +1,5 @@
+// src/app/app.tsx
+
 import { useState } from "react";
 import { LoginPage } from "@/app/components/login-page";
 import { ScheduleGenerator } from "@/app/components/schedule-generator";
@@ -33,6 +35,7 @@ export default function App() {
   });
 
   const handleLogin = (userData: any) => {
+  console.log("LOGIN USER:", userData);
   setUser(userData);
   setIsAuthenticated(true);
 };
@@ -126,7 +129,7 @@ export default function App() {
           {user.role === "admin" && (
             <>
               <TabsContent value="admin">
-                <AdminDashboard currentUser={user.email} />
+                <AdminDashboard currentUser={user} />
               </TabsContent>
 
               <TabsContent value="settings">
