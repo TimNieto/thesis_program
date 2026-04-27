@@ -224,26 +224,35 @@ def change_password(employee_id: int, data: dict):
         current = data.get("currentPassword")
         new_password = data.get("newPassword")
 
+        # ✅ validate + trim
         if not current or not new_password or not current.strip() or not new_password.strip():
             raise HTTPException(status_code=400, detail="Missing fields")
 
+        current = current.strip()
+        new_password = new_password.strip()
+
         is_valid = False
 
-        # plain password (legacy users)
-        if current == stored_password:
-            is_valid = True
-        else:
+        # check if stored password is bcrypt (starts with $2b$ or $2a$)
+        if stored_password.startswith("$2"):
             try:
                 if bcrypt.verify(current, stored_password):
                     is_valid = True
             except Exception:
                 pass
+        else:
+            # legacy plain password
+            if current == stored_password:
+                is_valid = True
 
         if not is_valid:
             raise HTTPException(status_code=400, detail="Incorrect current password")
         
         if len(new_password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        if len(new_password) > 72:
+            raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters")
 
         # store new password as hashed
         cursor.execute(

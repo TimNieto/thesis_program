@@ -99,6 +99,11 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
       return;
     }
 
+    if (newPassword.trim().length > 72) {
+      toast.error("Password cannot exceed 72 characters");
+      return;
+    }
+
     setChangingPassword(true);
 
     try {
