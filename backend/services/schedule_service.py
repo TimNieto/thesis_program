@@ -34,9 +34,10 @@ def fetch_shifts(cursor):
     SELECT shift_id, shift_date, account, shift_type,
            required_host_count, required_operator_count
     FROM shifts
-    WHERE shift_date BETWEEN '2026-01-01' AND '2026-01-31'
+    WHERE shift_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+    
 """)
-     #WHERE shift_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+     #WHERE shift_date BETWEEN '2026-01-01' AND '2026-01-31'
 
     rows = cursor.fetchall()
 
