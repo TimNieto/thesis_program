@@ -143,25 +143,25 @@ def is_valid_candidate(employee, shift, role, context):
     Master function used by scheduler
     """
 
-    # employee_id = employee["employee_id"]
-    # shift_id = shift["shift_id"]
+    employee_id = employee["employee_id"]
+    shift_id = shift["shift_id"]
 
-    # # Role check
-    # if not has_role(employee, role):
-    #     return False
+    # Role check
+    if not has_role(employee, role):
+        return False
 
-    # # Availability + leave + absence
-    # if is_unavailable(employee_id, shift, context):
-    #     return False
+    # Availability + leave + absence
+    if is_unavailable(employee_id, shift, context):
+        return False
 
-    # # Already assigned to this shift
-    # if already_assigned(employee_id, shift_id, context):
-    #     return False
+    # Already assigned to this shift
+    if already_assigned(employee_id, shift_id, context):
+        return False
     
-    # if already_assigned_same_time(employee_id, shift, context):
-    #     return False
+    if already_assigned_same_time(employee_id, shift, context):
+        return False
     
-    # if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
-    #     return False
+    if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
+        return False
 
     return True
