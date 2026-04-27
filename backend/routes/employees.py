@@ -15,6 +15,9 @@ def hash_password(password: str) -> str:
 
 # ✅ ADD THIS TOO (for verification)
 def verify_password(password: str, hashed: str) -> bool:
+    import hashlib
+
+    # 1. Try new system (SHA256 → bcrypt)
     try:
         prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
         if bcrypt.verify(prehashed, hashed):
@@ -22,12 +25,17 @@ def verify_password(password: str, hashed: str) -> bool:
     except Exception:
         pass
 
-    # fallback for old passwords
+    # 2. Try old bcrypt
     try:
-        if bcrypt.verify(password, hashed):
-            return True
-    except:
+        if hashed.startswith("$2"):
+            if bcrypt.verify(password, hashed):
+                return True
+    except Exception:
         pass
+
+    # 3. Try plain text (VERY IMPORTANT)
+    if password == hashed:
+        return True
 
     return False
 
