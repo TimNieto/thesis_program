@@ -108,13 +108,14 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
 
     try {
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/employees/${userId}/password`,
+        `https://thesisprogram-production.up.railway.app/change-password`,
         {
-          method: "PUT",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            currentPassword: currentPassword.trim(),
-            newPassword: newPassword.trim()
+            user_id: userId,
+            current_password: currentPassword.trim(),
+            new_password: newPassword.trim()
           }),
         }
       );
