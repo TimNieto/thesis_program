@@ -27,6 +27,9 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+
   useEffect(() => {
   fetch(`https://thesisprogram-production.up.railway.app/employees/${userId}`)
     .then(res => res.json())
@@ -41,6 +44,7 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
 }, [userId]);
 
   const handleSaveProfile = async () => {
+
     if (!name.trim()) {
       toast.error("Name cannot be empty");
       return;
@@ -50,6 +54,8 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
       return;
     }
 
+    setSavingProfile(true);
+
     try {
       const response = await fetch(`https://thesisprogram-production.up.railway.app/employees/${userId}`, {
         method: "PUT",
@@ -57,6 +63,7 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          name,
           contactNumber,
         }),
       });
@@ -71,19 +78,28 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
     } catch (error) {
       console.error(error);
       toast.error("Failed to update profile");
+    } finally {
+      setSavingProfile(false);
     }
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword) {
+    if (!currentPassword.trim() || !newPassword.trim()) {
       toast.error("Fill all fields");
       return;
     }
 
-    if (newPassword !== confirmPassword) {
+    if (newPassword.trim() !== confirmPassword.trim()) {
       toast.error("Passwords do not match");
       return;
     }
+
+    if (newPassword.trim().length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setChangingPassword(true);
 
     try {
       const res = await fetch(
@@ -92,14 +108,15 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            password: newPassword
+            currentPassword: currentPassword.trim(),
+            newPassword: newPassword.trim()
           }),
         }
       );
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to change password");
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to change password");
       }
 
       toast.success("Password changed successfully");
@@ -113,6 +130,8 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
       } else {
         toast.error("Something went wrong");
       }
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -194,7 +213,7 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
             </p>
           </div>
 
-          <Button onClick={handleSaveProfile} className="gap-2">
+          <Button onClick={handleSaveProfile} className="gap-2" disabled={savingProfile}>
             <Save className="size-4" />
             Save Changes
           </Button>
@@ -254,9 +273,14 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
             />
           </div>
 
-          <Button onClick={handleChangePassword} variant="secondary" className="gap-2">
+          <Button
+            onClick={handleChangePassword}
+            variant="secondary"
+            className="gap-2"
+            disabled={changingPassword}
+          >
             <Lock className="size-4" />
-            Change Password
+            {changingPassword ? "Changing..." : "Change Password"}
           </Button>
         </CardContent>
       </Card>

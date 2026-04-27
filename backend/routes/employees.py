@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from db.database import get_connection
 from passlib.hash import bcrypt
+import traceback
 
 router = APIRouter()
 
@@ -220,14 +221,34 @@ def change_password(employee_id: int, data: dict):
 
         stored_password = row[0]
 
-        # ✅ support BOTH plain + hashed passwords
-        if not (data["currentPassword"] == stored_password or bcrypt.verify(data["currentPassword"], stored_password)):
+        current = data.get("currentPassword")
+        new_password = data.get("newPassword")
+
+        if not current or not new_password or not current.strip() or not new_password.strip():
+            raise HTTPException(status_code=400, detail="Missing fields")
+
+        is_valid = False
+
+        # plain password (legacy users)
+        if current == stored_password:
+            is_valid = True
+        else:
+            try:
+                if bcrypt.verify(current, stored_password):
+                    is_valid = True
+            except Exception:
+                pass
+
+        if not is_valid:
             raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+        if len(new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
         # store new password as hashed
         cursor.execute(
             "UPDATE employees SET password = %s WHERE employee_id = %s",
-            (bcrypt.hash(data["newPassword"]), employee_id)
+            (bcrypt.hash(new_password), employee_id)
         )
 
         conn.commit()
@@ -239,7 +260,8 @@ def change_password(employee_id: int, data: dict):
 
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail="Server error")
+        traceback.print_exc()   # 👈 prints real error in Railway logs
+        raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         cursor.close()
