@@ -9,24 +9,24 @@ import hashlib
 router = APIRouter()
 
 def verify_password(password: str, hashed: str) -> bool:
-    try:
-        # ✅ NEW method (SHA256 + bcrypt)
-        prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        if bcrypt.verify(prehashed, hashed):
-            return True
-    except Exception:
-        return False
+    # ✅ VERY OLD (plain text fallback FIRST)
+    if password == hashed:
+        return True
 
+    # ✅ OLD method (bcrypt only)
     try:
-        # ✅ OLD method (bcrypt only)
         if bcrypt.verify(password, hashed):
             return True
     except Exception:
         pass
 
-    # ✅ VERY OLD (plain text fallback)
-    if password == hashed:
-        return True
+    # ✅ NEW method (SHA256 + bcrypt)
+    try:
+        prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        if bcrypt.verify(prehashed, hashed):
+            return True
+    except Exception:
+        pass
 
     return False
 
