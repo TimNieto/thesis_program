@@ -4,8 +4,32 @@ from fastapi import APIRouter, HTTPException
 from db.database import get_connection
 from passlib.hash import bcrypt
 import traceback
+import hashlib
 
 router = APIRouter()
+
+# ✅ ADD THIS FUNCTION
+def hash_password(password: str) -> str:
+    prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return bcrypt.hash(prehashed)
+
+# ✅ ADD THIS TOO (for verification)
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        if bcrypt.verify(prehashed, hashed):
+            return True
+    except Exception:
+        pass
+
+    # fallback for old passwords
+    try:
+        if bcrypt.verify(password, hashed):
+            return True
+    except:
+        pass
+
+    return False
 
 # GET all employees
 @router.get("/employees")
@@ -91,7 +115,7 @@ def add_employee(data: dict):
             data["name"],
             data["email"],
             role,
-            bcrypt.hash("1234"),
+            hash_password("1234"),
             "Active",
             can_be_host,
             can_be_operator,
@@ -231,32 +255,17 @@ def change_password(employee_id: int, data: dict):
         current = current.strip()
         new_password = new_password.strip()
 
-        is_valid = False
-
         # check if stored password is bcrypt (starts with $2b$ or $2a$)
-        if stored_password.startswith("$2"):
-            try:
-                if bcrypt.verify(current, stored_password):
-                    is_valid = True
-            except Exception:
-                pass
-        else:
-            # legacy plain password
-            if current == stored_password:
-                is_valid = True
-
-        if not is_valid:
+        if not verify_password(current, stored_password):
             raise HTTPException(status_code=400, detail="Incorrect current password")
         
         if len(new_password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
         
-        new_password = new_password.encode("utf-8")[:72].decode("utf-8", "ignore")
-
         # store new password as hashed
         cursor.execute(
             "UPDATE employees SET password = %s WHERE employee_id = %s",
-            (bcrypt.hash(new_password), employee_id)
+            (hash_password(new_password), employee_id)
         )
 
         conn.commit()

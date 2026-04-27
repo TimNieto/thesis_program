@@ -4,8 +4,31 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from db.database import get_connection
 from passlib.hash import bcrypt
+import hashlib
 
 router = APIRouter()
+
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        # ✅ NEW method (SHA256 + bcrypt)
+        prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        if bcrypt.verify(prehashed, hashed):
+            return True
+    except Exception:
+        return False
+
+    try:
+        # ✅ OLD method (bcrypt only)
+        if bcrypt.verify(password, hashed):
+            return True
+    except Exception:
+        pass
+
+    # ✅ VERY OLD (plain text fallback)
+    if password == hashed:
+        return True
+
+    return False
 
 class LoginRequest(BaseModel):
     email: str
@@ -29,7 +52,7 @@ def login(data: LoginRequest):
 
         employee_id, full_name, db_password, main_role = user
 
-        if not (data.password == db_password or bcrypt.verify(data.password, db_password)):
+        if not verify_password(data.password, db_password):
             raise HTTPException(status_code=401, detail="Invalid password")
 
         role_map = {
