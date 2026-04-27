@@ -57,7 +57,6 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name,
           contactNumber,
         }),
       });
@@ -93,15 +92,14 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            currentPassword,
-            newPassword,
+            password: newPassword
           }),
         }
       );
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail || "Failed");
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to change password");
       }
 
       toast.success("Password changed successfully");
@@ -141,8 +139,8 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
             <Input
               id="name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
+              disabled
+              className="bg-gray-50 cursor-not-allowed"
             />
           </div>
 
