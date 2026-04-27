@@ -49,7 +49,7 @@ const ROLES = ["Host", "Operator"] as const;
 export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps) {
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
 
-  const assignmentMap = React.useMemo(() => {
+  /*const assignmentMap = React.useMemo(() => {
     const map = new Map<string, ShiftAssignment>();
 
     assignments.forEach(a => {
@@ -58,7 +58,7 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
     });
 
     return map;
-  }, [assignments]);
+  }, [assignments]);*/
 
   const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([
     {
@@ -155,14 +155,29 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
     return leaveMap.get(formatDate(date)) || [];
   };
 
-const getAssignment = (
+/*const getAssignment = (
     livestream: string,
     day: string,
     shift: string,
     role: "Host" | "Operator"
   ) => {
     return assignmentMap.get(`${livestream}-${day}-${shift}-${role}`);
-  };
+  };*/  
+
+  const getAssignment = (
+  livestream: string,
+  day: string,
+  shift: string,
+  role: "Host" | "Operator"
+) => {
+  return assignments.find(
+    (a) =>
+      a.livestream === livestream &&
+      a.day === day &&
+      a.shift === shift &&
+      a.role === role
+  );
+};
 
   const openAssignDialog = (livestream: string, day: string, shift: string, role: "Host" | "Operator") => {
     setSelectedCell({ livestream, day, shift, role });
@@ -239,15 +254,28 @@ const getAssignment = (
   
   const generateSchedule = async () => {
     try {
-      const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.detail || "Failed");
+      const grouped = {
+      Mommypoko: {
+        Monday: {
+          GY: {
+            host: [{ employee_name: "John Doe" }],
+            operator: [{ employee_name: "Jane Doe" }]
+          }
+        }
       }
+    };
 
-      const grouped = data.grouped_schedule || {};
-      const unfilled = data.unfilled_slots || [];
+      //const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
+      //const data = await res.json();
+
+     // if (!res.ok) {
+    //    throw new Error(data.detail || "Failed");
+    //  }
+
+      //const grouped = data.grouped_schedule || {};
+     // const unfilled = data.unfilled_slots || [];
+
+     const unfilled: any[] = [];
 
       const transformed: ShiftAssignment[] = [];
 
@@ -289,7 +317,10 @@ const getAssignment = (
         });
       });
 
-      setAssignments(transformed);
+      //setAssignments(transformed);
+
+      console.log("TRANSFORMED:", transformed);
+      setAssignments([...transformed]);
 
       if (unfilled.length > 0) {
         toast.warning(`${unfilled.length} slots could not be filled`);
