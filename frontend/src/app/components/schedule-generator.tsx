@@ -254,7 +254,7 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
   
   const generateSchedule = async () => {
     try {
-      const grouped = {
+      /*const grouped = {
       Mommypoko: {
         Monday: {
           GY: {
@@ -263,19 +263,19 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
           }
         }
       }
-    };
+    };*/
 
-      //const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
-      //const data = await res.json();
+      const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
+      const data = await res.json();
 
-     // if (!res.ok) {
-    //    throw new Error(data.detail || "Failed");
-    //  }
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed");
+      }
 
-      //const grouped = data.grouped_schedule || {};
-     // const unfilled = data.unfilled_slots || [];
+      const grouped = data.grouped_schedule || {};
+      const unfilled = data.unfilled_slots || [];
 
-     const unfilled: any[] = [];
+     //const unfilled: any[] = [];
 
       const transformed: ShiftAssignment[] = [];
 
@@ -317,10 +317,10 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
         });
       });
 
-      //setAssignments(transformed);
-
-      console.log("TRANSFORMED:", transformed);
       setAssignments([...transformed]);
+
+      /*console.log("TRANSFORMED:", transformed);
+      setAssignments([...transformed]);*/
 
       if (unfilled.length > 0) {
         toast.warning(`${unfilled.length} slots could not be filled`);
