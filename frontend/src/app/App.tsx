@@ -34,12 +34,18 @@ export default function App() {
 
   const handleLogin = (userData: any) => {
   setUser(userData);
+  setIsAuthenticated(true);
 };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setCurrentUser("");
-    setUserRole("");
+    setUser({
+      id: 0,
+      name: "",
+      email: "",
+      role: "",
+      displayRole: ""
+    });
   };
 
   if (!isAuthenticated) {
@@ -78,15 +84,17 @@ export default function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs
-          defaultValue={
-            userRole === "admin" ? "admin" : "schedule"
-          }
+          defaultValue={user.role === "admin" ? "admin" : "schedule"}
           className="space-y-6"
         >
           <TabsList
-            className={`grid w-full ${userRole === "admin" ? "max-w-5xl grid-cols-5" : "max-w-3xl grid-cols-3"}`}
+            className={`grid w-full ${
+              user.role === "admin"
+                ? "max-w-5xl grid-cols-5"
+                : "max-w-3xl grid-cols-3"
+            }`}
           >
-            {userRole === "admin" && (
+            {user.role === "admin" && (
               <>
                 <TabsTrigger value="admin" className="gap-2">
                   <LayoutDashboard className="size-4" />
@@ -98,50 +106,56 @@ export default function App() {
                 </TabsTrigger>
               </>
             )}
+
             <TabsTrigger value="schedule" className="gap-2">
               <Calendar className="size-4" />
               Schedule Generator
             </TabsTrigger>
+
             <TabsTrigger value="cover" className="gap-2">
               <ClipboardList className="size-4" />
               Cover Requests
             </TabsTrigger>
+
             <TabsTrigger value="profile" className="gap-2">
               <User className="size-4" />
               Profile
             </TabsTrigger>
           </TabsList>
 
-          {userRole === "admin" && (
+          {user.role === "admin" && (
             <>
-              <TabsContent value="admin" className="space-y-4">
-                <AdminDashboard currentUser={currentUser} />
+              <TabsContent value="admin">
+                <AdminDashboard currentUser={user.email} />
               </TabsContent>
 
-              <TabsContent value="settings" className="space-y-4">
+              <TabsContent value="settings">
                 <CompanySettings />
               </TabsContent>
             </>
           )}
 
-          <TabsContent value="schedule" className="space-y-4">
+          <TabsContent value="schedule">
             <ScheduleGenerator
-              currentUser={currentUser}
-              role={userRole}
+              currentUser={user.email}
+              role={user.role}
             />
           </TabsContent>
 
-          <TabsContent value="cover" className="space-y-4">
+          <TabsContent value="cover">
             <CoverApplication
-              currentUser={currentUser}
-              role={userRole}
+              currentUser={user.email}
+              role={user.role}
             />
           </TabsContent>
 
-          <TabsContent value="profile" className="space-y-4">
+          <TabsContent value="profile">
             <EmployeeProfile
-              currentUser={currentUser}
-              role={userRole}
+              userId={user.id}
+              role={user.displayRole}
+              onProfileUpdated={() => {
+                console.log("Profile updated");
+              }}
             />
           </TabsContent>
         </Tabs>
