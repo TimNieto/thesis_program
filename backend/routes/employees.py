@@ -251,8 +251,7 @@ def change_password(employee_id: int, data: dict):
         if len(new_password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
         
-        if len(new_password) > 72:
-            raise HTTPException(status_code=400, detail="Password cannot exceed 72 characters")
+        new_password = new_password.encode("utf-8")[:72].decode("utf-8", "ignore")
 
         # store new password as hashed
         cursor.execute(
