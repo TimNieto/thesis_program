@@ -268,11 +268,14 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
       const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
       const data = await res.json();
 
+      console.log("API RESPONSE:", data);
+
       if (!res.ok) {
         throw new Error(data.detail || "Failed");
       }
 
       const grouped = data.grouped_schedule || {};
+      console.log("GROUPED:", grouped);
       const unfilled = data.unfilled_slots || [];
 
      //const unfilled: any[] = [];
