@@ -24,14 +24,17 @@ import { Toaster } from "@/app/components/ui/sonner";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState("");
-  const [userRole, setUserRole] = useState("");
+  const [user, setUser] = useState({
+    id: 0,
+    name: "",
+    email: "",
+    role: "",
+    displayRole: ""
+  });
 
-  const handleLogin = (username: string, role: string) => {
-    setCurrentUser(username);
-    setUserRole(role);
-    setIsAuthenticated(true);
-  };
+  const handleLogin = (userData: any) => {
+  setUser(userData);
+};
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -56,7 +59,7 @@ export default function App() {
               <div>
                 <h1 className="text-2xl">Schedule Manager</h1>
                 <p className="text-sm text-gray-600">
-                  Welcome, {currentUser} ({userRole})
+                  Welcome, {user.name} ({user.displayRole})
                 </p>
               </div>
             </div>

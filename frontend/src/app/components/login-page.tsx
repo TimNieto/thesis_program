@@ -8,7 +8,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Calendar } from "lucide-react";
 
 interface LoginPageProps {
-  onLogin: (username: string, role: string) => void;
+  onLogin: (user: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    displayRole: string;
+  }) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -45,7 +51,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       return;
     }
 
-    onLogin(username.trim().toLowerCase(), data.role);
+    onLogin({
+      id: data.user.id,
+      name: data.user.name,
+      email: username.trim().toLowerCase(),
+      role: data.role,
+      displayRole: data.displayRole
+    });
 
     } catch (err) {
       setError("Server not reachable");

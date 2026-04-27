@@ -75,7 +75,13 @@ interface EmployeeDayOff {
 }
 
 interface AdminDashboardProps {
-  currentUser: string;
+  currentUser: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    displayRole: string;
+  };
 }
 
 const SHIFTS = [
@@ -289,7 +295,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     setAssignments(
       assignments.map((a) =>
         a.id === selectedAssignment.id
-          ? { ...a, employee: overrideEmployee, approvedBy: currentUser, approvedAt: new Date().toISOString().split('T')[0] }
+          ? { ...a, employee: overrideEmployee, approvedBy: currentUser.name, approvedAt: new Date().toISOString().split('T')[0] }
           : a
       )
     );
@@ -363,8 +369,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const isAdmin = (employee: Employee) => employee.role === "Team Leader";
 
   const currentEmployee = employees.find(
-    (e) =>
-      e.email?.trim().toLowerCase() === currentUser.trim().toLowerCase()
+    (e) => e.id === currentUser.id
   );
 
   const getRequestTypeColor = (type: string) => {

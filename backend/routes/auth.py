@@ -42,7 +42,8 @@ def login(data: LoginRequest):
 
         return {
             "message": "Login successful",
-            "role": role,
+            "role": role,                 # system role (admin, host, etc.)
+            "displayRole": main_role,     # 👈 ADD THIS (Human readable)
             "user": {
                 "id": employee_id,
                 "name": full_name
