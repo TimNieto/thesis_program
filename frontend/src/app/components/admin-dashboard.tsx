@@ -175,7 +175,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employeeToDelete, setEmployeeToDelete] = useState<number | null>(null);
 
   const [selectedEmployeeForDayOff, setSelectedEmployeeForDayOff] = useState<number | null>(null);
-  const [employeeDayOffs, setEmployeeDayOffs] = useState<EmployeeDayOff[]>([]);
+  const [employeeAvailability, setEmployeeAvailability] = useState<any>({});
 
   const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
   const [selectedEmployeeForAvailability, setSelectedEmployeeForAvailability] = useState<Employee | null>(null);
@@ -325,54 +325,94 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   // Day Off Management Functions
   const isSlotUnavailable = (employeeId: number, day: string, shift: string): boolean => {
-    const employeeDayOff = employeeDayOffs.find((edo) => edo.employeeId === employeeId);
-    if (!employeeDayOff) return false;
-    return employeeDayOff.unavailableSlots.some((slot) => slot.day === day && slot.shift === shift);
+    const emp = employeeAvailability[employeeId];
+
+    // ❗ No employee record → UNAVAILABLE
+    if (!emp) return true;
+
+    const dayData = emp[day.toLowerCase()];
+
+    // ❗ No day → UNAVAILABLE
+    if (!dayData) return true;
+
+    const shiftData = dayData[shift.toLowerCase()];
+
+    // ❗ No shift → UNAVAILABLE
+    if (shiftData === undefined) return true;
+
+    // ❗ false = unavailable → return true (grey)
+    return !shiftData;
   };
 
-  const toggleSlotAvailability = (employeeId: number, day: string, shift: string) => {
-    const employeeDayOffIndex = employeeDayOffs.findIndex((edo) => edo.employeeId === employeeId);
+  const toggleSlotAvailability = async (employeeId: number, day: string, shift: string) => {
+    // 🔥 STEP 1: determine current state
+    const isCurrentlyUnavailable = isSlotUnavailable(employeeId, day, shift);
 
-  
-    if (employeeDayOffIndex === -1) {
-      setEmployeeDayOffs([
-        ...employeeDayOffs,
-        {
-          employeeId,
-          unavailableSlots: [{ day, shift }]
+    // 🔥 STEP 2: send to backend FIRST
+    try {
+      await fetch("https://thesisprogram-production.up.railway.app/availability", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          employee_id: employeeId,
+          day_of_week: day.toLowerCase(),
+          preferred_shift: shift.toLowerCase(),
+          is_available: isCurrentlyUnavailable // invert
+        })
+      });
+
+    await fetchAvailability();
+
+    } catch (err) {
+      console.error("Failed to update availability", err);
+      return; // ❗ stop if backend fails
+    }
+
+  };
+
+  const fetchAvailability = async () => {
+    try {
+      const res = await fetch("https://thesisprogram-production.up.railway.app/availability");
+      const data = await res.json();
+
+      const transformed: any = {};
+
+      data.forEach((row: any) => {
+        if (!row.day_of_week || !row.preferred_shift) return;
+
+        const empId = Number(row.employee_id);
+        const day = row.day_of_week.toLowerCase();
+        const shift = row.preferred_shift.toLowerCase();
+
+        if (!transformed[empId]) {
+          transformed[empId] = {};
         }
-      ]);
-      toast.success("Shift marked as unavailable");
-      return;
-    }
 
-    const employeeDayOff = employeeDayOffs[employeeDayOffIndex];
-    const slotIndex = employeeDayOff.unavailableSlots.findIndex(
-      (slot) => slot.day === day && slot.shift === shift
-    );
+        if (!transformed[empId][day]) {
+          transformed[empId][day] = {};
+        }
 
-    if (slotIndex === -1) {
-      const updatedDayOffs = [...employeeDayOffs];
-      updatedDayOffs[employeeDayOffIndex] = {
-        ...employeeDayOff,
-        unavailableSlots: [...employeeDayOff.unavailableSlots, { day, shift }]
-      };
-      setEmployeeDayOffs(updatedDayOffs);
-      toast.success("Shift marked as unavailable");
-    } else {
-      const updatedDayOffs = [...employeeDayOffs];
-      updatedDayOffs[employeeDayOffIndex] = {
-        ...employeeDayOff,
-        unavailableSlots: employeeDayOff.unavailableSlots.filter((_, i) => i !== slotIndex)
-      };
-      setEmployeeDayOffs(updatedDayOffs);
-      toast.success("Shift marked as available");
+        transformed[empId][day][shift] = row.is_available;
+      });
+
+      console.log("STRICT AVAILABILITY MAP:", transformed);
+
+      setEmployeeAvailability(transformed);
+
+    } catch (err) {
+      console.error("Failed to load availability", err);
     }
   };
+
+
+
 
 const openAvailabilityDialog = (employee: Employee) => {
   setSelectedEmployeeForAvailability(employee);
   setIsAvailabilityDialogOpen(true);
+  fetchAvailability();
 };
 
   // Statistics

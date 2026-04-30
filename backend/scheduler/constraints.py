@@ -26,23 +26,35 @@ def get_day_of_week(date):
 
 def is_available(employee_id, shift, availability_map):
     """
-    Check if employee is available on that day
-    availability_map: {
-        employee_id: {
-            "Monday": {...},
-            ...
-        }
-    }
+    Strict availability:
+    - Must match day
+    - Must match shift
+    - Must be explicitly available
     """
-    day = get_day_of_week(shift["shift_date"])
+
+    day = get_day_of_week(shift["shift_date"])   # e.g. 'friday'
+    shift_type = shift["shift_type"].lower()     # e.g. 'nn'
 
     emp_availability = availability_map.get(employee_id, {})
 
-    # strict: no record = NOT available
-    if day not in emp_availability:
+    # ❌ No data at all → NOT available
+    if not emp_availability:
         return False
 
-    return emp_availability[day]["is_available"]
+    day_data = emp_availability.get(day)
+
+    # ❌ No record for that day → NOT available
+    if not day_data:
+        return False
+
+    shift_data = day_data.get(shift_type)
+
+    # ❌ No record for that shift → NOT available
+    if not shift_data:
+        return False
+
+    # ✅ Final check
+    return shift_data.get("is_available", False)
 
 
 # -------------------------------
