@@ -326,3 +326,53 @@ def get_availability():
     finally:
         cursor.close()
         conn.close()    
+
+@router.post("/availability")
+def update_availability(data: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        employee_id = data["employee_id"]
+        day_of_week = data["day_of_week"]
+        preferred_shift = data["preferred_shift"]
+        is_available = data["is_available"]
+
+        # 🔍 Check if record already exists
+        cursor.execute("""
+            SELECT availability_id
+            FROM availability
+            WHERE employee_id = %s
+              AND day_of_week = %s
+              AND preferred_shift = %s
+        """, (employee_id, day_of_week, preferred_shift))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            # 🔄 UPDATE existing row
+            cursor.execute("""
+                UPDATE availability
+                SET is_available = %s
+                WHERE availability_id = %s
+            """, (is_available, existing[0]))
+
+        else:
+            # ➕ INSERT new row
+            cursor.execute("""
+                INSERT INTO availability (employee_id, day_of_week, preferred_shift, is_available)
+                VALUES (%s, %s, %s, %s)
+            """, (employee_id, day_of_week, preferred_shift, is_available))
+
+        conn.commit()
+
+        return {"message": "Availability saved"}
+
+    except Exception as e:
+        conn.rollback()
+        print("ERROR:", e)
+        raise HTTPException(status_code=500, detail="Failed to update availability")
+
+    finally:
+        cursor.close()
+        conn.close()
