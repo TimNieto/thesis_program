@@ -175,8 +175,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employeeToDelete, setEmployeeToDelete] = useState<number | null>(null);
 
   const [selectedEmployeeForDayOff, setSelectedEmployeeForDayOff] = useState<number | null>(null);
-
   const [employeeDayOffs, setEmployeeDayOffs] = useState<EmployeeDayOff[]>([]);
+
+  const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
+  const [selectedEmployeeForAvailability, setSelectedEmployeeForAvailability] = useState<Employee | null>(null);
 
   const fetchEmployees = () => {
     setIsLoading(true);
@@ -331,6 +333,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const toggleSlotAvailability = (employeeId: number, day: string, shift: string) => {
     const employeeDayOffIndex = employeeDayOffs.findIndex((edo) => edo.employeeId === employeeId);
 
+  
     if (employeeDayOffIndex === -1) {
       setEmployeeDayOffs([
         ...employeeDayOffs,
@@ -366,6 +369,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       toast.success("Shift marked as available");
     }
   };
+
+const openAvailabilityDialog = (employee: Employee) => {
+  setSelectedEmployeeForAvailability(employee);
+  setIsAvailabilityDialogOpen(true);
+};
 
   // Statistics
   const totalEmployees = employees.length;
@@ -586,6 +594,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             <TableCell>{employee.totalShifts}</TableCell>
                             <TableCell>{new Date(employee.joinedDate).toLocaleDateString()}</TableCell>
                             <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openAvailabilityDialog(employee)}
+                                  className="gap-2"
+                            >
+                                  <CalendarOff className="size-4" />
+                                  Availability
+                              </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
@@ -598,6 +616,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 <UserMinus className="size-4" />
                                 Deactivate
                               </Button>
+                              </div> 
                             </TableCell>
                           </TableRow>
                         ))
@@ -943,6 +962,85 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+    <Dialog open={isAvailabilityDialogOpen} onOpenChange={setIsAvailabilityDialogOpen}>
+  <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>
+        Manage Weekly Availability - {selectedEmployeeForAvailability?.name}
+      </DialogTitle>
+      <DialogDescription>
+        Click on any shift to toggle availability
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="py-6">
+      {selectedEmployeeForAvailability && (
+        <div className="overflow-x-auto">
+          <div className="min-w-max">
+            
+            {/* DAYS HEADER */}
+            <div className="grid grid-cols-8 gap-3">
+              <div></div>
+              {DAYS.map((day) => (
+                <div key={day} className="p-4 text-center bg-gray-100 rounded">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* SHIFTS GRID */}
+            {SHIFTS.map((shift) => (
+              <div key={shift.code} className="grid grid-cols-8 gap-3 mt-3">
+                
+                {/* SHIFT LABEL */}
+                <div className="p-4 bg-gray-100 rounded">
+                  {shift.code} - {shift.name}
+                </div>
+
+                {/* CELLS */}
+                {DAYS.map((day) => {
+                  const isUnavailable = isSlotUnavailable(
+                    selectedEmployeeForAvailability.id,
+                    day,
+                    shift.code
+                  );
+
+                  return (
+                    <div
+                      key={`${day}-${shift.code}`}
+                      onClick={() =>
+                        toggleSlotAvailability(
+                          selectedEmployeeForAvailability.id,
+                          day,
+                          shift.code
+                        )
+                      }
+                      className={`p-4 rounded border cursor-pointer
+                        ${
+                          isUnavailable
+                            ? "bg-gray-300"
+                            : "bg-white hover:bg-blue-50"
+                        }`}
+                    >
+                      {isUnavailable ? "Unavailable" : "Available"}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+
+    <DialogFooter>
+      <Button onClick={() => setIsAvailabilityDialogOpen(false)}>
+        Done
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>  
     </div>
   );
 }
