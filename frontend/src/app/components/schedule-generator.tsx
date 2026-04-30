@@ -254,16 +254,6 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
   
   const generateSchedule = async () => {
     try {
-      /*const grouped = {
-      Mommypoko: {
-        Monday: {
-          GY: {
-            host: [{ employee_name: "John Doe" }],
-            operator: [{ employee_name: "Jane Doe" }]
-          }
-        }
-      }
-    };*/
 
       const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
       const data = await res.json();
@@ -371,10 +361,13 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
           <p className="text-gray-600">Weekly livestream shift allocation and leave management</p>
         </div>
         <div className="flex items-center gap-4">
+          
           <Badge variant="secondary">{role}</Badge>
-          <Button onClick={generateSchedule} className="gap-2">
-                      Generate Schedule
-                    </Button>
+          {role === "admin" && (
+            <Button onClick={generateSchedule} className="gap-2">
+              Generate Schedule
+          </Button>
+  )}
           <Button onClick={exportSchedule} variant="outline" className="gap-2">
             <Download className="size-4" />
             Export CSV
