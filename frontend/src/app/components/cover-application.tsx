@@ -166,7 +166,7 @@ export function CoverApplication({
   const [myShifts, setMyShifts] = useState<any[]>([]);
 
   const employeesMap = Object.fromEntries(
-  employees.map(emp => [emp.employee_id, emp.name])
+  employees.map(emp => [emp.id, emp.name])
 );
 
   const fetchMyLeaves = async () => {
@@ -215,7 +215,7 @@ const fetchAllLeaves = async () => {
     setLeaveRequests(
       data.map((r: any) => ({
         id: r.request_id,
-        requester: employeesMap[r.employee_id] || `Employee ${r.employee_id}`,
+        requester: employeesMap[Number(r.employee_id)] || `Employee ${r.employee_id}`,
         livestream: "All Streams",
         day:
           r.from === r.to
