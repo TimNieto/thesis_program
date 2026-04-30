@@ -198,6 +198,39 @@ export function CoverApplication({
   }
 };
 
+const fetchAllLeaves = async () => {
+  try {
+    const res = await fetch(
+      "https://thesisprogram-production.up.railway.app/leaves"
+    );
+
+    const data = await res.json();
+
+    console.log("ALL LEAVES:", data);
+
+    setLeaveRequests(
+      data.map((r: any) => ({
+        id: r.request_id,
+        requester: `Employee ${r.employee_id}`,
+        livestream: "All Streams",
+        day:
+          r.from === r.to
+            ? new Date(r.from).toLocaleDateString()
+            : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
+        shift: "All",
+        role: "Host",
+        leaveType: r.leave_type,
+        reason: "", // optional for now
+        status: r.status,
+        submittedAt: new Date().toISOString()
+      }))
+    );
+
+  } catch (err) {
+    console.error("Failed to fetch all leaves", err);
+  }
+};
+
   const fetchCoverRequests = async () => {
     try {
       const res = await fetch("https://thesisprogram-production.up.railway.app/coverage-requests");
@@ -226,7 +259,11 @@ export function CoverApplication({
 
   useEffect(() => {
     fetchMyShifts();
-    fetchMyLeaves();
+    if (role === "admin") {
+      fetchAllLeaves();   // 🔥 admin view
+    } else {
+      fetchMyLeaves();    // 🔥 employee view
+    }
   }, []);
 
   useEffect(() => {
@@ -517,17 +554,39 @@ export function CoverApplication({
     }
   };
 
-  const updateLeaveStatus = (
-    id: string,
-    status: "approved" | "denied",
+  const updateLeaveStatus = async (
+    requestId: string,
+    status: "approved" | "rejected"
   ) => {
-    setLeaveRequests(
-      leaveRequests.map((req) =>
-        req.id === id ? { ...req, status } : req,
-      ),
-    );
-    toast.success(`Leave request ${status}`);
-  };
+    try {
+      const res = await fetch(
+        `https://thesisprogram-production.up.railway.app/leaves/${requestId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      toast.success(`Leave request ${status}`);
+
+      // 🔥 REFRESH FROM BACKEND (IMPORTANT)
+      fetchAllLeaves();
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update leave");
+    }
+};
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -1274,10 +1333,7 @@ export function CoverApplication({
                                         size="sm"
                                         variant="destructive"
                                         onClick={() =>
-                                          updateLeaveStatus(
-                                            request.id,
-                                            "denied",
-                                          )
+                                          updateLeaveStatus(request.id, "rejected")
                                         }
                                       >
                                         Deny
