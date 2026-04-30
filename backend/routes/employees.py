@@ -293,7 +293,7 @@ def change_password(employee_id: int, data: dict):
         conn.close()
 
 
-@router.get("/employees/availability")
+@router.get("/availability")
 def get_availability():
     conn = get_connection()
     cursor = conn.cursor()
