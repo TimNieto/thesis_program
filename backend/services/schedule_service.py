@@ -178,6 +178,26 @@ def generate_weekly_schedule():
             absences
         )
 
+        # -------------------------------
+        # SAVE GENERATED SCHEDULE (DRAFT)
+        # -------------------------------
+
+        # clear previous draft schedule
+        cursor.execute("DELETE FROM generated_schedule")
+
+        # insert new generated schedule
+        for a in result["assignments"]:
+            cursor.execute("""
+                INSERT INTO generated_schedule (shift_id, employee_id, role)
+                VALUES (%s, %s, %s)
+            """, (
+                a["shift_id"],
+                a["employee_id"],
+                a["role"]
+            ))
+
+        conn.commit()
+
         grouped = group_schedule(result["assignments"])
 
         return {
@@ -185,6 +205,51 @@ def generate_weekly_schedule():
             "assignments": result["assignments"],      # keep raw (important for debugging)
             "grouped_schedule": grouped,               # ✅ NEW structured data
             "unfilled_slots": result["unfilled_slots"]
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_generated_schedule():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT 
+                s.shift_date,
+                s.shift_type,
+                s.account,
+                e.employee_id,
+                e.full_name,
+                g.role
+            FROM generated_schedule g
+            JOIN shifts s ON g.shift_id = s.shift_id
+            JOIN employees e ON g.employee_id = e.employee_id
+        """)
+
+        rows = cursor.fetchall()
+
+        assignments = [
+            {
+                "shift_date": r[0],
+                "shift_type": r[1],
+                "account": r[2],
+                "employee_id": r[3],
+                "employee_name": r[4],
+                "role": r[5]
+            }
+            for r in rows
+        ]
+
+        grouped = group_schedule(assignments)
+
+        return {
+            "status": "success",
+            "assignments": assignments,
+            "grouped_schedule": grouped
         }
 
     finally:

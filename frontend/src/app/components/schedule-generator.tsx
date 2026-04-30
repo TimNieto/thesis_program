@@ -1,6 +1,6 @@
 // src/app/components/schedule-generator.tsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
@@ -48,17 +48,6 @@ const ROLES = ["Host", "Operator"] as const;
 
 export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps) {
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
-
-  /*const assignmentMap = React.useMemo(() => {
-    const map = new Map<string, ShiftAssignment>();
-
-    assignments.forEach(a => {
-      const key = `${a.livestream}-${a.day}-${a.shift}-${a.role}`;
-      map.set(key, a);
-    });
-
-    return map;
-  }, [assignments]);*/
 
   const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([
     {
@@ -123,6 +112,56 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [leaveWeekOffset, setLeaveWeekOffset] = useState(0); // 0 = current week, 1 = next week
+
+  useEffect(() => {
+  const loadSchedule = async () => {
+    try {
+      const res = await fetch("https://thesisprogram-production.up.railway.app/generated-schedule");
+      const data = await res.json();
+
+      if (!data.grouped_schedule) return;
+
+      const transformed: ShiftAssignment[] = [];
+
+      Object.entries(data.grouped_schedule).forEach(([livestream, days]: any) => {
+        Object.entries(days).forEach(([day, shifts]: any) => {
+          Object.entries(shifts).forEach(([shift, roles]: any) => {
+
+            (roles.host || []).forEach((emp: any) => {
+              transformed.push({
+                id: `${livestream}-${day}-${shift}-host-${emp.employee_id}`,
+                livestream,
+                day,
+                shift,
+                role: "Host",
+                employee: emp.employee_name
+              });
+            });
+
+            (roles.operator || []).forEach((emp: any) => {
+              transformed.push({
+                id: `${livestream}-${day}-${shift}-operator-${emp.employee_id}`,
+                livestream,
+                day,
+                shift,
+                role: "Operator",
+                employee: emp.employee_name
+              });
+            });
+
+          });
+        });
+      });
+
+      setAssignments(transformed);
+
+    } catch (err) {
+      console.error("Failed to load schedule", err);
+    }
+  };
+
+  loadSchedule();
+}, []);
 
   // Get date range for week based on offset
   const getWeekDates = (offset: number = 0) => {
