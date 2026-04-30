@@ -291,3 +291,38 @@ def change_password(employee_id: int, data: dict):
     finally:
         cursor.close()
         conn.close()
+
+
+@router.get("/employees/availability")
+def get_availability():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT employee_id, day_of_week, is_available, preferred_shift
+            FROM availability
+            ORDER BY employee_id
+        """)
+
+        rows = cursor.fetchall()
+
+        availability = [
+            {
+                "employee_id": r[0],
+                "day_of_week": r[1],
+                "is_available": r[2],
+                "preferred_shift": r[3]
+            }
+            for r in rows
+        ]
+
+        return availability
+
+    except Exception as e:
+        print("ERROR fetching availability:", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch availability")
+
+    finally:
+        cursor.close()
+        conn.close()    
