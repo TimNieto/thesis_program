@@ -162,8 +162,12 @@ export function CoverApplication({
 
   const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-
+  const [employees, setEmployees] = useState<any[]>([]);
   const [myShifts, setMyShifts] = useState<any[]>([]);
+
+  const employeesMap = Object.fromEntries(
+  employees.map(emp => [emp.employee_id, emp.name])
+);
 
   const fetchMyLeaves = async () => {
   try {
@@ -211,7 +215,7 @@ const fetchAllLeaves = async () => {
     setLeaveRequests(
       data.map((r: any) => ({
         id: r.request_id,
-        requester: `Employee ${r.employee_id}`,
+        requester: employeesMap[r.employee_id] || `Employee ${r.employee_id}`,
         livestream: "All Streams",
         day:
           r.from === r.to
@@ -257,14 +261,30 @@ const fetchAllLeaves = async () => {
     }
   };
 
+  const fetchEmployees = () => {
+  fetch("https://thesisprogram-production.up.railway.app/employees")
+    .then(res => res.json())
+    .then(data => setEmployees(data))
+    .catch(() => console.log("Failed to load employees"));
+  };
+
+
   useEffect(() => {
     fetchMyShifts();
+    fetchEmployees();
+
     if (role === "admin") {
       fetchAllLeaves();   // 🔥 admin view
     } else {
       fetchMyLeaves();    // 🔥 employee view
     }
   }, []);
+
+  useEffect(() => {
+  if (role === "admin" && employees.length > 0) {
+    fetchAllLeaves();
+  }
+}, [employees]);
 
   useEffect(() => {
     fetchCoverRequests();
