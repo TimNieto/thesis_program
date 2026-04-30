@@ -161,37 +161,42 @@ export function CoverApplication({
   ]);
 
   const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
-
-  const [leaveRequests, setLeaveRequests] = useState<
-    LeaveRequest[]
-  >([
-    {
-      id: "1",
-      requester: "John Smith",
-      livestream: "Mommypoko",
-      day: "Friday",
-      shift: "AM",
-      role: "Host",
-      leaveType: "Sick Leave",
-      reason: "Medical appointment",
-      status: "pending",
-      submittedAt: "2026-01-25T09:00:00",
-    },
-    {
-      id: "2",
-      requester: "Sarah Johnson",
-      livestream: "Sofy",
-      day: "Monday",
-      shift: "NN",
-      role: "Operator",
-      leaveType: "Vacation",
-      reason: "Personal travel",
-      status: "approved",
-      submittedAt: "2026-01-23T15:30:00",
-    },
-  ]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
 
   const [myShifts, setMyShifts] = useState<any[]>([]);
+
+  const fetchMyLeaves = async () => {
+  try {
+    const res = await fetch(
+      `https://thesisprogram-production.up.railway.app/leaves/${currentUser.employee_id}`
+    );
+
+    const data = await res.json();
+
+    console.log("LEAVES:", data);
+
+    setLeaveRequests(
+      data.map((r: any) => ({
+        id: r.request_id,
+        requester: currentUser.name,
+        livestream: "All Streams",
+        day:
+          r.from === r.to
+            ? new Date(r.from).toLocaleDateString()
+            : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
+        shift: "All",
+        role: "Host", // can improve later
+        leaveType: r.leave_type,
+        reason: "", // optional (not returned yet)
+        status: r.status,
+        submittedAt: new Date().toISOString()
+      }))
+    );
+
+  } catch (err) {
+    console.error("Failed to fetch leaves", err);
+  }
+};
 
   const fetchCoverRequests = async () => {
     try {
@@ -221,6 +226,7 @@ export function CoverApplication({
 
   useEffect(() => {
     fetchMyShifts();
+    fetchMyLeaves();
   }, []);
 
   useEffect(() => {
@@ -274,8 +280,6 @@ export function CoverApplication({
   const [isCoverDialogOpen, setIsCoverDialogOpen] =
     useState(false);
 
-  const [isLeaveDialogOpen, setIsLeaveDialogOpen] =
-    useState(false);
 
   const [selectedShift, setSelectedShift] = useState<{
   schedule_id: number;
@@ -290,9 +294,6 @@ export function CoverApplication({
 
   const [coverReason, setCoverReason] = useState("");
 
-  const [leaveReason, setLeaveReason] = useState("");
-
-  const [leaveType, setLeaveType] = useState(LEAVE_TYPES[0]);
 
   // Standalone leave request states
   const [selectedLeaveDateRange, setSelectedLeaveDateRange] = useState<{
@@ -333,19 +334,6 @@ export function CoverApplication({
     setIsCoverDialogOpen(true);
   };
 
-  const openLeaveDialog = (slot: any) => {
-    setSelectedShift({
-      schedule_id: slot.schedule_id,
-      livestream: slot.livestream,
-      day: slot.day,
-      shift: slot.shift,
-      role: slot.role,
-    });
-
-    setLeaveReason("");
-    setLeaveType(LEAVE_TYPES[0]);
-    setIsLeaveDialogOpen(true);
-  };
 
   const submitApplication = () => {
     if (!selectedShift || !applicationReason.trim()) {
@@ -416,83 +404,58 @@ export function CoverApplication({
     }
   };
 
-  const submitLeaveRequest = () => {
-    if (!selectedShift || !leaveReason.trim()) {
-      toast.error(
-        "Please provide a reason for your leave request",
-      );
-      return;
-    }
+  // const submitLeaveRequest = () => {
+  //   if (!selectedShift || !leaveReason.trim()) {
+  //     toast.error(
+  //       "Please provide a reason for your leave request",
+  //     );
+  //     return;
+  //   }
 
-    const request: LeaveRequest = {
-      id: Date.now().toString(),
-      requester: currentUser.name,
-      livestream: selectedShift.livestream,
-      day: selectedShift.day,
-      shift: selectedShift.shift,
-      role: selectedShift.role,
-      leaveType: leaveType,
-      reason: leaveReason,
-      status: "pending",
-      submittedAt: new Date().toISOString(),
-    };
+    const submitStandaloneLeaveRequest = async () => {
+      if (!selectedLeaveDateRange.from) {
+        toast.error("Please select a start date");
+        return;
+      }
 
-    setLeaveRequests([request, ...leaveRequests]);
-    setIsLeaveDialogOpen(false);
-    setLeaveReason("");
-    setSelectedShift(null);
-    toast.success("Leave request submitted successfully");
-  };
+      if (!standaloneLeaveReason.trim()) {
+        toast.error("Please provide a reason");
+        return;
+      }
 
-  const submitStandaloneLeaveRequest = () => {
-    if (!selectedLeaveDateRange.from) {
-      toast.error("Please select a start date for your leave request");
-      return;
-    }
-    if (!standaloneLeaveReason.trim()) {
-      toast.error("Please provide a reason for your leave request");
-      return;
-    }
+      try {
+        const res = await fetch("https://thesisprogram-production.up.railway.app/leaves", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            employee_id: currentUser.employee_id,
+            from: selectedLeaveDateRange.from.toISOString().split("T")[0],
+            to: (selectedLeaveDateRange.to || selectedLeaveDateRange.from)
+                  .toISOString().split("T")[0],
+            leave_type: standaloneLeaveType,
+            reason: standaloneLeaveReason
+          })
+        });
 
-    // Format the date range
-    const startDate = selectedLeaveDateRange.from.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-    const endDate = selectedLeaveDateRange.to
-      ? selectedLeaveDateRange.to.toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : startDate;
+    const data = await res.json();
 
-    const dateRangeDisplay =
-      selectedLeaveDateRange.to && selectedLeaveDateRange.from.getTime() !== selectedLeaveDateRange.to.getTime()
-        ? `${startDate} - ${endDate}`
-        : startDate;
+    toast.success("Leave request submitted!");
 
-    // Mock data - in a real app, this would create requests for each day in the range
-    const request: LeaveRequest = {
-      id: Date.now().toString(),
-      requester: currentUser.name,
-      livestream: "All Streams", // Indicating all assigned shifts
-      day: dateRangeDisplay,
-      shift: "All", // All shifts for the selected dates
-      role: "Host", // Would be from user profile
-      leaveType: standaloneLeaveType,
-      reason: standaloneLeaveReason,
-      status: "pending",
-      submittedAt: new Date().toISOString(),
-    };
+    // 🔥 refresh list from DB
+    fetchMyLeaves();
 
-    setLeaveRequests([request, ...leaveRequests]);
+    // reset UI
     setSelectedLeaveDateRange({ from: undefined, to: undefined });
     setStandaloneLeaveReason("");
     setStandaloneLeaveType(LEAVE_TYPES[0]);
-    toast.success("Leave request submitted successfully");
-  };
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to submit leave");
+  }
+};
 
   // Helper function to check if a date is disabled (less than 1 week from today)
   const isDateDisabled = (date: Date) => {
@@ -1436,85 +1399,6 @@ export function CoverApplication({
             </Button>
             <Button onClick={submitCoverRequest}>
               Submit Request
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Leave Request Dialog */}
-      <Dialog
-        open={isLeaveDialogOpen}
-        onOpenChange={setIsLeaveDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plane className="size-5" />
-              Request Leave
-            </DialogTitle>
-            <DialogDescription>
-              {selectedShift && (
-                <div className="space-y-1 mt-2">
-                  <div>
-                    <strong>Livestream:</strong>{" "}
-                    {selectedShift.livestream}
-                  </div>
-                  <div>
-                    <strong>Day:</strong> {selectedShift.day}
-                  </div>
-                  <div>
-                    <strong>Shift:</strong>{" "}
-                    {getShiftInfo(selectedShift.shift)?.name} (
-                    {getShiftInfo(selectedShift.shift)?.time})
-                  </div>
-                  <div>
-                    <strong>Role:</strong> {selectedShift.role}
-                  </div>
-                </div>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="leaveType">Leave Type</Label>
-              <Select
-                value={leaveType}
-                onValueChange={setLeaveType}
-              >
-                <SelectTrigger id="leaveType">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LEAVE_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="leaveReason">
-                Reason for Leave
-              </Label>
-              <Textarea
-                id="leaveReason"
-                placeholder="Please provide details about your leave request..."
-                value={leaveReason}
-                onChange={(e) => setLeaveReason(e.target.value)}
-                rows={4}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsLeaveDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitLeaveRequest}>
-              Submit Leave Request
             </Button>
           </DialogFooter>
         </DialogContent>
