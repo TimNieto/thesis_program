@@ -14,6 +14,8 @@ def create_leave_request(payload: dict):
     cursor = conn.cursor()
 
     try:
+        print("PAYLOAD RECEIVED:", payload)
+
         employee_id = payload["employee_id"]
         leave_type = payload["leave_type"]
         reason = payload.get("reason", "")
@@ -26,9 +28,11 @@ def create_leave_request(payload: dict):
         current = start
 
         while current <= end:
+            print("INSERTING:", employee_id, current.date(), leave_type)
+
             cursor.execute("""
                 INSERT INTO leaves (request_id, employee_id, date, leave_type, reason, status)
-                VALUES (%s, %s, %s, %s, %s, 'pending')
+                VALUES (%s::uuid, %s, %s, %s, %s, 'pending')
             """, (
                 request_id,
                 employee_id,
@@ -45,6 +49,10 @@ def create_leave_request(payload: dict):
             "status": "success",
             "request_id": request_id
         }
+
+    except Exception as e:
+        print("ERROR:", str(e))
+        return {"error": str(e)}  # 🔥 forces JSON response
 
     finally:
         cursor.close()
