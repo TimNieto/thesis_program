@@ -150,68 +150,68 @@ def assigned_count_same_day(employee_id, shift, context):
 
 MAX_SHIFTS_PER_DAY = 1
 
-# def is_valid_candidate(employee, shift, role, context):
-#     """
-#     Master function used by scheduler
-#     """
-
-#     employee_id = employee["employee_id"]
-#     shift_id = shift["shift_id"]
-
-#     # Role check
-#     if not has_role(employee, role):
-#         return False
-
-#     # Availability + leave + absence
-#     if is_unavailable(employee_id, shift, context):
-#         return False
-
-#     # Already assigned to this shift
-#     if already_assigned(employee_id, shift_id, context):
-#         return False
-    
-#     if already_assigned_same_time(employee_id, shift, context):
-#         return False
-    
-#     if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
-#         return False
-
-#     return True
-
-
 def is_valid_candidate(employee, shift, role, context):
+    """
+    Master function used by scheduler
+    """
+
     employee_id = employee["employee_id"]
     shift_id = shift["shift_id"]
 
-    print(f"\nCHECKING EMP {employee_id} FOR {role} {shift['shift_type']} {shift['shift_date']}")
-
+    # Role check
     if not has_role(employee, role):
-        print("❌ role fail")
         return False
 
-    if not is_available(employee_id, shift, context["availability_map"]):
-        print("❌ availability fail")
+    # Availability + leave + absence
+    if is_unavailable(employee_id, shift, context):
         return False
 
-    if is_on_leave(employee_id, shift["shift_date"], context["leaves_map"]):
-        print("❌ on leave")
-        return False
-
-    if is_absent(employee_id, shift["shift_date"], context["absences_map"]):
-        print("❌ absent")
-        return False
-
+    # Already assigned to this shift
     if already_assigned(employee_id, shift_id, context):
-        print("❌ already assigned same shift")
         return False
     
     if already_assigned_same_time(employee_id, shift, context):
-        print("❌ same time conflict")
         return False
     
     if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
-        print("❌ max shifts reached")
         return False
 
-    print("✅ VALID")
     return True
+
+
+# def is_valid_candidate(employee, shift, role, context):
+#     employee_id = employee["employee_id"]
+#     shift_id = shift["shift_id"]
+
+#     print(f"\nCHECKING EMP {employee_id} FOR {role} {shift['shift_type']} {shift['shift_date']}")
+
+#     if not has_role(employee, role):
+#         print("❌ role fail")
+#         return False
+
+#     if not is_available(employee_id, shift, context["availability_map"]):
+#         print("❌ availability fail")
+#         return False
+
+#     if is_on_leave(employee_id, shift["shift_date"], context["leaves_map"]):
+#         print("❌ on leave")
+#         return False
+
+#     if is_absent(employee_id, shift["shift_date"], context["absences_map"]):
+#         print("❌ absent")
+#         return False
+
+#     if already_assigned(employee_id, shift_id, context):
+#         print("❌ already assigned same shift")
+#         return False
+    
+#     if already_assigned_same_time(employee_id, shift, context):
+#         print("❌ same time conflict")
+#         return False
+    
+#     if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
+#         print("❌ max shifts reached")
+#         return False
+
+#     print("✅ VALID")
+#     return True
