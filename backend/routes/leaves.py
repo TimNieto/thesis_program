@@ -18,8 +18,8 @@ def create_leave_request(payload: dict):
         leave_type = payload["leave_type"]
         reason = payload.get("reason", "")
 
-        start = datetime.fromisoformat(payload["from"])
-        end = datetime.fromisoformat(payload["to"])
+        start = datetime.strptime(payload["from"], "%Y-%m-%d")
+        end = datetime.strptime(payload["to"], "%Y-%m-%d")
 
         request_id = str(uuid4())
 
