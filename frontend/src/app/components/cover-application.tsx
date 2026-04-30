@@ -439,23 +439,34 @@ export function CoverApplication({
           })
         });
 
-    const data = await res.json();
+        console.log("STATUS:", res.status);
 
-    toast.success("Leave request submitted!");
+        const raw = await res.text();
+        console.log("RAW RESPONSE:", raw);
 
-    // 🔥 refresh list from DB
-    fetchMyLeaves();
+        if (!res.ok) {
+          toast.error("Backend error: " + raw);
+          return;
+        }
 
-    // reset UI
-    setSelectedLeaveDateRange({ from: undefined, to: undefined });
-    setStandaloneLeaveReason("");
-    setStandaloneLeaveType(LEAVE_TYPES[0]);
+        const data = JSON.parse(raw);
+        console.log("SUCCESS:", data);
 
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to submit leave");
-  }
-};
+        toast.success("Leave request submitted!");
+
+        // 🔥 refresh list
+        fetchMyLeaves();
+
+        // 🔥 reset UI
+        setSelectedLeaveDateRange({ from: undefined, to: undefined });
+        setStandaloneLeaveReason("");
+        setStandaloneLeaveType(LEAVE_TYPES[0]);
+
+      } catch (err) {
+        console.error("FETCH FAILED:", err);
+        toast.error("Network or parsing error");
+      }
+    };
 
   // Helper function to check if a date is disabled (less than 1 week from today)
   const isDateDisabled = (date: Date) => {
