@@ -450,9 +450,14 @@ export function CoverApplication({
         }
 
         const data = JSON.parse(raw);
-        console.log("SUCCESS:", data);
 
-        toast.success("Leave request submitted!");
+          if (data.error) {
+            console.error("BACKEND ERROR:", data.error);
+            toast.error(data.error);
+            return;
+          }
+
+          toast.success("Leave request submitted!");
 
         // 🔥 refresh list
         fetchMyLeaves();

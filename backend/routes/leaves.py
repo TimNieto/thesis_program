@@ -96,3 +96,65 @@ def get_employee_leaves(employee_id: int):
     finally:
         cursor.close()
         conn.close()
+
+@router.get("/leaves")
+def get_all_leaves():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT request_id,
+                   employee_id,
+                   MIN(date) as start_date,
+                   MAX(date) as end_date,
+                   leave_type,
+                   status
+            FROM leaves
+            GROUP BY request_id, employee_id, leave_type, status
+            ORDER BY start_date DESC
+        """)
+
+        rows = cursor.fetchall()
+
+        return [
+            {
+                "request_id": r[0],
+                "employee_id": r[1],
+                "from": str(r[2]),
+                "to": str(r[3]),
+                "leave_type": r[4],
+                "status": r[5]
+            }
+            for r in rows
+        ]
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.patch("/leaves/{request_id}")
+def update_leave_status(request_id: str, payload: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        status = payload.get("status")
+
+        if status not in ["approved", "rejected"]:
+            return {"error": "Invalid status"}
+
+        cursor.execute("""
+            UPDATE leaves
+            SET status = %s
+            WHERE request_id = %s
+        """, (status, request_id))
+
+        conn.commit()
+
+        return {"status": "success"}
+
+    finally:
+        cursor.close()
+        conn.close()
