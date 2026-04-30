@@ -1219,6 +1219,8 @@ const fetchAllLeaves = async () => {
             </CardContent>
           </Card>
 
+
+
           {/* Leave Requests Table */}
           <Card>
             <CardHeader>
@@ -1239,10 +1241,7 @@ const fetchAllLeaves = async () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Requester</TableHead>
-                        <TableHead>Livestream</TableHead>
                         <TableHead>Day</TableHead>
-                        <TableHead>Shift</TableHead>
-                        <TableHead>Role</TableHead>
                         <TableHead>Leave Type</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Status</TableHead>
@@ -1268,32 +1267,7 @@ const fetchAllLeaves = async () => {
                                 {request.requester}
                               </TableCell>
                               <TableCell>
-                                <span className="font-semibold text-blue-700">
-                                  {request.livestream}
-                                </span>
-                              </TableCell>
-                              <TableCell>
                                 {request.day}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {request.shift} -{" "}
-                                    {shiftInfo?.name}
-                                  </span>
-                                  <span className="text-xs text-gray-600">
-                                    {shiftInfo?.time}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  className={getRoleBadgeColor(
-                                    request.role,
-                                  )}
-                                >
-                                  {request.role}
-                                </Badge>
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline">
