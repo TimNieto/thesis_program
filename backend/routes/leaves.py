@@ -109,6 +109,7 @@ def get_all_leaves():
                    MIN(date) as start_date,
                    MAX(date) as end_date,
                    leave_type,
+                    MAX(reason) as reason,
                    status
             FROM leaves
             GROUP BY request_id, employee_id, leave_type, status
@@ -124,7 +125,8 @@ def get_all_leaves():
                 "from": str(r[2]),
                 "to": str(r[3]),
                 "leave_type": r[4],
-                "status": r[5]
+                "reason": r[5],
+                "status": r[6]
             }
             for r in rows
         ]

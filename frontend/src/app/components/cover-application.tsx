@@ -191,7 +191,7 @@ export function CoverApplication({
         shift: "All",
         role: "Host", // can improve later
         leaveType: r.leave_type,
-        reason: "", // optional (not returned yet)
+        reason: r.reason || "—", // optional (not returned yet)
         status: r.status,
         submittedAt: new Date().toISOString()
       }))
@@ -224,7 +224,7 @@ const fetchAllLeaves = async () => {
         shift: "All",
         role: "Host",
         leaveType: r.leave_type,
-        reason: "", // optional for now
+        reason: r.reason || "—",
         status: r.status,
         submittedAt: new Date().toISOString()
       }))
@@ -273,11 +273,9 @@ const fetchAllLeaves = async () => {
     fetchMyShifts();
     fetchEmployees();
 
-    if (role === "admin") {
-      fetchAllLeaves();   // 🔥 admin view
-    } else {
-      fetchMyLeaves();    // 🔥 employee view
-    }
+    if (role !== "admin") {
+  fetchMyLeaves();
+}
   }, []);
 
   useEffect(() => {
