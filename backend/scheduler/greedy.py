@@ -12,13 +12,21 @@ def prepare_context(employees, shifts, availability, leaves, absences):
     """
     Converts raw DB data into fast lookup structures
     """
-    # availability_map:
-    # { employee_id: { "Monday": {is_available, preferred_shift} } }
-    availability_map = defaultdict(dict)
+    ##availability_map:
+    # { employee_id: { "monday": { "am": {is_available} } } }
+
+    availability_map = defaultdict(lambda: defaultdict(dict))
+
     for row in availability:
-        availability_map[row["employee_id"]][row["day_of_week"].lower()] = {
-            "is_available": row["is_available"],
-            "preferred_shift": row.get("preferred_shift")
+        if not row["preferred_shift"]:
+            continue  # skip nulls
+
+        emp_id = row["employee_id"]
+        day = row["day_of_week"].lower()
+        shift = row["preferred_shift"].lower()
+
+        availability_map[emp_id][day][shift] = {
+            "is_available": row["is_available"]
         }
 
     # leaves_map: { employee_id: set(date_str) }
