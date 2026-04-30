@@ -219,6 +219,7 @@ def get_generated_schedule():
     try:
         cursor.execute("""
             SELECT 
+                g.schedule_id,
                 s.shift_date,
                 s.shift_type,
                 s.account,
@@ -234,12 +235,13 @@ def get_generated_schedule():
 
         assignments = [
             {
-                "shift_date": r[0],
-                "shift_type": r[1],
-                "account": r[2],
-                "employee_id": r[3],
-                "employee_name": r[4],
-                "role": r[5]
+                "schedule_id": r[0],
+                "shift_date": r[1],
+                "shift_type": r[2],
+                "account": r[3],
+                "employee_id": r[4],
+                "employee_name": r[5],
+                "role": r[6]
             }
             for r in rows
         ]

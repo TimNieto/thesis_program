@@ -1,4 +1,6 @@
-import { useState } from "react";
+// src/app/components/cover-application.tsx
+
+import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Textarea } from "@/app/components/ui/textarea";
 import {
@@ -94,7 +96,10 @@ interface LeaveRequest {
 }
 
 interface CoverApplicationProps {
-  currentUser: string;
+  currentUser: {
+    employee_id: number;
+    name: string;
+  };
   role: string;
 }
 
@@ -155,32 +160,7 @@ export function CoverApplication({
     },
   ]);
 
-  const [coverRequests, setCoverRequests] = useState<
-    CoverRequest[]
-  >([
-    {
-      id: "1",
-      requester: "Sarah Johnson",
-      livestream: "Mommypoko",
-      day: "Wednesday",
-      shift: "NN",
-      role: "Host",
-      reason: "Medical appointment",
-      status: "pending",
-      submittedAt: "2026-01-25T10:30:00",
-    },
-    {
-      id: "2",
-      requester: "John Smith",
-      livestream: "Sofy",
-      day: "Thursday",
-      shift: "AM",
-      role: "Operator",
-      reason: "Family emergency",
-      status: "approved",
-      submittedAt: "2026-01-24T14:20:00",
-    },
-  ]);
+  const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
 
   const [leaveRequests, setLeaveRequests] = useState<
     LeaveRequest[]
@@ -210,6 +190,42 @@ export function CoverApplication({
       submittedAt: "2026-01-23T15:30:00",
     },
   ]);
+
+  const [myShifts, setMyShifts] = useState<any[]>([]);
+
+  const fetchCoverRequests = async () => {
+    try {
+      const res = await fetch("https://thesisprogram-production.up.railway.app/coverage-requests");
+      const data = await res.json();
+
+      console.log("COVER REQUESTS:", data);
+
+      setCoverRequests(
+        data.map((r: any) => ({
+          id: String(r.id),
+          requester: r.requester,
+          livestream: "N/A", // temporary (we improve later)
+          day: "N/A",
+          shift: r.shift,
+          role: r.role === "host" ? "Host" : "Operator",
+          reason: r.reason,
+          status: r.status,
+          submittedAt: new Date().toISOString()
+        }))
+      );
+
+    } catch (err) {
+      console.error("Failed to load cover requests", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyShifts();
+  }, []);
+
+  useEffect(() => {
+    fetchCoverRequests();
+  }, []);
 
   // Available shifts (mock data)
   const [availableShifts] = useState([
@@ -251,50 +267,31 @@ export function CoverApplication({
     },
   ]);
 
-  // My assigned shifts (mock data)
-  const myShifts = [
-    {
-      livestream: "Mommypoko",
-      day: "Monday",
-      shift: "AM",
-      role: "Host" as const,
-    },
-    {
-      livestream: "Mommypoko",
-      day: "Wednesday",
-      shift: "NN",
-      role: "Host" as const,
-    },
-    {
-      livestream: "Sofy",
-      day: "Tuesday",
-      shift: "PM",
-      role: "Operator" as const,
-    },
-    {
-      livestream: "Sofy",
-      day: "Friday",
-      shift: "AM",
-      role: "Operator" as const,
-    },
-  ];
 
   const [isApplicationDialogOpen, setIsApplicationDialogOpen] =
     useState(false);
+
   const [isCoverDialogOpen, setIsCoverDialogOpen] =
     useState(false);
+
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] =
     useState(false);
+
   const [selectedShift, setSelectedShift] = useState<{
-    livestream: string;
-    day: string;
-    shift: string;
-    role: "Host" | "Operator";
-  } | null>(null);
+  schedule_id: number;
+  livestream: string;
+  day: string;
+  shift: string;
+  role: "Host" | "Operator";
+} | null>(null);
+
   const [applicationReason, setApplicationReason] =
     useState("");
+
   const [coverReason, setCoverReason] = useState("");
+
   const [leaveReason, setLeaveReason] = useState("");
+
   const [leaveType, setLeaveType] = useState(LEAVE_TYPES[0]);
 
   // Standalone leave request states
@@ -303,37 +300,48 @@ export function CoverApplication({
     to: Date | undefined;
   }>({ from: undefined, to: undefined });
   const [standaloneLeaveReason, setStandaloneLeaveReason] = useState("");
+
   const [standaloneLeaveType, setStandaloneLeaveType] = useState(LEAVE_TYPES[0]);
 
-  const openApplicationDialog = (
-    livestream: string,
-    day: string,
-    shift: string,
-    role: "Host" | "Operator",
-  ) => {
-    setSelectedShift({ livestream, day, shift, role });
+  const openApplicationDialog = (slot: any) => {
+    setSelectedShift({
+      schedule_id: slot.schedule_id, // ⚠️ may be undefined for now (OK)
+      livestream: slot.livestream,
+      day: slot.day,
+      shift: slot.shift,
+      role: slot.role,
+    });
+
     setApplicationReason("");
     setIsApplicationDialogOpen(true);
   };
 
-  const openCoverDialog = (
-    livestream: string,
-    day: string,
-    shift: string,
-    role: "Host" | "Operator",
-  ) => {
-    setSelectedShift({ livestream, day, shift, role });
+  const openCoverDialog = (shiftObj: {
+    schedule_id: number;
+    livestream: string;
+    day: string;
+    shift: string;
+    role: "Host" | "Operator";
+  }) => {
+    if (!shiftObj.schedule_id) {
+      toast.error("Invalid shift");
+      return;
+    }
+
+    setSelectedShift(shiftObj);
     setCoverReason("");
     setIsCoverDialogOpen(true);
   };
 
-  const openLeaveDialog = (
-    livestream: string,
-    day: string,
-    shift: string,
-    role: "Host" | "Operator",
-  ) => {
-    setSelectedShift({ livestream, day, shift, role });
+  const openLeaveDialog = (slot: any) => {
+    setSelectedShift({
+      schedule_id: slot.schedule_id,
+      livestream: slot.livestream,
+      day: slot.day,
+      shift: slot.shift,
+      role: slot.role,
+    });
+
     setLeaveReason("");
     setLeaveType(LEAVE_TYPES[0]);
     setIsLeaveDialogOpen(true);
@@ -349,7 +357,7 @@ export function CoverApplication({
 
     const application: ShiftApplication = {
       id: Date.now().toString(),
-      applicant: currentUser,
+      applicant: currentUser.name,
       livestream: selectedShift.livestream,
       day: selectedShift.day,
       shift: selectedShift.shift,
@@ -366,31 +374,46 @@ export function CoverApplication({
     toast.success("Shift application submitted successfully");
   };
 
-  const submitCoverRequest = () => {
+  const submitCoverRequest = async () => {
     if (!selectedShift || !coverReason.trim()) {
-      toast.error(
-        "Please provide a reason for your cover request",
-      );
+      toast.error("Please provide a reason for your cover request");
       return;
     }
 
-    const request: CoverRequest = {
-      id: Date.now().toString(),
-      requester: currentUser,
-      livestream: selectedShift.livestream,
-      day: selectedShift.day,
-      shift: selectedShift.shift,
-      role: selectedShift.role,
-      reason: coverReason,
-      status: "pending",
-      submittedAt: new Date().toISOString(),
-    };
+    if (!selectedShift?.schedule_id) {
+      toast.error("Invalid shift");
+      return;
+    }
 
-    setCoverRequests([request, ...coverRequests]);
-    setIsCoverDialogOpen(false);
-    setCoverReason("");
-    setSelectedShift(null);
-    toast.success("Cover request submitted successfully");
+    try {
+
+      const scheduleId = selectedShift.schedule_id;
+
+      const res = await fetch(`https://thesisprogram-production.up.railway.app/request-cover/${scheduleId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: currentUser.employee_id,
+          reason: coverReason,
+        }),
+      });
+
+      const data = await res.json();
+
+      toast.success(data.message);
+
+      fetchCoverRequests();
+
+      setIsCoverDialogOpen(false);
+      setCoverReason("");
+      setSelectedShift(null);
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit request");
+    }
   };
 
   const submitLeaveRequest = () => {
@@ -403,7 +426,7 @@ export function CoverApplication({
 
     const request: LeaveRequest = {
       id: Date.now().toString(),
-      requester: currentUser,
+      requester: currentUser.name,
       livestream: selectedShift.livestream,
       day: selectedShift.day,
       shift: selectedShift.shift,
@@ -453,7 +476,7 @@ export function CoverApplication({
     // Mock data - in a real app, this would create requests for each day in the range
     const request: LeaveRequest = {
       id: Date.now().toString(),
-      requester: currentUser,
+      requester: currentUser.name,
       livestream: "All Streams", // Indicating all assigned shifts
       day: dateRangeDisplay,
       shift: "All", // All shifts for the selected dates
@@ -494,16 +517,25 @@ export function CoverApplication({
     toast.success(`Application ${status}`);
   };
 
-  const updateCoverStatus = (
-    id: string,
-    status: "approved" | "denied",
-  ) => {
-    setCoverRequests(
-      coverRequests.map((req) =>
-        req.id === id ? { ...req, status } : req,
-      ),
-    );
-    toast.success(`Cover request ${status}`);
+  const updateCoverStatus = async (id: string, status: "approved" | "denied") => {
+    try {
+      const endpoint =
+        status === "approved"
+          ? `/coverage-requests/${id}/approve`
+          : `/coverage-requests/${id}/deny`;
+
+      await fetch(`https://thesisprogram-production.up.railway.app${endpoint}`, {
+        method: "POST",
+      });
+
+      // refresh data after update
+      fetchCoverRequests();
+
+      toast.success(`Cover request ${status}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update request");
+    }
   };
 
   const updateLeaveStatus = (
@@ -566,6 +598,30 @@ export function CoverApplication({
 
   const getShiftInfo = (code: string) => {
     return SHIFTS.find((s) => s.code === code);
+  };
+
+  const fetchMyShifts = async () => {
+    try {
+      const res = await fetch("https://thesisprogram-production.up.railway.app/generated-schedule")
+      const data = await res.json();
+
+      console.log("SCHEDULE DATA:", data.assignments);
+
+      setMyShifts(
+        (data.assignments || [])
+          .filter((s: any) => s.employee_id === currentUser.employee_id)
+          .map((s: any) => ({
+            schedule_id: s.schedule_id,  // 🔥 THIS FIXES EVERYTHING
+            livestream: s.account,
+            day: new Date(s.shift_date).toLocaleDateString("en-US", { weekday: "long" }),
+            shift: s.shift_type,
+            role: s.role === "host" ? "Host" : "Operator"
+          }))
+      );
+
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -653,14 +709,7 @@ export function CoverApplication({
                               </div>
                             </div>
                             <Button
-                              onClick={() =>
-                                openApplicationDialog(
-                                  slot.livestream,
-                                  slot.day,
-                                  slot.shift,
-                                  slot.role,
-                                )
-                              }
+                              onClick={() => openApplicationDialog(slot)}
                               className="w-full"
                               size="sm"
                             >
@@ -728,14 +777,7 @@ export function CoverApplication({
                               </div>
                             </div>
                             <Button
-                              onClick={() =>
-                                openCoverDialog(
-                                  slot.livestream,
-                                  slot.day,
-                                  slot.shift,
-                                  slot.role,
-                                )
-                              }
+                              onClick={() => openCoverDialog(slot)}
                               variant="outline"
                               className="w-full"
                               size="sm"
@@ -907,7 +949,7 @@ export function CoverApplication({
                         .filter(
                           (app) =>
                             role === "admin" ||
-                            app.applicant === currentUser,
+                            app.applicant === currentUser.name
                         )
                         .map((application) => {
                           const shiftInfo = getShiftInfo(
@@ -1041,7 +1083,7 @@ export function CoverApplication({
                         .filter(
                           (req) =>
                             role === "admin" ||
-                            req.requester === currentUser,
+                            req.requester === currentUser.name
                         )
                         .map((request) => {
                           const shiftInfo = getShiftInfo(
@@ -1176,7 +1218,7 @@ export function CoverApplication({
                         .filter(
                           (req) =>
                             role === "admin" ||
-                            req.requester === currentUser,
+                            req.requester === currentUser.name
                         )
                         .map((request) => {
                           const shiftInfo = getShiftInfo(

@@ -147,7 +147,10 @@ export default function App() {
 
           <TabsContent value="cover">
             <CoverApplication
-              currentUser={user.email}
+              currentUser={{
+                employee_id: user.id,
+                name: user.name
+              }}
               role={user.role}
             />
           </TabsContent>
