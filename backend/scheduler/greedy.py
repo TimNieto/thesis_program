@@ -1,7 +1,12 @@
 # backend/scheduler/greedy.py
 
 from collections import defaultdict
-from scheduler.constraints import is_valid_candidate
+from scheduler.constraints import (
+    is_valid_candidate,
+    is_available,
+    is_on_leave,
+    is_absent
+)
 
 
 # -------------------------------
@@ -319,21 +324,34 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
     print("ABSENCES:", len(absences))
 
     # 5. Candidate test (CRITICAL)
-    print("\n--- CANDIDATE CHECK ---")
-    for shift in shifts[:10]:
-        host_candidates = [
-            e for e in employees
-            if is_valid_candidate(e, shift, "host", context)
-        ]
-        op_candidates = [
-            e for e in employees
-            if is_valid_candidate(e, shift, "operator", context)
-        ]
+    print("\n========== CANDIDATE DEBUG ==========")
 
-        print("SHIFT:", shift["shift_date"], shift["shift_type"])
-        print("HOST CANDIDATES:", len(host_candidates))
-        print("OPERATOR CANDIDATES:", len(op_candidates))
-        print("-----")
+    for shift in shifts[:5]:  # keep small to avoid log spam
+        print(f"\nSHIFT: {shift['shift_date']} {shift['shift_type']}")
+
+        for e in employees:
+            emp_id = e["employee_id"]
+
+            print(f"\nEMP {emp_id} ({e['full_name']})")
+
+            # role check (test both roles)
+            print("Roles:",
+                "Host" if e.get("can_be_host") else "",
+                "Operator" if e.get("can_be_operator") else "")
+
+            if not is_available(emp_id, shift, context["availability_map"]):
+                print("❌ availability fail")
+                continue
+
+            if is_on_leave(emp_id, shift["shift_date"], context["leaves_map"]):
+                print("❌ on leave")
+                continue
+
+            if is_absent(emp_id, shift["shift_date"], context["absences_map"]):
+                print("❌ absent")
+                continue
+
+            print("✅ VALID")
 
     print("========== END DEBUG ==========")
 
