@@ -3,6 +3,7 @@
 from db.database import get_connection
 from scheduler.greedy import generate_schedule
 from collections import defaultdict
+from datetime import datetime, timedelta
 
 
 # -------------------------------
@@ -28,16 +29,25 @@ def fetch_employees(cursor):
         for r in rows
     ]
 
+def get_next_week_range():
+    today = datetime.today()
+
+    days_ahead = 7 - today.weekday()  # Monday = 0
+    next_monday = today + timedelta(days=days_ahead)
+    next_sunday = next_monday + timedelta(days=6)
+
+    return next_monday.date(), next_sunday.date()
 
 def fetch_shifts(cursor):
+    start_date, end_date = get_next_week_range()
+
     cursor.execute("""
-    SELECT shift_id, shift_date, account, shift_type,
-           required_host_count, required_operator_count
-    FROM shifts
-    WHERE shift_date BETWEEN '2026-01-01' AND '2026-01-31'
-    
-""")
-     #
+        SELECT shift_id, shift_date, account, shift_type,
+               required_host_count, required_operator_count
+        FROM shifts
+        WHERE shift_date BETWEEN %s AND %s
+        ORDER BY shift_date
+    """, (start_date, end_date))
 
     rows = cursor.fetchall()
 
@@ -45,7 +55,7 @@ def fetch_shifts(cursor):
         {
             "shift_id": r[0],
             "shift_date": r[1],
-            "account": r[2],  # 🔥 ADD THIS
+            "account": r[2],
             "shift_type": r[3],
             "required_host_count": r[4] or 0,
             "required_operator_count": r[5] or 0
@@ -162,6 +172,8 @@ def generate_weekly_schedule():
     cursor = conn.cursor()
 
     try:
+        ensure_next_week_shifts(cursor)
+        conn.commit()
         # Fetch all data
         employees = fetch_employees(cursor)
         shifts = fetch_shifts(cursor)
@@ -177,6 +189,13 @@ def generate_weekly_schedule():
             leaves,
             absences
         )
+
+        # -------------------------------
+        # RESET OLD DATA
+        # -------------------------------
+
+        # 🧹 delete ALL cover requests (IMPORTANT)
+        cursor.execute("DELETE FROM coverage_requests")
 
         # -------------------------------
         # SAVE GENERATED SCHEDULE (DRAFT)
@@ -258,3 +277,47 @@ def get_generated_schedule():
     finally:
         cursor.close()
         conn.close()
+
+def ensure_next_week_shifts(cursor):
+    from datetime import datetime, timedelta
+
+    today = datetime.today()
+    days_ahead = 7 - today.weekday()
+    next_monday = today + timedelta(days=days_ahead)
+
+    # 1. Get template week (January)
+    cursor.execute("""
+        SELECT shift_date, account, shift_type,
+               start_time, end_time,
+               required_host_count, required_operator_count
+        FROM shifts
+        WHERE shift_date BETWEEN '2026-01-01' AND '2026-01-07'
+        ORDER BY shift_date
+    """)
+
+    template = cursor.fetchall()
+
+    # 2. Insert real shifts for next week
+    for i, row in enumerate(template):
+        _, account, shift_type, start_time, end_time, host_count, op_count = row
+
+        new_date = (next_monday + timedelta(days=i)).date()
+
+        cursor.execute("""
+            INSERT INTO shifts (
+                shift_date, account, shift_type,
+                start_time, end_time,
+                required_host_count, required_operator_count
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (shift_date, account, shift_type) DO NOTHING
+        """, (
+            new_date,
+            account,
+            shift_type,
+            start_time,
+            end_time,
+            host_count,
+            op_count
+        ))
+

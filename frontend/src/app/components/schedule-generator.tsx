@@ -13,6 +13,9 @@ import { toast } from "sonner";
 
 interface ShiftAssignment {
   id: string;
+  schedule_id?: number;
+  shift_id?: number;
+  employee_id?: number;
   livestream: string;
   day: string;
   shift: string;
@@ -130,6 +133,9 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
             (roles.host || []).forEach((emp: any) => {
               transformed.push({
                 id: `${livestream}-${day}-${shift}-host-${emp.employee_id}`,
+                schedule_id: emp.schedule_id,
+                shift_id: emp.shift_id,
+                employee_id: emp.employee_id,
                 livestream,
                 day,
                 shift,
@@ -141,6 +147,9 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
             (roles.operator || []).forEach((emp: any) => {
               transformed.push({
                 id: `${livestream}-${day}-${shift}-operator-${emp.employee_id}`,
+                schedule_id: emp.schedule_id,
+                shift_id: emp.shift_id,
+                employee_id: emp.employee_id,
                 livestream,
                 day,
                 shift,
@@ -325,6 +334,9 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
             (shiftData.host || []).forEach((emp: any) => {
               transformed.push({
                 id: String(idCounter++),
+                shift_id: emp.shift_id,
+                employee_id: emp.employee_id,
+                schedule_id: emp.schedule_id,
                 livestream,
                 day,
                 shift: shift.code,
@@ -337,6 +349,9 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
             (shiftData.operator || []).forEach((emp: any) => {
               transformed.push({
                 id: String(idCounter++),
+                shift_id: emp.shift_id,
+                employee_id: emp.employee_id,
+                schedule_id: emp.schedule_id,
                 livestream,
                 day,
                 shift: shift.code,
@@ -363,6 +378,23 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate schedule");
+    }
+  };
+
+  const saveSchedule = async () => {
+    try {
+      await fetch("https://thesisprogram-production.up.railway.app/save-schedule", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(assignments),
+      });
+
+      toast.success("Schedule saved");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save");
     }
   };
 
@@ -403,10 +435,16 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
           
           <Badge variant="secondary">{role}</Badge>
           {role === "admin" && (
-            <Button onClick={generateSchedule} className="gap-2">
-              Generate Schedule
-          </Button>
-  )}
+            <>
+              <Button onClick={generateSchedule} className="gap-2">
+                Generate Schedule
+              </Button>
+
+              <Button onClick={saveSchedule} variant="secondary">
+                Save Changes
+              </Button>
+            </>
+          )}
           <Button onClick={exportSchedule} variant="outline" className="gap-2">
             <Download className="size-4" />
             Export CSV

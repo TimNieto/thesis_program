@@ -157,3 +157,25 @@ def deny_request(id: int):
     conn.close()
 
     return {"message": "Denied"}
+
+@router.post("/save-schedule")
+def save_schedule(assignments: list):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM generated_schedule")
+
+        for a in assignments:
+            cursor.execute("""
+                INSERT INTO generated_schedule (shift_id, employee_id, role)
+                VALUES (%s, %s, %s)
+            """, (a["shift_id"], a["employee_id"], a["role"]))
+
+        conn.commit()
+
+        return {"message": "Schedule saved"}
+
+    finally:
+        cursor.close()
+        conn.close()
