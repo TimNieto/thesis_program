@@ -160,3 +160,36 @@ def update_leave_status(request_id: str, payload: dict):
     finally:
         cursor.close()
         conn.close()
+
+@router.get("/leaves/approved")
+def get_approved_leaves(start: str, end: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT employee_id,
+                   date,
+                   leave_type,
+                   reason
+            FROM leaves
+            WHERE status = 'approved'
+              AND date BETWEEN %s AND %s
+            ORDER BY employee_id, date
+        """, (start, end))
+
+        rows = cursor.fetchall()
+
+        return [
+            {
+                "employee_id": r[0],
+                "date": str(r[1]),
+                "leave_type": r[2],
+                "reason": r[3]
+            }
+            for r in rows
+        ]
+
+    finally:
+        cursor.close()
+        conn.close()
