@@ -285,39 +285,40 @@ def ensure_next_week_shifts(cursor):
     days_ahead = 7 - today.weekday()
     next_monday = today + timedelta(days=days_ahead)
 
-    # 1. Get template week (January)
+    # 🔥 Get ONE DAY TEMPLATE ONLY (Jan 1)
     cursor.execute("""
-        SELECT shift_date, account, shift_type,
+        SELECT account, shift_type,
                start_time, end_time,
                required_host_count, required_operator_count
         FROM shifts
-        WHERE shift_date BETWEEN '2026-01-01' AND '2026-01-07'
-        ORDER BY shift_date
+        WHERE shift_date = '2026-01-01'
+        ORDER BY account, shift_type
     """)
 
     template = cursor.fetchall()
 
-    # 2. Insert real shifts for next week
-    for i, row in enumerate(template):
-        _, account, shift_type, start_time, end_time, host_count, op_count = row
+    # 🔁 Loop 7 days (Mon → Sun)
+    for day_offset in range(7):
+        new_date = (next_monday + timedelta(days=day_offset)).date()
 
-        new_date = (next_monday + timedelta(days=i)).date()
+        for row in template:
+            account, shift_type, start_time, end_time, host_count, op_count = row
 
-        cursor.execute("""
-            INSERT INTO shifts (
-                shift_date, account, shift_type,
-                start_time, end_time,
-                required_host_count, required_operator_count
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (shift_date, account, shift_type) DO NOTHING
-        """, (
-            new_date,
-            account,
-            shift_type,
-            start_time,
-            end_time,
-            host_count,
-            op_count
-        ))
+            cursor.execute("""
+                INSERT INTO shifts (
+                    shift_date, account, shift_type,
+                    start_time, end_time,
+                    required_host_count, required_operator_count
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (shift_date, account, shift_type) DO NOTHING
+            """, (
+                new_date,
+                account,
+                shift_type,
+                start_time,
+                end_time,
+                host_count,
+                op_count
+            ))
 
