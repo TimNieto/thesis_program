@@ -300,60 +300,50 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
 
     # ================= DEBUG START =================
 
-    print("========== DEBUG INFO ==========")
+    print("\n========== GLOBAL DEBUG START ==========")
 
-    # 1. Employees
-    print("TOTAL EMPLOYEES:", len(employees))
-    hosts = [e for e in employees if e.get("can_be_host")]
-    operators = [e for e in employees if e.get("can_be_operator")]
-    print("HOSTS:", len(hosts))
-    print("OPERATORS:", len(operators))
-
-    # 2. Shifts sample
-    print("\n--- SAMPLE SHIFTS ---")
-    for s in shifts[:5]:
-        print(s)
-
-    # 3. Availability sample
-    print("\n--- SAMPLE AVAILABILITY ---")
-    for a in availability[:10]:
-        print(a)
-
-    # 4. Leaves / Absences
-    print("\nLEAVES:", len(leaves))
-    print("ABSENCES:", len(absences))
-
-    # 5. Candidate test (CRITICAL)
-    print("\n========== CANDIDATE DEBUG ==========")
-
-    for shift in shifts[:5]:  # keep small to avoid log spam
+    for shift in shifts[:10]:  # limit to avoid spam
         print(f"\nSHIFT: {shift['shift_date']} {shift['shift_type']}")
+
+        total = len(employees)
+        role_pass = 0
+        availability_pass = 0
+        leave_pass = 0
+        assignment_pass = 0
+        final_valid = 0
 
         for e in employees:
             emp_id = e["employee_id"]
 
-            print(f"\nEMP {emp_id} ({e['full_name']})")
+            # 1. ROLE CHECK
+            if not (e.get("can_be_host") or e.get("can_be_operator")):
+                continue
+            role_pass += 1
 
-            # role check (test both roles)
-            print("Roles:",
-                "Host" if e.get("can_be_host") else "",
-                "Operator" if e.get("can_be_operator") else "")
-
+            # 2. AVAILABILITY
             if not is_available(emp_id, shift, context["availability_map"]):
-                print("❌ availability fail")
                 continue
+            availability_pass += 1
 
+            # 3. LEAVE / ABSENCE
             if is_on_leave(emp_id, shift["shift_date"], context["leaves_map"]):
-                print("❌ on leave")
                 continue
-
             if is_absent(emp_id, shift["shift_date"], context["absences_map"]):
-                print("❌ absent")
                 continue
+            leave_pass += 1
 
-            print("✅ VALID")
+            # 4. (skip assignment rules — not meaningful yet)
+            assignment_pass = leave_pass
+            final_valid = leave_pass
 
-    print("========== END DEBUG ==========")
+        print(f"TOTAL EMPLOYEES: {total}")
+        print(f"AFTER ROLE FILTER: {role_pass}")
+        print(f"AFTER AVAILABILITY: {availability_pass}")
+        print(f"AFTER LEAVE/ABSENCE: {leave_pass}")
+        print(f"AFTER ASSIGNMENT RULES: {assignment_pass}")
+        print(f"FINAL VALID CANDIDATES: {final_valid}")
+
+    print("\n========== GLOBAL DEBUG END ==========")
 
     # ================= DEBUG END =================
 
