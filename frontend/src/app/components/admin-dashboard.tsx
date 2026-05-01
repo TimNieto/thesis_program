@@ -409,10 +409,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
 
 
-const openAvailabilityDialog = (employee: Employee) => {
+const openAvailabilityDialog = (
+  employee: Employee,
+  openDialog: boolean = true
+) => {
   setSelectedEmployeeForAvailability(employee);
-  setIsAvailabilityDialogOpen(true);
-  fetchAvailability();
+
+  if (openDialog) {
+    setIsAvailabilityDialogOpen(true);
+  }
+
+  fetchAvailability(); // pass id directly if possible
 };
 
   // Statistics
@@ -681,7 +688,17 @@ const openAvailabilityDialog = (employee: Employee) => {
                 <div className="w-64">
                   <Select
                     value={selectedEmployeeForDayOff?.toString() || ""}
-                    onValueChange={(value) => setSelectedEmployeeForDayOff(Number(value))}
+                    onValueChange={(value) => {
+                      const employeeId = Number(value);
+
+                      setSelectedEmployeeForDayOff(employeeId);
+
+                      const employee = employees.find(e => e.id === employeeId);
+
+                      if (employee) {
+                        openAvailabilityDialog(employee, false); // 👈 KEY LINE
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select an employee" />
