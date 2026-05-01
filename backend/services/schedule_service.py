@@ -190,6 +190,7 @@ def generate_weekly_schedule():
             cursor.execute("""
                 INSERT INTO generated_schedule (shift_id, employee_id, role)
                 VALUES (%s, %s, %s)
+                ON CONFLICT (shift_id, employee_id, role) DO NOTHING
             """, (
                 a["shift_id"],
                 a["employee_id"],
