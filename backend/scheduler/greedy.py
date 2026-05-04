@@ -33,7 +33,7 @@ def prepare_context(employees, shifts, availability, leaves, absences):
         availability_map[emp_id][day][shift] = {
             "is_available": row["is_available"]
         }
-        
+
 
     # leaves_map: { employee_id: set(date_str) }
     leaves_map = leaves   # 👈 already a map
@@ -64,6 +64,8 @@ def prepare_context(employees, shifts, availability, leaves, absences):
     context["employee_map"] = {
         e["employee_id"]: e for e in employees
     }
+
+    print("\n🔥 LEAVES MAP:", context["leaves_map"])
 
     return context
 
