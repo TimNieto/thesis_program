@@ -100,6 +100,20 @@ def fetch_leaves(cursor):
         for r in rows
     ]
 
+def build_leaves_map(leaves):
+    leaves_map = {}
+
+    for l in leaves:
+        emp_id = l["employee_id"]
+        date = l["date"]
+
+        if emp_id not in leaves_map:
+            leaves_map[emp_id] = set()
+
+        leaves_map[emp_id].add(date)
+
+    return leaves_map
+
 
 def fetch_absences(cursor):
     cursor.execute("""
@@ -179,6 +193,7 @@ def generate_weekly_schedule():
         shifts = fetch_shifts(cursor)
         availability = fetch_availability(cursor)
         leaves = fetch_leaves(cursor)
+        leaves_map = build_leaves_map(leaves)
         absences = fetch_absences(cursor)
 
         # Run scheduler
@@ -186,7 +201,7 @@ def generate_weekly_schedule():
             employees,
             shifts,
             availability,
-            leaves,
+            leaves_map,
             absences
         )
 
