@@ -21,7 +21,7 @@ def generate_schedule():
 
     except Exception as e:
         print("ERROR generating schedule:", e)
-        raise HTTPException(status_code=500, detail="Failed to generate schedule")
+        raise HTTPException(status_code=500, detail=str(e)) 
     
 @router.get("/generated-schedule")
 def get_schedule():
