@@ -194,7 +194,8 @@ def generate_weekly_schedule():
         availability = fetch_availability(cursor)
         leaves = fetch_leaves(cursor)
         leaves_map = build_leaves_map(leaves)
-        absences = fetch_absences(cursor)
+        absences_map = {}
+        #absences = fetch_absences(cursor)
 
         # Run scheduler
         result = generate_schedule(
@@ -202,7 +203,8 @@ def generate_weekly_schedule():
             shifts,
             availability,
             leaves_map,
-            absences
+            absences_map   
+           # absences
         )
 
         # -------------------------------
