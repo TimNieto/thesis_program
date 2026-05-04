@@ -68,7 +68,7 @@ def is_on_leave(employee_id, shift_date, leaves_map):
     }
     """
     if isinstance(shift_date, datetime):
-        shift_date = shift_date.strftime("%Y-%m-%d")
+        shift_date = normalize_date(shift_date)
 
     return shift_date in leaves_map.get(employee_id, set())
 
