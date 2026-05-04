@@ -174,7 +174,7 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
 
   // Get date range for week based on offset
   const getWeekDates = (offset: number = 0) => {
-    const today = new Date(2026, 3, 9); // April 9, 2026 (Thursday)
+    const today = new Date();
     const currentDay = today.getDay() || 7; // Make Sunday = 7 instead of 0
     const mondayOffset = currentDay === 1 ? 0 : -(currentDay - 1);
     const monday = new Date(today);
@@ -419,9 +419,9 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
   };
 
   const weekDates = React.useMemo(
-      () => getWeekDates(leaveWeekOffset),
-      [leaveWeekOffset]
-    );
+    () => getWeekDates(1), // 👈 FORCE NEXT WEEK
+    []
+  );
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
 
   return (
@@ -529,14 +529,21 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
                           <th className="border border-gray-300 bg-gray-100 p-3 text-center font-semibold min-w-[80px]">
                             Role
                           </th>
-                          {DAYS.map((day) => (
-                            <th
-                              key={day}
-                              className="border border-gray-300 bg-gray-100 p-3 text-center font-semibold min-w-[120px]"
-                            >
-                              {day}
-                            </th>
-                          ))}
+                          {DAYS.map((day, index) => (
+                          <th
+                            key={day}
+                            className="border border-gray-300 bg-gray-100 p-3 text-center font-semibold min-w-[120px]"
+                          >
+                            <div>{day}</div>
+                            <div className="text-xs text-gray-600">
+                              {weekDates[index].toLocaleDateString("en-US", {
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </div>
+                          </th>
+                        ))}
                         </tr>
                       </thead>
                       <tbody>
