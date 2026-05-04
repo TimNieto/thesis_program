@@ -168,11 +168,13 @@ def get_approved_leaves(start: str, end: str):
 
     try:
         cursor.execute("""
-            SELECT employee_id,
-                   date,
-                   leave_type,
-                   reason
-            FROM leaves
+            SELECT l.employee_id,
+                    e.full_name,
+                    l.date,
+                    l.leave_type,
+                    l.reason
+            FROM leaves l
+            JOIN employees e ON l.employee_id = e.employee_id
             WHERE status = 'approved'
               AND date >= %s::date
               AND date <= %s::date
@@ -184,12 +186,13 @@ def get_approved_leaves(start: str, end: str):
         return [
             {
                 "employee_id": r[0],
-                "date": str(r[1]),
-                "leave_type": r[2],
-                "reason": r[3]
+                "employee_name": r[1],
+                "date": str(r[2]),
+                "leave_type": r[3],
+                "reason": r[4]
             }
             for r in rows
-        ]
+]
 
     finally:
         cursor.close()
