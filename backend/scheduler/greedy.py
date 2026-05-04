@@ -35,9 +35,7 @@ def prepare_context(employees, shifts, availability, leaves, absences):
         }
 
     # leaves_map: { employee_id: set(date_str) }
-    leaves_map = defaultdict(set)
-    for emp_id, date in leaves:
-        leaves_map[emp_id].add(str(date))
+    leaves_map = leaves   # 👈 already a map
 
     # absences_map: same structure
     absences_map = defaultdict(set)
