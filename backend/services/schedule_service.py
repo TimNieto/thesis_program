@@ -198,6 +198,17 @@ def generate_weekly_schedule():
            # absences
         )
 
+        # ✅ BUILD LOOKUP
+        employee_lookup = {
+            e["employee_id"]: e["full_name"]
+            for e in employees
+        }
+
+        # ✅ ATTACH NAMES TO ASSIGNMENTS
+        for a in result["assignments"]:
+            emp_id = a["employee_id"]
+            a["employee_name"] = employee_lookup.get(emp_id, f"Employee {emp_id}")
+
         # -------------------------------
         # RESET OLD DATA
         # -------------------------------
