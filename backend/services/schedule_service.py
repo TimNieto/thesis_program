@@ -197,7 +197,7 @@ def generate_weekly_schedule():
             absences_map   
            # absences
         )
-
+ 
         # ✅ BUILD LOOKUP
         employee_lookup = {
             e["employee_id"]: e["full_name"]
