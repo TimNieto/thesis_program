@@ -46,7 +46,7 @@ const SHIFTS = [
 ];
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const LIVESTREAMS = ["Mommypoko", "Sofy"];
+const LIVESTREAMS = ["Mommypoko", "Sofy", "Shopee"];
 const ROLES = ["Host", "Operator"] as const;
 
 export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps) {

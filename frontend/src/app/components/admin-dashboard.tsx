@@ -92,7 +92,7 @@ const SHIFTS = [
 ];
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const LIVESTREAMS = ["Mommypoko", "Sofy"];
+const LIVESTREAMS = ["Mommypoko", "Sofy", "Shopee"];
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);

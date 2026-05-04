@@ -119,7 +119,7 @@ const DAYS = [
   "Saturday",
   "Sunday",
 ];
-const LIVESTREAMS = ["Mommypoko", "Sofy"];
+const LIVESTREAMS = ["Mommypoko", "Sofy", "Shopee"];
 const ROLES = ["Host", "Operator"] as const;
 const LEAVE_TYPES = [
   "Sick Leave",
