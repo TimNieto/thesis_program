@@ -52,35 +52,7 @@ const ROLES = ["Host", "Operator"] as const;
 export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps) {
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
 
-  const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([
-    {
-      id: "1",
-      employee: "John Smith",
-      leaveType: "Sick Leave",
-      startDate: "2026-04-14", // Monday
-      endDate: "2026-04-16", // Wednesday
-      status: "approved",
-      reason: "Medical appointment",
-    },
-    {
-      id: "2",
-      employee: "Sarah Johnson",
-      leaveType: "Annual Leave",
-      startDate: "2026-04-15", // Tuesday
-      endDate: "2026-04-15", // Tuesday
-      status: "approved",
-      reason: "Personal matters",
-    },
-    {
-      id: "3",
-      employee: "Mike Davis",
-      leaveType: "Annual Leave",
-      startDate: "2026-04-21", // Next week Monday
-      endDate: "2026-04-23", // Next week Wednesday
-      status: "approved",
-      reason: "Vacation",
-    },
-  ]);
+  const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([]);
   
     const formatDate = (date: Date) => {
     const year = date.getFullYear();
@@ -88,6 +60,22 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+
+  const getWeekDates = (offset: number = 0) => {
+  const today = new Date();
+  const currentDay = today.getDay() || 7;
+  const mondayOffset = currentDay === 1 ? 0 : -(currentDay - 1);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + mondayOffset + (offset * 7));
+
+  const dates: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    dates.push(date);
+  }
+  return dates;
+};
 
   const leaveMap = React.useMemo(() => {
       const map = new Map<string, LeaveRequest[]>();
@@ -172,22 +160,43 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
   loadSchedule();
 }, []);
 
-  // Get date range for week based on offset
-  const getWeekDates = (offset: number = 0) => {
-    const today = new Date();
-    const currentDay = today.getDay() || 7; // Make Sunday = 7 instead of 0
-    const mondayOffset = currentDay === 1 ? 0 : -(currentDay - 1);
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + mondayOffset + (offset * 7));
-    
-    const dates: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
-  };
+const weekDates = React.useMemo(
+  () => getWeekDates(leaveWeekOffset),
+  [leaveWeekOffset]
+);
+
+useEffect(() => {
+  fetchApprovedLeaves();
+}, [weekDates]);
+
+
+  const fetchApprovedLeaves = async () => {
+  try {
+    const start = weekDates[0];
+    const end = weekDates[6];
+
+    const res = await fetch(
+      `https://thesisprogram-production.up.railway.app/leaves-approved?start=${formatDate(start)}&end=${formatDate(end)}`
+    );
+
+    const data = await res.json();
+
+    const mapped: LeaveRequest[] = data.map((l: any) => ({
+      id: `${l.employee_id}-${l.date}`,
+      employee: l.employee_name,
+      leaveType: l.leave_type,
+      startDate: l.date,
+      endDate: l.date,
+      status: "approved",
+      reason: l.reason
+    }));
+
+    setApprovedLeaves(mapped);
+
+  } catch (err) {
+    console.error("Failed to fetch leaves", err);
+  }
+};
 
 
   const isEmployeeOnLeave = (employeeName: string, date: Date) => {
@@ -418,10 +427,6 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
     return colors[shift as keyof typeof colors] || "text-gray-700";
   };
 
-  const weekDates = React.useMemo(
-    () => getWeekDates(1), // 👈 FORCE NEXT WEEK
-    []
-  );
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
 
   return (
@@ -746,11 +751,11 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
                 </table>
 
                 {/* Show message if no leaves */}
-                {!approvedLeaves.some(leave => {
-                  const startDate = new Date(leave.startDate);
-                  const endDate = new Date(leave.endDate);
-                  return weekDates.some(date => date >= startDate && date <= endDate);
-                }) && (
+                {!approvedLeaves.some(leave =>
+                  weekDates.some(date =>
+                    formatDate(date) === leave.startDate
+                  )
+                ) && (
                   <div className="text-center py-8 text-gray-500">
                     No approved leaves for {weekLabel.toLowerCase()}
                   </div>
