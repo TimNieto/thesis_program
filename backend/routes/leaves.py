@@ -161,7 +161,7 @@ def update_leave_status(request_id: str, payload: dict):
         cursor.close()
         conn.close()
 
-@router.get("/leaves/approved")
+@router.get("/leaves-approved")
 def get_approved_leaves(start: str, end: str):
     conn = get_connection()
     cursor = conn.cursor()
