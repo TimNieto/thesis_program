@@ -87,30 +87,21 @@ def fetch_leaves(cursor):
     cursor.execute("""
         SELECT employee_id, date
         FROM leaves
-        WHERE status = 'approved'
+        WHERE LOWER(status) = 'approved'
     """)
-
-    rows = cursor.fetchall()
-
-    return [
-        {
-            "employee_id": r[0],
-            "date": str(r[1])
-        }
-        for r in rows
-    ]
+    return cursor.fetchall()   # returns tuples
 
 def build_leaves_map(leaves):
     leaves_map = {}
 
-    for l in leaves:
-        emp_id = l["employee_id"]
-        date = l["date"]
+    for emp_id, date in leaves:   # 👈 unpack tuple
+
+        date_str = str(date)
 
         if emp_id not in leaves_map:
             leaves_map[emp_id] = set()
 
-        leaves_map[emp_id].add(date)
+        leaves_map[emp_id].add(date_str)
 
     return leaves_map
 
