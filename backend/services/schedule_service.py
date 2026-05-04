@@ -207,13 +207,22 @@ def generate_weekly_schedule():
         # insert new generated schedule
         for a in result["assignments"]:
             cursor.execute("""
-                INSERT INTO generated_schedule (shift_id, employee_id, role)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (shift_id, employee_id, role) DO NOTHING
+                INSERT INTO generated_schedule (
+                    shift_id,
+                    employee_id,
+                    role,
+                    shift_date,
+                    shift_type,
+                    account
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (
                 a["shift_id"],
                 a["employee_id"],
-                a["role"]
+                a["role"],
+                a["shift_date"],   # ✅ ADD THIS
+                a["shift_type"],   # ✅ ADD THIS
+                a["account"]       # ✅ ADD THIS
             ))
 
         conn.commit()

@@ -168,9 +168,23 @@ def save_schedule(assignments: list):
 
         for a in assignments:
             cursor.execute("""
-                INSERT INTO generated_schedule (shift_id, employee_id, role)
-                VALUES (%s, %s, %s)
-            """, (a["shift_id"], a["employee_id"], a["role"]))
+                INSERT INTO generated_schedule (
+                    shift_id,
+                    employee_id,
+                    role,
+                    shift_date,
+                    shift_type,
+                    account
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                a["shift_id"],
+                a["employee_id"],
+                a["role"],
+                a["shift_date"],
+                a["shift_type"],
+                a["account"]
+            ))
 
         conn.commit()
 
