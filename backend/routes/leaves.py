@@ -174,7 +174,8 @@ def get_approved_leaves(start: str, end: str):
                    reason
             FROM leaves
             WHERE status = 'approved'
-              AND date BETWEEN %s AND %s
+              AND date >= %s::date
+              AND date <= %s::date
             ORDER BY employee_id, date
         """, (start, end))
 
