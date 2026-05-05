@@ -5,7 +5,10 @@ from scheduler.constraints import (
     is_valid_candidate,
     is_available,
     is_on_leave,
-    is_absent
+    is_absent,
+    already_assigned,
+    already_assigned_same_time,
+    assigned_count_same_day
 )
 
 
@@ -303,46 +306,61 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
 
     print("\n========== GLOBAL DEBUG START ==========")
 
-    for shift in shifts[:10]:  # limit to avoid spam
-        print(f"\nSHIFT: {shift['shift_date']} {shift['shift_type']}")
+    for shift in shifts[:10]:  # limit if needed
+        print(f"\n🔎 SHIFT: {shift['shift_date']} {shift['shift_type']}")
 
-        total = len(employees)
-        role_pass = 0
-        availability_pass = 0
-        leave_pass = 0
-        assignment_pass = 0
-        final_valid = 0
+        reasons = {
+            "role_fail": 0,
+            "availability_fail": 0,
+            "leave_fail": 0,
+            "absence_fail": 0,
+            "already_assigned": 0,
+            "same_time_conflict": 0,
+            "max_shift_day": 0,
+            "valid": 0
+        }
 
         for e in employees:
             emp_id = e["employee_id"]
 
-            # 1. ROLE CHECK
+            # ROLE
             if not (e.get("can_be_host") or e.get("can_be_operator")):
+                reasons["role_fail"] += 1
                 continue
-            role_pass += 1
 
-            # 2. AVAILABILITY
+            # AVAILABILITY
             if not is_available(emp_id, shift, context["availability_map"]):
+                reasons["availability_fail"] += 1
                 continue
-            availability_pass += 1
 
-            # 3. LEAVE / ABSENCE
+            # LEAVE
             if is_on_leave(emp_id, shift["shift_date"], context["leaves_map"]):
+                reasons["leave_fail"] += 1
                 continue
+
+            # ABSENCE
             if is_absent(emp_id, shift["shift_date"], context["absences_map"]):
+                reasons["absence_fail"] += 1
                 continue
-            leave_pass += 1
 
-            # 4. (skip assignment rules — not meaningful yet)
-            assignment_pass = leave_pass
-            final_valid = leave_pass
+            # ASSIGNMENT CONFLICTS
+            if already_assigned(emp_id, shift["shift_id"], context):
+                reasons["already_assigned"] += 1
+                continue
 
-        print(f"TOTAL EMPLOYEES: {total}")
-        print(f"AFTER ROLE FILTER: {role_pass}")
-        print(f"AFTER AVAILABILITY: {availability_pass}")
-        print(f"AFTER LEAVE/ABSENCE: {leave_pass}")
-        print(f"AFTER ASSIGNMENT RULES: {assignment_pass}")
-        print(f"FINAL VALID CANDIDATES: {final_valid}")
+            if already_assigned_same_time(emp_id, shift, context):
+                reasons["same_time_conflict"] += 1
+                continue
+
+            if assigned_count_same_day(emp_id, shift, context) >= 1:
+                reasons["max_shift_day"] += 1
+                continue
+
+            reasons["valid"] += 1
+
+        print("📊 RESULTS:")
+        for k, v in reasons.items():
+            print(f"   {k}: {v}")
 
     print("\n========== GLOBAL DEBUG END ==========")
 
@@ -390,6 +408,81 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
     # NEW: attempt to fix unfilled slots
     unfilled = repair_schedule(unfilled, employees, shifts, context)
 
+    # ================= UNFILLED DEBUG =================
+
+    if unfilled:
+        print("\n🚨 UNFILLED SLOT ANALYSIS START")
+
+        for slot in unfilled:
+            shift = context["shift_map"][slot["shift_id"]]
+            role = slot["role"]
+
+            print(f"\n❌ UNFILLED SHIFT:")
+            print(f"   Date: {shift['shift_date']}")
+            print(f"   Shift: {shift['shift_type']}")
+            print(f"   Role: {role}")
+
+            reasons = {
+                "role_fail": 0,
+                "availability_fail": 0,
+                "leave_fail": 0,
+                "absence_fail": 0,
+                "already_assigned": 0,
+                "same_time_conflict": 0,
+                "max_shift_day": 0,
+                "valid": 0
+            }
+
+            pool = context["role_pools"][role]
+
+            for e in pool:
+                emp_id = e["employee_id"]
+
+                # ROLE CHECK
+                if role == "host" and not e.get("can_be_host"):
+                    reasons["role_fail"] += 1
+                    continue
+
+                if role == "operator" and not e.get("can_be_operator"):
+                    reasons["role_fail"] += 1
+                    continue
+
+                # AVAILABILITY
+                if not is_available(emp_id, shift, context["availability_map"]):
+                    reasons["availability_fail"] += 1
+                    continue
+
+                # LEAVE
+                if is_on_leave(emp_id, shift["shift_date"], context["leaves_map"]):
+                    reasons["leave_fail"] += 1
+                    continue
+
+                # ABSENCE
+                if is_absent(emp_id, shift["shift_date"], context["absences_map"]):
+                    reasons["absence_fail"] += 1
+                    continue
+
+                # ASSIGNMENT CONFLICTS
+                if already_assigned(emp_id, shift["shift_id"], context):
+                    reasons["already_assigned"] += 1
+                    continue
+
+                if already_assigned_same_time(emp_id, shift, context):
+                    reasons["same_time_conflict"] += 1
+                    continue
+
+                if assigned_count_same_day(emp_id, shift, context) >= 1:
+                    reasons["max_shift_day"] += 1
+                    continue
+
+                reasons["valid"] += 1
+
+            print("📊 REASONS:")
+            for k, v in reasons.items():
+                print(f"   {k}: {v}")
+
+        print("\n🚨 UNFILLED SLOT ANALYSIS END")
+        
     return {
         "assignments": context["assignments"],
         "unfilled_slots": unfilled
