@@ -526,6 +526,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
             "already_assigned": 0,
             "same_time_conflict": 0,
             "max_shift_day": 0,
+            "rest_day_fail": 0,
             "valid": 0
         }
 
@@ -696,6 +697,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
                 "already_assigned": 0,
                 "same_time_conflict": 0,
                 "max_shift_day": 0,
+                "rest_day_fail": 0,
                 "valid": 0
             }
 
@@ -739,6 +741,17 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
 
                 if assigned_count_same_day(emp_id, shift, context) >= 1:
                     reasons["max_shift_day"] += 1
+                    continue
+
+                days = working_days(emp_id, context)
+
+                candidate_day = normalize_date(shift["shift_date"])
+
+                projected_days = set(days)
+                projected_days.add(candidate_day)
+
+                if len(projected_days) > MAX_WORKING_DAYS:
+                    reasons["rest_day_fail"] += 1
                     continue
 
                 reasons["valid"] += 1
