@@ -77,6 +77,38 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
   return dates;
 };
 
+const parseLocalDate = (dateStr: string) => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const getWeekDatesFromAssignments = (assignments: any[]) => {
+  if (!assignments || assignments.length === 0) {
+    return getWeekDates(0);
+  }
+
+  const sortedDates = assignments
+    .map((a: any) => a.shift_date)
+    .filter(Boolean)
+    .sort();
+
+  const firstDate = parseLocalDate(sortedDates[0]);
+
+  const currentDay = firstDate.getDay() || 7;
+  const monday = new Date(firstDate);
+  monday.setDate(firstDate.getDate() - (currentDay - 1));
+
+  const dates: Date[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    dates.push(date);
+  }
+
+  return dates;
+};
+
   const leaveMap = React.useMemo(() => {
       const map = new Map<string, LeaveRequest[]>();
   
@@ -103,12 +135,15 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [leaveWeekOffset, setLeaveWeekOffset] = useState(0); // 0 = current week, 1 = next week
+  const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
 
   useEffect(() => {
   const loadSchedule = async () => {
     try {
       const res = await fetch("https://thesisprogram-production.up.railway.app/generated-schedule");
       const data = await res.json();
+
+      setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
 
       if (!data.grouped_schedule) return;
 
@@ -159,11 +194,6 @@ export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps)
 
   loadSchedule();
 }, []);
-
-const weekDates = React.useMemo(
-  () => getWeekDates(leaveWeekOffset),
-  [leaveWeekOffset]
-);
 
 useEffect(() => {
   fetchApprovedLeaves();
@@ -314,6 +344,8 @@ useEffect(() => {
 
       const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
       const data = await res.json();
+
+      setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
 
       console.log("API RESPONSE:", data);
 
