@@ -60,7 +60,13 @@ def prepare_context(employees, shifts, availability, leaves, absences):
         "absences_map": absences_map,
         "assignments": [],
         "assignment_counts": defaultdict(int),
-        "context_assignments_by_employee": defaultdict(list)
+        "context_assignments_by_employee": defaultdict(list),
+
+        "context_flags": {
+            "relax_account": False,
+            "relax_role": False,
+            "allow_double_shift": False
+        }
     }
 
     hosts = [e for e in employees if e.get("can_be_host")]
@@ -266,7 +272,10 @@ def get_candidates(employees, shift, role, context):
     key = (shift["shift_id"], role)
 
     # 🔥 USE ROLE POOL INSTEAD OF ALL EMPLOYEES
-    pool = context["role_pools"][role]
+    if context["context_flags"].get("relax_role"):
+        pool = employees
+    else:
+        pool = context["role_pools"][role]
 
     candidates = [
         e for e in pool
@@ -283,6 +292,21 @@ def assign_employee(employee, shift, role, context):
     """
     Save assignment in memory
     """
+
+    flags = context["context_flags"]
+
+    if flags["allow_double_shift"]:
+        relaxation_level = "double_shift_relaxed"
+
+    elif flags["relax_role"]:
+        relaxation_level = "role_relaxed"
+
+    elif flags["relax_account"]:
+        relaxation_level = "account_relaxed"
+
+    else:
+        relaxation_level = "strict"
+        
     assignment = {
         "shift_id": shift["shift_id"],
         "shift_date": shift["shift_date"],
@@ -290,7 +314,8 @@ def assign_employee(employee, shift, role, context):
         "account": shift["account"],
         "employee_id": employee["employee_id"],
         "employee_name": employee["full_name"],
-        "role": role
+        "role": role,
+        "relaxation_level": relaxation_level
     }
 
     context["assignments"].append(assignment)
@@ -344,7 +369,10 @@ def try_fill_unfilled_slot(
     if depth >= MAX_REPAIR_DEPTH:
         return False
 
-    pool = context["role_pools"][role]
+    if context["context_flags"].get("relax_role"):
+        pool = employees
+    else:
+        pool = context["role_pools"][role]
     
     for emp in pool:
 
@@ -372,7 +400,10 @@ def try_fill_unfilled_slot(
         remove_assignment(existing_assignment, context)
 
         # check if someone else can fill old slot
-        replacement_pool = context["role_pools"][old_role]
+        if context["context_flags"].get("relax_role"):
+            replacement_pool = employees
+        else:
+            replacement_pool = context["role_pools"][old_role]
 
         replacement_candidates = [
             e for e in replacement_pool
@@ -571,7 +602,12 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
                 continue
 
             # AVAILABILITY
-            if not is_available(emp_id, shift, context["availability_map"]):
+            if not is_available(
+                        emp_id,
+                        shift,
+                        context["availability_map"],
+                        context
+                    ):
                 reasons["availability_fail"] += 1
                 continue
 
@@ -594,7 +630,13 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
                 reasons["same_time_conflict"] += 1
                 continue
 
-            if assigned_count_same_day(emp_id, shift, context) >= 1:
+            max_shifts = (
+                2
+                if context["context_flags"].get("allow_double_shift")
+                else 1
+            )
+
+            if assigned_count_same_day(emp_id, shift, context) >= max_shifts:
                 reasons["max_shift_day"] += 1
                 continue
             
@@ -708,6 +750,44 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
     unfilled = repair_schedule(unfilled, employees, shifts, context)
 
     # ================= UNFILLED DEBUG =================
+    if unfilled:
+
+        print("\n🔥 RELAXING ACCOUNT CONSTRAINT")
+
+        context["context_flags"]["relax_account"] = True
+
+        unfilled = repair_schedule(
+            unfilled,
+            employees,
+            shifts,
+            context
+        )
+    
+    if unfilled:
+
+        print("\n🔥 RELAXING ROLE CONSTRAINT")
+
+        context["context_flags"]["relax_role"] = True
+
+        unfilled = repair_schedule(
+            unfilled,
+            employees,
+            shifts,
+            context
+        )
+
+    if unfilled:
+
+        print("\n🔥 ALLOWING DOUBLE SHIFTS")
+
+        context["context_flags"]["allow_double_shift"] = True
+
+        unfilled = repair_schedule(
+            unfilled,
+            employees,
+            shifts,
+            context
+        )
 
     if unfilled:
         print("\n🚨 UNFILLED SLOT ANALYSIS START")
@@ -748,7 +828,12 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
                     continue
 
                 # AVAILABILITY
-                if not is_available(emp_id, shift, context["availability_map"]):
+                if not is_available(
+                            emp_id,
+                            shift,
+                            context["availability_map"],
+                            context
+                        ):
                     reasons["availability_fail"] += 1
                     continue
 
@@ -771,7 +856,13 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
                     reasons["same_time_conflict"] += 1
                     continue
 
-                if assigned_count_same_day(emp_id, shift, context) >= 1:
+                max_shifts = (
+                    2
+                    if context["context_flags"].get("allow_double_shift")
+                    else 1
+                )
+
+                if assigned_count_same_day(emp_id, shift, context) >= max_shifts:
                     reasons["max_shift_day"] += 1
                     continue
 

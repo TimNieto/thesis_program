@@ -24,7 +24,7 @@ def get_day_of_week(date):
 # AVAILABILITY
 # -------------------------------
 
-def is_available(employee_id, shift, availability_map):
+def is_available(employee_id, shift, availability_map, context=None):
     """
     Strict availability:
     - Must match day
@@ -43,21 +43,43 @@ def is_available(employee_id, shift, availability_map):
 
     account_data = emp_availability.get(account)
 
-    if not account_data:
-        return False
+    # STRICT MODE
+    if account_data:
 
-    day_data = account_data.get(day)
+        day_data = account_data.get(day)
 
-    if not day_data:
-        return False
+        if not day_data:
+            return False
 
-    shift_data = day_data.get(shift_type)
+        shift_data = day_data.get(shift_type)
 
-    if not shift_data:
-        return False
+        if not shift_data:
+            return False
 
-    return shift_data.get("is_available", False)
+        return shift_data.get("is_available", False)
 
+    # RELAX ACCOUNT MODE
+    if (
+        context and
+        context["context_flags"].get("relax_account")
+    ):
+
+        for acc_data in emp_availability.values():
+
+            day_data = acc_data.get(day)
+
+            if not day_data:
+                continue
+
+            shift_data = day_data.get(shift_type)
+
+            if not shift_data:
+                continue
+
+            if shift_data.get("is_available"):
+                return True
+
+    return False
 
 # -------------------------------
 # LEAVES & ABSENCES
@@ -96,7 +118,12 @@ def is_absent(employee_id, shift_date, absences_map):
 
 def is_unavailable(employee_id, shift, context):
     return (
-        not is_available(employee_id, shift, context["availability_map"]) or
+        not is_available(
+            employee_id,
+            shift,
+            context["availability_map"],
+            context
+        ) or
         is_on_leave(employee_id, shift["shift_date"], context["leaves_map"]) or
         is_absent(employee_id, shift["shift_date"], context["absences_map"])
     )
@@ -106,10 +133,20 @@ def is_unavailable(employee_id, shift, context):
 # ROLE CHECK
 # -------------------------------
 
-def has_role(employee, role):
-    """
-    role: 'host' or 'operator'
-    """
+def has_role(employee, role, context=None):
+
+    # RELAX ROLE MODE
+    if (
+        context and
+        context["context_flags"].get("relax_role")
+    ):
+        return (
+            employee.get("can_be_host", False)
+            or
+            employee.get("can_be_operator", False)
+        )
+
+    # STRICT MODE
     if role == "host":
         return employee.get("can_be_host", False)
 
@@ -171,7 +208,7 @@ def is_valid_candidate(employee, shift, role, context):
     shift_id = shift["shift_id"]
 
     # Role check
-    if not has_role(employee, role):
+    if not has_role(employee, role, context):
         return False
 
     # Availability + leave + absence
@@ -185,7 +222,13 @@ def is_valid_candidate(employee, shift, role, context):
     if already_assigned_same_time(employee_id, shift, context):
         return False
     
-    if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
+    max_shifts = (
+        2
+        if context["context_flags"].get("allow_double_shift")
+        else MAX_SHIFTS_PER_DAY
+    )
+
+    if assigned_count_same_day(employee_id, shift, context) >= max_shifts:
         return False
 
     days = working_days(employee_id, context)
