@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 def fetch_employees(cursor):
     cursor.execute("""
-        SELECT employee_id, full_name, can_be_host, can_be_operator
+        SELECT employee_id, full_name, main_role, can_be_host, can_be_operator
         FROM employees
         WHERE employment_status = 'Active'
     """)
@@ -23,8 +23,9 @@ def fetch_employees(cursor):
         {
             "employee_id": r[0],
             "full_name": r[1],
-            "can_be_host": r[2],
-            "can_be_operator": r[3]
+            "main_role": r[2],
+            "can_be_host": r[3],
+            "can_be_operator": r[4]
         }
         for r in rows
     ]

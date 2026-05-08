@@ -165,6 +165,28 @@ def score_employee(employee, shift, role, context):
     score -= assignment_count * 3
 
     # --------------------------------
+    # 1.5 MAIN ROLE PRIORITY
+    # --------------------------------
+
+    main_role = (employee.get("main_role") or "").strip()
+
+    if role == "host":
+        if main_role == "Host":
+            score += 8
+        elif main_role == "Both":
+            score += 4
+        else:
+            score -= 6
+
+    elif role == "operator":
+        if main_role == "Operator":
+            score += 8
+        elif main_role == "Both":
+            score += 4
+        else:
+            score -= 6
+
+    # --------------------------------
     # 2. PRESERVE FLEXIBLE EMPLOYEES
     # --------------------------------
 
