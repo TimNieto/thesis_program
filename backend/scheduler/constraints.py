@@ -158,6 +158,7 @@ def assigned_count_same_day(employee_id, shift, context):
 # -------------------------------
 
 MAX_SHIFTS_PER_DAY = 1
+MAX_WORKING_DAYS = 6
 
 def is_valid_candidate(employee, shift, role, context):
     """
@@ -185,7 +186,34 @@ def is_valid_candidate(employee, shift, role, context):
     if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
         return False
 
+    days = working_days(employee_id, context)
+
+    candidate_day = normalize_date(shift["shift_date"])
+
+    projected_days = set(days)
+    projected_days.add(candidate_day)
+
+    if len(projected_days) > MAX_WORKING_DAYS:
+
+        context["rest_day_failures"] = (
+            context.get("rest_day_failures", 0) + 1
+        )
+
+        return False
+
     return True
+
+def working_days(employee_id, context):
+    days = set()
+
+    assignments = context[
+        "context_assignments_by_employee"
+    ].get(employee_id, [])
+
+    for a in assignments:
+        days.add(normalize_date(a["shift_date"]))
+
+    return days
 
 
 # def is_valid_candidate(employee, shift, role, context):
