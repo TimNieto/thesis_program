@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
@@ -58,6 +58,46 @@ export function CompanySettings() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
 
+  useEffect(() => {
+  fetchSettings();
+}, []);
+
+const fetchSettings = async () => {
+  try {
+    const res = await fetch(
+      "https://thesisprogram-production.up.railway.app/settings"
+    );
+
+    const data = await res.json();
+
+    setCompanyName(data.company_name);
+    setCompanyType(data.company_type);
+
+    setMaxConsecutiveWorkingDays(
+      String(data.max_working_days)
+    );
+
+    setMaxShiftsPerEmployee(
+      String(data.max_shifts_per_week)
+    );
+
+    setShiftsPerDay(
+      String(data.max_shifts_per_day)
+    );
+
+    setDoubleShiftAllowance(
+      data.allow_double_shifts
+    );
+
+    setAbsenceReplacementMode(
+      data.absence_replacement_mode
+    );
+
+  } catch (err) {
+    console.error("Failed to fetch settings", err);
+  }
+};
+
   const handleAddShift = () => {
     const newShift: ShiftTiming = {
       id: Date.now().toString(),
@@ -101,9 +141,52 @@ export function CompanySettings() {
     );
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
+  try {
+    const res = await fetch(
+      "https://thesisprogram-production.up.railway.app/settings",
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_name: companyName,
+          company_type: companyType,
+
+          max_working_days:
+            Number(maxConsecutiveWorkingDays),
+
+          max_shifts_per_day:
+            Number(shiftsPerDay),
+
+          max_shifts_per_week:
+            Number(maxShiftsPerEmployee),
+
+          allow_double_shifts:
+            doubleShiftAllowance,
+
+          fairness_weight: 3,
+
+          gy_shift_penalty: 5,
+
+          absence_replacement_mode:
+            absenceReplacementMode
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error("Failed to save settings");
+    }
+
     toast.success("Company settings saved successfully");
-  };
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to save settings");
+  }
+};
 
   const handleCancel = () => {
     toast.info("Changes discarded");
@@ -198,6 +281,7 @@ export function CompanySettings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="1">1 Shift</SelectItem>
                   <SelectItem value="2">2 Shifts</SelectItem>
                   <SelectItem value="3">3 Shifts</SelectItem>
                   <SelectItem value="4">4 Shifts</SelectItem>

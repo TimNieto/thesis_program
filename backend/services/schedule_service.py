@@ -194,13 +194,40 @@ def generate_weekly_schedule():
         absences_map = {}
         #absences = fetch_absences(cursor)
 
+        # -------------------------
+        # FETCH SETTINGS
+        # -------------------------
+        cursor.execute("""
+            SELECT
+                max_working_days,
+                max_shifts_per_day,
+                max_shifts_per_week,
+                allow_double_shifts,
+                fairness_weight,
+                gy_shift_penalty
+            FROM company_settings
+            LIMIT 1
+        """)
+
+        settings_row = cursor.fetchone()
+
+        settings = {
+            "max_working_days": settings_row[0],
+            "max_shifts_per_day": settings_row[1],
+            "max_shifts_per_week": settings_row[2],
+            "allow_double_shifts": settings_row[3],
+            "fairness_weight": settings_row[4],
+            "gy_shift_penalty": settings_row[5]
+        }
+
         # Run scheduler
         result = generate_schedule(
             employees,
             shifts,
             availability,
             leaves_map,
-            absences_map   
+            absences_map,
+            settings   
            # absences
         )
  

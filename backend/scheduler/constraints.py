@@ -196,8 +196,7 @@ def assigned_count_same_day(employee_id, shift, context):
 # MAIN VALIDATION
 # -------------------------------
 
-MAX_SHIFTS_PER_DAY = 1
-MAX_WORKING_DAYS = 6
+
 
 def is_valid_candidate(employee, shift, role, context):
     """
@@ -222,11 +221,11 @@ def is_valid_candidate(employee, shift, role, context):
     if already_assigned_same_time(employee_id, shift, context):
         return False
     
-    max_shifts = (
-        2
-        if context["context_flags"].get("allow_double_shift")
-        else MAX_SHIFTS_PER_DAY
+    allow_double_shifts = (
+        context["settings"]["allow_double_shifts"]
     )
+
+    max_shifts = 2 if allow_double_shifts else 1
 
     if assigned_count_same_day(employee_id, shift, context) >= max_shifts:
         return False
@@ -238,7 +237,11 @@ def is_valid_candidate(employee, shift, role, context):
     projected_days = set(days)
     projected_days.add(candidate_day)
 
-    if len(projected_days) > MAX_WORKING_DAYS:
+    max_days = (
+    context["settings"]["max_working_days"]
+        )   
+
+    if len(projected_days) > max_days:
 
         context["rest_day_failures"] = (
             context.get("rest_day_failures", 0) + 1

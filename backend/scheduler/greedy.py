@@ -11,7 +11,6 @@ from scheduler.constraints import (
     assigned_count_same_day,
     working_days,
     normalize_date,
-    MAX_WORKING_DAYS
 )
 
 
@@ -19,7 +18,7 @@ from scheduler.constraints import (
 # CONTEXT PREPARATION
 # -------------------------------
 
-def prepare_context(employees, shifts, availability, leaves, absences):
+def prepare_context(employees, shifts, availability, leaves, absences,settings):
     """
     Converts raw DB data into fast lookup structures
     """
@@ -58,6 +57,7 @@ def prepare_context(employees, shifts, availability, leaves, absences):
         "availability_map": availability_map,
         "leaves_map": leaves_map,
         "absences_map": absences_map,
+        "settings": settings,
         "assignments": [],
         "assignment_counts": defaultdict(int),
         "context_assignments_by_employee": defaultdict(list),
@@ -554,12 +554,12 @@ def repair_schedule(unfilled, employees, shifts, context):
 # MAIN GENERATOR
 # -------------------------------
 
-def generate_schedule(employees, shifts, availability, leaves, absences):
+def generate_schedule(employees, shifts, availability, leaves, absences,settings):
     """
     Main entry point
     """
 
-    context = prepare_context(employees, shifts, availability, leaves, absences)
+    context = prepare_context(employees, shifts, availability, leaves, absences,settings)
 
     context["shift_map"] = {s["shift_id"]: s for s in shifts}
     
@@ -650,7 +650,8 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
             projected_days = set(days)
             projected_days.add(candidate_day)
 
-            if len(projected_days) > MAX_WORKING_DAYS:
+            max_days = context["settings"]["max_working_days"]
+            if len(projected_days) > max_days:
                 reasons["rest_day_fail"] += 1
                 continue
 
@@ -1088,7 +1089,8 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
                 projected_days = set(days)
                 projected_days.add(candidate_day)
 
-                if len(projected_days) > MAX_WORKING_DAYS:
+                max_days = context["settings"]["max_working_days"]
+                if len(projected_days) > max_days:
                     reasons["rest_day_fail"] += 1
                     continue
 
