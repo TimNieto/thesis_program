@@ -32,28 +32,30 @@ def is_available(employee_id, shift, availability_map):
     - Must be explicitly available
     """
 
-    day = get_day_of_week(shift["shift_date"])   # e.g. 'friday'
-    shift_type = shift["shift_type"].lower()     # e.g. 'nn'
+    day = get_day_of_week(shift["shift_date"])
+    shift_type = shift["shift_type"].lower()
+    account = shift["account"].lower()
 
     emp_availability = availability_map.get(employee_id, {})
 
-    # ❌ No data at all → NOT available
     if not emp_availability:
         return False
 
-    day_data = emp_availability.get(day)
+    account_data = emp_availability.get(account)
 
-    # ❌ No record for that day → NOT available
+    if not account_data:
+        return False
+
+    day_data = account_data.get(day)
+
     if not day_data:
         return False
 
     shift_data = day_data.get(shift_type)
 
-    # ❌ No record for that shift → NOT available
     if not shift_data:
         return False
 
-    # ✅ Final check
     return shift_data.get("is_available", False)
 
 

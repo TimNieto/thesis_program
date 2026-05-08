@@ -67,7 +67,11 @@ def fetch_shifts(cursor):
 
 def fetch_availability(cursor):
     cursor.execute("""
-        SELECT employee_id, day_of_week, is_available, preferred_shift
+        SELECT employee_id,
+            account,
+            day_of_week,
+            is_available,
+            preferred_shift
         FROM availability
     """)
 
@@ -76,9 +80,10 @@ def fetch_availability(cursor):
     return [
         {
             "employee_id": r[0],
-            "day_of_week": r[1],
-            "is_available": r[2],
-            "preferred_shift": r[3]
+            "account": r[1],
+            "day_of_week": r[2],
+            "is_available": r[3],
+            "preferred_shift": r[4]
         }
         for r in rows
     ]

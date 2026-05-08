@@ -26,17 +26,22 @@ def prepare_context(employees, shifts, availability, leaves, absences):
     ##availability_map:
     # { employee_id: { "monday": { "am": {is_available} } } }
 
-    availability_map = defaultdict(lambda: defaultdict(dict))
+    availability_map = defaultdict(
+        lambda: defaultdict(
+            lambda: defaultdict(dict)
+        )
+    )
 
     for row in availability:
         if not row["preferred_shift"]:
             continue  # skip nulls
 
         emp_id = row["employee_id"]
+        account = row["account"].lower()
         day = row["day_of_week"].lower()
         shift = row["preferred_shift"].lower()
 
-        availability_map[emp_id][day][shift] = {
+        availability_map[emp_id][account][day][shift] = {
             "is_available": row["is_available"]
         }
 
@@ -214,8 +219,13 @@ def score_employee(employee, shift, role, context):
 
     availability = context["availability_map"].get(emp_id, {})
 
-    shift_pref = availability.get(day_name, {}).get(
-        shift["shift_type"].lower()
+    account = shift["account"].lower()
+
+    shift_pref = (
+        availability
+        .get(account, {})
+        .get(day_name, {})
+        .get(shift["shift_type"].lower())
     )
 
     if shift_pref and shift_pref.get("is_available"):

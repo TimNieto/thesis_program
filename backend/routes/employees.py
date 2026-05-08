@@ -300,7 +300,11 @@ def get_availability():
 
     try:
         cursor.execute("""
-            SELECT employee_id, day_of_week, is_available, preferred_shift
+            SELECT employee_id,
+                account,
+                day_of_week,
+                is_available,
+                preferred_shift
             FROM availability
             ORDER BY employee_id
         """)
@@ -310,9 +314,10 @@ def get_availability():
         availability = [
             {
                 "employee_id": r[0],
-                "day_of_week": r[1],
-                "is_available": r[2],
-                "preferred_shift": r[3]
+                "account": r[1],
+                "day_of_week": r[2],
+                "is_available": r[3],
+                "preferred_shift": r[4]
             }
             for r in rows
         ]
@@ -337,15 +342,17 @@ def update_availability(data: dict):
         day_of_week = data["day_of_week"]
         preferred_shift = data["preferred_shift"]
         is_available = data["is_available"]
+        account = data["account"]
 
         # 🔍 Check if record already exists
         cursor.execute("""
             SELECT availability_id
             FROM availability
             WHERE employee_id = %s
-              AND day_of_week = %s
-              AND preferred_shift = %s
-        """, (employee_id, day_of_week, preferred_shift))
+                AND account = %s
+                AND day_of_week = %s
+                AND preferred_shift = %s
+        """, (employee_id, account, day_of_week, preferred_shift))
 
         existing = cursor.fetchone()
 
@@ -360,9 +367,21 @@ def update_availability(data: dict):
         else:
             # ➕ INSERT new row
             cursor.execute("""
-                INSERT INTO availability (employee_id, day_of_week, preferred_shift, is_available)
-                VALUES (%s, %s, %s, %s)
-            """, (employee_id, day_of_week, preferred_shift, is_available))
+                INSERT INTO availability (
+                    employee_id,
+                    account,
+                    day_of_week,
+                    preferred_shift,
+                    is_available
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                employee_id,
+                account,
+                day_of_week,
+                preferred_shift,
+                is_available
+            ))
 
         conn.commit()
 
