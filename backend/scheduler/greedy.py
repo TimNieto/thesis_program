@@ -96,7 +96,10 @@ def estimate_candidates(employees, shift, role, context):
     """
     count = 0
 
-    pool = context["role_pools"][role]
+    if context["context_flags"].get("relax_role"):
+        pool = employees
+    else:
+        pool = context["role_pools"][role]
 
     for e in pool:
 
@@ -405,157 +408,133 @@ def try_fill_unfilled_slot(
             continue
 
         # check if already assigned somewhere else
-        existing_assignment = None
         existing_list = context["context_assignments_by_employee"].get(emp_id, [])
-        existing_assignment = next(iter(existing_list), None)
 
-        # if free → assign directly
-        if not existing_assignment:
+        # free employee
+        if not existing_list:
             assign_employee(emp, shift, role, context)
             return True
 
-        # try swapping
-        old_shift = context["shift_map"].get(existing_assignment["shift_id"])
-        old_role = existing_assignment["role"]
+        # try every existing assignment
+        for existing_assignment in existing_list[:]:
 
-        # remove temporarily
-        remove_assignment(existing_assignment, context)
-
-        # check if someone else can fill old slot
-        if context["context_flags"].get("relax_role"):
-            replacement_pool = employees
-        else:
-            replacement_pool = context["role_pools"][old_role]
-
-        replacement_candidates = [
-            e for e in replacement_pool
-            if is_valid_candidate(e, old_shift, old_role, context)
-        ]
-
-        if replacement_candidates:
-
-            replacement = max(
-                replacement_candidates,
-                key=lambda e:
-                    score_employee(
-                        e,
-                        old_shift,
-                        old_role,
-                        context
-                    )
+            old_shift = context["shift_map"].get(
+                existing_assignment["shift_id"]
             )
 
-            # --------------------------------
-            # Assign replacement temporarily
-            # --------------------------------
+            old_role = existing_assignment["role"]
 
+            # remove temporarily
+            remove_assignment(existing_assignment, context)
+
+            # check if someone else can fill old slot
+            if context["context_flags"].get("relax_role"):
+                replacement_pool = employees
+            else:
+                replacement_pool = context["role_pools"][old_role]
+
+            replacement_candidates = [
+                e for e in replacement_pool
+                if is_valid_candidate(e, old_shift, old_role, context)
+            ]
+
+            if replacement_candidates:
+
+                replacement = max(
+                    replacement_candidates,
+                    key=lambda e:
+                        score_employee(
+                            e,
+                            old_shift,
+                            old_role,
+                            context
+                        )
+                )
+
+                assign_employee(
+                    replacement,
+                    old_shift,
+                    old_role,
+                    context
+                )
+
+                assign_employee(
+                    emp,
+                    shift,
+                    role,
+                    context
+                )
+
+                unresolved = []
+
+                for s in shifts:
+
+                    for r in ["host", "operator"]:
+
+                        required = s.get(
+                            f"required_{r}_count",
+                            1
+                        )
+
+                        current_count = len([
+                            a for a in context["assignments"]
+                            if (
+                                a["shift_id"] == s["shift_id"]
+                                and a["role"] == r
+                            )
+                        ])
+
+                        if current_count < required:
+
+                            unresolved.append({
+                                "shift_id": s["shift_id"],
+                                "role": r
+                            })
+
+                success = True
+
+                for missing in unresolved:
+
+                    repaired = try_fill_unfilled_slot(
+                        missing,
+                        employees,
+                        shifts,
+                        context,
+                        depth + 1
+                    )
+
+                    if not repaired:
+                        success = False
+                        break
+
+                if success:
+                    return True
+
+                remove_assignment(
+                    {
+                        "shift_id": old_shift["shift_id"],
+                        "employee_id": replacement["employee_id"],
+                        "role": old_role
+                    },
+                    context
+                )
+
+                remove_assignment(
+                    {
+                        "shift_id": shift["shift_id"],
+                        "employee_id": emp["employee_id"],
+                        "role": role
+                    },
+                    context
+                )
+
+            # restore original assignment
             assign_employee(
-                replacement,
+                context["employee_map"][existing_assignment["employee_id"]],
                 old_shift,
                 old_role,
                 context
             )
-
-            # --------------------------------
-            # Assign original employee
-            # to new slot
-            # --------------------------------
-
-            assign_employee(
-                emp,
-                shift,
-                role,
-                context
-            )
-
-            # --------------------------------
-            # Check if replacement created
-            # another gap elsewhere
-            # --------------------------------
-
-            unresolved = []
-
-            for s in shifts:
-
-                for r in ["host", "operator"]:
-
-                    required = s.get(
-                        f"required_{r}_count",
-                        1
-                    )
-
-                    current_count = len([
-                        a for a in context["assignments"]
-                        if (
-                            a["shift_id"] == s["shift_id"]
-                            and a["role"] == r
-                        )
-                    ])
-
-                    if current_count < required:
-
-                        unresolved.append({
-                            "shift_id": s["shift_id"],
-                            "role": r
-                        })
-
-            # --------------------------------
-            # Attempt recursive repair
-            # --------------------------------
-
-            success = True
-
-            for missing in unresolved:
-
-                repaired = try_fill_unfilled_slot(
-                    missing,
-                    employees,
-                    shifts,
-                    context,
-                    depth + 1
-                )
-
-                if not repaired:
-                    success = False
-                    break
-
-            if success:
-                return True
-
-            # --------------------------------
-            # REVERT EVERYTHING
-            # --------------------------------
-
-            remove_assignment(
-                {
-                    "shift_id": old_shift["shift_id"],
-                    "employee_id": replacement["employee_id"],
-                    "role": old_role,
-                    "shift_date": old_shift["shift_date"],
-                    "shift_type": old_shift["shift_type"],
-                    "account": old_shift["account"],
-                    "employee_name": replacement["full_name"]
-                },
-                context
-            )
-
-            remove_assignment(
-                {
-                    "shift_id": shift["shift_id"],
-                    "employee_id": emp["employee_id"],
-                    "role": role,
-                    "shift_date": shift["shift_date"],
-                    "shift_type": shift["shift_type"],
-                    "account": shift["account"],
-                    "employee_name": emp["full_name"]
-                },
-                context
-            )
-
-        # revert if swap fails
-        original_employee = context["employee_map"][existing_assignment["employee_id"]]
-
-        assign_employee(original_employee, old_shift, old_role, context)
 
     return False
 
@@ -769,28 +748,174 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
                 })
 
     # NEW: attempt to fix unfilled slots
-    unfilled = repair_schedule(unfilled, employees, shifts, context)
+    # --------------------------------
+    # STRICT REPAIR
+    # --------------------------------
 
-    # ================= UNFILLED DEBUG =================
+    unfilled = repair_schedule(
+        unfilled,
+        employees,
+        shifts,
+        context
+    )
+
+    # --------------------------------
+    # RELAX ACCOUNT → FULL REBUILD
+    # --------------------------------
+
     if unfilled:
 
         print("\n🔥 RELAXING ACCOUNT CONSTRAINT")
 
         context["context_flags"]["relax_account"] = True
 
+        # RESET SCHEDULE
+        context["assignments"].clear()
+        context["assignment_counts"].clear()
+        context["context_assignments_by_employee"].clear()
+
+        # REBUILD
+        unfilled = []
+
+        context["remaining_shifts"] = sort_shifts_by_difficulty(
+            shifts,
+            employees,
+            context
+        )
+
+        while context["remaining_shifts"]:
+
+            shift = min(
+                context["remaining_shifts"],
+                key=lambda s:
+                    estimate_candidates(employees, s, "host", context)
+                    +
+                    estimate_candidates(employees, s, "operator", context)
+            )
+
+            context["remaining_shifts"].remove(shift)
+
+            assigned_hosts = fill_role(
+                shift,
+                "host",
+                shift.get("required_host_count", 1),
+                employees,
+                context
+            )
+
+            if assigned_hosts < shift.get("required_host_count", 1):
+
+                for _ in range(
+                    shift.get("required_host_count", 1)
+                    - assigned_hosts
+                ):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "role": "host"
+                    })
+
+            assigned_ops = fill_role(
+                shift,
+                "operator",
+                shift.get("required_operator_count", 1),
+                employees,
+                context
+            )
+
+            if assigned_ops < shift.get("required_operator_count", 1):
+
+                for _ in range(
+                    shift.get("required_operator_count", 1)
+                    - assigned_ops
+                ):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "role": "operator"
+                    })
+
         unfilled = repair_schedule(
             unfilled,
             employees,
             shifts,
             context
         )
-    
+
+    # --------------------------------
+    # RELAX ROLE → FULL REBUILD
+    # --------------------------------
+
     if unfilled:
 
         print("\n🔥 RELAXING ROLE CONSTRAINT")
 
         context["context_flags"]["relax_role"] = True
 
+        context["assignments"].clear()
+        context["assignment_counts"].clear()
+        context["context_assignments_by_employee"].clear()
+
+        unfilled = []
+
+        context["remaining_shifts"] = sort_shifts_by_difficulty(
+            shifts,
+            employees,
+            context
+        )
+
+        while context["remaining_shifts"]:
+
+            shift = min(
+                context["remaining_shifts"],
+                key=lambda s:
+                    estimate_candidates(employees, s, "host", context)
+                    +
+                    estimate_candidates(employees, s, "operator", context)
+            )
+
+            context["remaining_shifts"].remove(shift)
+
+            assigned_hosts = fill_role(
+                shift,
+                "host",
+                shift.get("required_host_count", 1),
+                employees,
+                context
+            )
+
+            if assigned_hosts < shift.get("required_host_count", 1):
+
+                for _ in range(
+                    shift.get("required_host_count", 1)
+                    - assigned_hosts
+                ):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "role": "host"
+                    })
+
+            assigned_ops = fill_role(
+                shift,
+                "operator",
+                shift.get("required_operator_count", 1),
+                employees,
+                context
+            )
+
+            if assigned_ops < shift.get("required_operator_count", 1):
+
+                for _ in range(
+                    shift.get("required_operator_count", 1)
+                    - assigned_ops
+                ):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "role": "operator"
+                    })
+
         unfilled = repair_schedule(
             unfilled,
             employees,
@@ -798,11 +923,79 @@ def generate_schedule(employees, shifts, availability, leaves, absences):
             context
         )
 
+    # --------------------------------
+    # DOUBLE SHIFT → FULL REBUILD
+    # --------------------------------
+
     if unfilled:
 
         print("\n🔥 ALLOWING DOUBLE SHIFTS")
 
         context["context_flags"]["allow_double_shift"] = True
+
+        context["assignments"].clear()
+        context["assignment_counts"].clear()
+        context["context_assignments_by_employee"].clear()
+
+        unfilled = []
+
+        context["remaining_shifts"] = sort_shifts_by_difficulty(
+            shifts,
+            employees,
+            context
+        )
+
+        while context["remaining_shifts"]:
+
+            shift = min(
+                context["remaining_shifts"],
+                key=lambda s:
+                    estimate_candidates(employees, s, "host", context)
+                    +
+                    estimate_candidates(employees, s, "operator", context)
+            )
+
+            context["remaining_shifts"].remove(shift)
+
+            assigned_hosts = fill_role(
+                shift,
+                "host",
+                shift.get("required_host_count", 1),
+                employees,
+                context
+            )
+
+            if assigned_hosts < shift.get("required_host_count", 1):
+
+                for _ in range(
+                    shift.get("required_host_count", 1)
+                    - assigned_hosts
+                ):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "role": "host"
+                    })
+
+            assigned_ops = fill_role(
+                shift,
+                "operator",
+                shift.get("required_operator_count", 1),
+                employees,
+                context
+            )
+
+            if assigned_ops < shift.get("required_operator_count", 1):
+
+                for _ in range(
+                    shift.get("required_operator_count", 1)
+                    - assigned_ops
+                ):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "role": "operator"
+                    })
 
         unfilled = repair_schedule(
             unfilled,
