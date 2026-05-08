@@ -36,6 +36,7 @@ export function CompanySettings() {
   const [maxConsecutiveWorkingDays, setMaxConsecutiveWorkingDays] = useState("6");
   const [minRestPeriod, setMinRestPeriod] = useState("8");
   const [doubleShiftAllowance, setDoubleShiftAllowance] = useState(true);
+  
 
   // Shift Timings
   const [shiftTimings, setShiftTimings] = useState<ShiftTiming[]>([
@@ -57,6 +58,12 @@ export function CompanySettings() {
   const [inAppNotifications, setInAppNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
+
+  const [fairnessWeight, setFairnessWeight] =
+    useState("3");
+
+  const [gyPenalty, setGyPenalty] =
+    useState("5");
 
   useEffect(() => {
   fetchSettings();
@@ -91,6 +98,14 @@ const fetchSettings = async () => {
 
     setAbsenceReplacementMode(
       data.absence_replacement_mode
+    );
+
+    setFairnessWeight(
+      String(data.fairness_weight)
+    );
+
+    setGyPenalty(
+      String(data.gy_shift_penalty)
     );
 
   } catch (err) {
@@ -166,9 +181,9 @@ const fetchSettings = async () => {
           allow_double_shifts:
             doubleShiftAllowance,
 
-          fairness_weight: 3,
+          fairness_weight: Number(fairnessWeight),
 
-          gy_shift_penalty: 5,
+          gy_shift_penalty: Number(gyPenalty),
 
           absence_replacement_mode:
             absenceReplacementMode
@@ -497,6 +512,112 @@ const fetchSettings = async () => {
             <Plus className="size-4" />
             Add Role
           </Button>
+        </CardContent>
+      </Card>
+      {/* Scheduler Scoring */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <SettingsIcon className="size-5 text-blue-600" />
+            <CardTitle>Scheduler Scoring</CardTitle>
+          </div>
+
+          <CardDescription>
+            Configure assignment balancing and
+            night shift weighting
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+
+          {/* Fairness Weight */}
+          <div className="space-y-2">
+            <Label>
+              Fairness Weight
+            </Label>
+
+            <Select
+              value={fairnessWeight}
+              onValueChange={setFairnessWeight}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+
+              <SelectContent>
+
+                <SelectItem value="1">
+                  1 - Loose Balancing
+                </SelectItem>
+
+                <SelectItem value="2">
+                  2 - Mild Balancing
+                </SelectItem>
+
+                <SelectItem value="3">
+                  3 - Normal Balancing
+                </SelectItem>
+
+                <SelectItem value="4">
+                  4 - Strong Balancing
+                </SelectItem>
+
+                <SelectItem value="5">
+                  5 - Very Strict Balancing
+                </SelectItem>
+
+              </SelectContent>
+            </Select>
+
+            <p className="text-xs text-gray-500">
+              Higher values distribute shifts more evenly
+            </p>
+          </div>
+
+          {/* GY Penalty */}
+          <div className="space-y-2">
+            <Label>
+              GY Shift Penalty
+            </Label>
+
+            <Select
+              value={gyPenalty}
+              onValueChange={setGyPenalty}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+
+              <SelectContent>
+
+                <SelectItem value="0">
+                  0 - No Penalty
+                </SelectItem>
+
+                <SelectItem value="2">
+                  2 - Low Penalty
+                </SelectItem>
+
+                <SelectItem value="5">
+                  5 - Moderate Penalty
+                </SelectItem>
+
+                <SelectItem value="8">
+                  8 - High Penalty
+                </SelectItem>
+
+                <SelectItem value="10">
+                  10 - Very High Penalty
+                </SelectItem>
+
+              </SelectContent>
+            </Select>
+
+            <p className="text-xs text-gray-500">
+              Higher values avoid assigning GY shifts
+            </p>
+          </div>
+
         </CardContent>
       </Card>
 

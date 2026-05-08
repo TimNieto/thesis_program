@@ -124,7 +124,10 @@ def sort_shifts_by_difficulty(shifts, employees, context):
 
         # GY harder
         if shift["shift_type"].upper() == "GY":
-            difficulty_score -= 2
+            gy_penalty = (
+        context["settings"]["gy_shift_penalty"]
+            )
+            difficulty_score -= gy_penalty
 
         # Weekend harder
         if shift["shift_date"].weekday() >= 5:
@@ -176,7 +179,10 @@ def score_employee(employee, shift, role, context):
     assignment_count = context["assignment_counts"][emp_id]
 
     # stronger fairness penalty
-    score -= assignment_count * 3
+    fairness_weight = (
+    context["settings"]["fairness_weight"]
+        )
+    score -= assignment_count * fairness_weight
 
     # --------------------------------
     # 1.5 MAIN ROLE PRIORITY
@@ -928,7 +934,10 @@ def generate_schedule(employees, shifts, availability, leaves, absences,settings
     # DOUBLE SHIFT → FULL REBUILD
     # --------------------------------
 
-    if unfilled:
+    if (
+    unfilled and
+    context["settings"]["allow_double_shifts"]
+        ):
 
         print("\n🔥 ALLOWING DOUBLE SHIFTS")
 
