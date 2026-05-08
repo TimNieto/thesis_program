@@ -349,9 +349,31 @@ def fill_role(shift, role, required_count, employees, context):
     return assigned
 
 def remove_assignment(assignment, context):
-    context["assignments"].remove(assignment)
-    context["assignment_counts"][assignment["employee_id"]] -= 1
-    context["context_assignments_by_employee"][assignment["employee_id"]].remove(assignment)
+
+    target = None
+
+    for a in context["assignments"]:
+
+        if (
+            a["shift_id"] == assignment["shift_id"]
+            and a["employee_id"] == assignment["employee_id"]
+            and a["role"] == assignment["role"]
+        ):
+            target = a
+            break
+
+    if not target:
+        return
+
+    context["assignments"].remove(target)
+
+    context["assignment_counts"][target["employee_id"]] -= 1
+
+    employee_assignments = context[
+        "context_assignments_by_employee"
+    ][target["employee_id"]]
+
+    employee_assignments.remove(target)
 
 
 def try_fill_unfilled_slot(
