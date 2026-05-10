@@ -807,32 +807,51 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
             .get(shift["account"], {})
         )
 
-        require_operator = (
+        operator_policy = (
             account_policy.get(
-                "require_operator",
-                True
+                "operator_policy",
+                "required"
             )
         )
 
-        assigned_ops = fill_role(
-            shift,
-            "operator",
-            shift.get("required_operator_count", 1),
-            employees,
-            context
-        )
+        assigned_ops = 0
 
-        if require_operator and assigned_ops < shift.get("required_operator_count", 1):
+        # Skip operator staffing entirely
+        # for avoid-policy accounts
+        if operator_policy != "avoid":
 
-            for _ in range(
-                shift.get("required_operator_count", 1)
-                - assigned_ops
+            assigned_ops = fill_role(
+                shift,
+                "operator",
+                shift.get(
+                    "required_operator_count",
+                    1
+                ),
+                employees,
+                context
+            )
+
+            if (
+                operator_policy == "required"
+                and
+                assigned_ops <
+                shift.get(
+                    "required_operator_count",
+                    1
+                )
             ):
 
-                unfilled.append({
-                    "shift_id": shift["shift_id"],
-                    "role": "operator"
-                })
+                for _ in range(
+                    shift.get(
+                        "required_operator_count",
+                        1
+                    ) - assigned_ops
+                ):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "role": "operator"
+                    })
 
     # NEW: attempt to fix unfilled slots
     # --------------------------------
@@ -902,25 +921,54 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                         "role": "host"
                     })
 
-            assigned_ops = fill_role(
-                shift,
-                "operator",
-                shift.get("required_operator_count", 1),
-                employees,
-                context
+            account_policy = (
+                context["account_settings"]
+                .get(shift["account"], {})
             )
 
-            if require_operator and assigned_ops < shift.get("required_operator_count", 1):
+            operator_policy = (
+                account_policy.get(
+                    "operator_policy",
+                    "required"
+                )
+            )
 
-                for _ in range(
-                    shift.get("required_operator_count", 1)
-                    - assigned_ops
+            assigned_ops = 0
+
+            if operator_policy != "avoid":
+
+                assigned_ops = fill_role(
+                    shift,
+                    "operator",
+                    shift.get(
+                        "required_operator_count",
+                        1
+                    ),
+                    employees,
+                    context
+                )
+
+                if (
+                    operator_policy == "required"
+                    and
+                    assigned_ops <
+                    shift.get(
+                        "required_operator_count",
+                        1
+                    )
                 ):
 
-                    unfilled.append({
-                        "shift_id": shift["shift_id"],
-                        "role": "operator"
-                    })
+                    for _ in range(
+                        shift.get(
+                            "required_operator_count",
+                            1
+                        ) - assigned_ops
+                    ):
+
+                        unfilled.append({
+                            "shift_id": shift["shift_id"],
+                            "role": "operator"
+                        })
 
         unfilled = repair_schedule(
             unfilled,
@@ -983,25 +1031,54 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                         "role": "host"
                     })
 
-            assigned_ops = fill_role(
-                shift,
-                "operator",
-                shift.get("required_operator_count", 1),
-                employees,
-                context
+            account_policy = (
+                context["account_settings"]
+                .get(shift["account"], {})
             )
 
-            if require_operator and assigned_ops < shift.get("required_operator_count", 1):
+            operator_policy = (
+                account_policy.get(
+                    "operator_policy",
+                    "required"
+                )
+            )
 
-                for _ in range(
-                    shift.get("required_operator_count", 1)
-                    - assigned_ops
+            assigned_ops = 0
+
+            if operator_policy != "avoid":
+
+                assigned_ops = fill_role(
+                    shift,
+                    "operator",
+                    shift.get(
+                        "required_operator_count",
+                        1
+                    ),
+                    employees,
+                    context
+                )
+
+                if (
+                    operator_policy == "required"
+                    and
+                    assigned_ops <
+                    shift.get(
+                        "required_operator_count",
+                        1
+                    )
                 ):
 
-                    unfilled.append({
-                        "shift_id": shift["shift_id"],
-                        "role": "operator"
-                    })
+                    for _ in range(
+                        shift.get(
+                            "required_operator_count",
+                            1
+                        ) - assigned_ops
+                    ):
+
+                        unfilled.append({
+                            "shift_id": shift["shift_id"],
+                            "role": "operator"
+                        })
 
         unfilled = repair_schedule(
             unfilled,
@@ -1067,25 +1144,54 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                         "role": "host"
                     })
 
-            assigned_ops = fill_role(
-                shift,
-                "operator",
-                shift.get("required_operator_count", 1),
-                employees,
-                context
+            account_policy = (
+                context["account_settings"]
+                .get(shift["account"], {})
             )
 
-            if require_operator and assigned_ops < shift.get("required_operator_count", 1):
+            operator_policy = (
+                account_policy.get(
+                    "operator_policy",
+                    "required"
+                )
+            )
 
-                for _ in range(
-                    shift.get("required_operator_count", 1)
-                    - assigned_ops
+            assigned_ops = 0
+
+            if operator_policy != "avoid":
+
+                assigned_ops = fill_role(
+                    shift,
+                    "operator",
+                    shift.get(
+                        "required_operator_count",
+                        1
+                    ),
+                    employees,
+                    context
+                )
+
+                if (
+                    operator_policy == "required"
+                    and
+                    assigned_ops <
+                    shift.get(
+                        "required_operator_count",
+                        1
+                    )
                 ):
 
-                    unfilled.append({
-                        "shift_id": shift["shift_id"],
-                        "role": "operator"
-                    })
+                    for _ in range(
+                        shift.get(
+                            "required_operator_count",
+                            1
+                        ) - assigned_ops
+                    ):
+
+                        unfilled.append({
+                            "shift_id": shift["shift_id"],
+                            "role": "operator"
+                        })
 
         unfilled = repair_schedule(
             unfilled,
