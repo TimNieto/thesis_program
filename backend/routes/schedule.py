@@ -289,6 +289,75 @@ def get_requests(employee_id: int):
         cursor.close()
         conn.close()
 
+@router.get("/coverage-requests-admin")
+def get_all_requests():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        cursor.execute("""
+
+            SELECT
+
+                cr.id,
+
+                e.full_name,
+
+                gs.account,
+
+                gs.shift_date,
+
+                gs.shift_type,
+
+                gs.role,
+
+                cr.reason,
+
+                cr.status,
+
+                cr.request_type,
+
+                cr.created_at
+
+            FROM coverage_requests cr
+
+            JOIN employees e
+                ON cr.requested_by = e.employee_id
+
+            JOIN generated_schedule gs
+                ON cr.schedule_id = gs.schedule_id
+
+            ORDER BY cr.created_at DESC
+
+        """)
+
+        rows = cursor.fetchall()
+
+        result = []
+
+        for r in rows:
+
+            result.append({
+                "id": r[0],
+                "requester": r[1],
+                "livestream": r[2],
+                "day": str(r[3]),
+                "shift": r[4],
+                "role": r[5],
+                "reason": r[6],
+                "status": r[7],
+                "request_type": r[8],
+                "created_at": str(r[9])
+            })
+
+        return result
+
+    finally:
+        cursor.close()
+        conn.close()
+
 @router.post("/coverage-requests/{id}/approve")
 def approve_request(id: int):
     conn = get_connection()

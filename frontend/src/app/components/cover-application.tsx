@@ -221,7 +221,12 @@ const fetchAllLeaves = async () => {
 
   const fetchCoverRequests = async () => {
     try {
-      const res = await fetch(`https://thesisprogram-production.up.railway.app/coverage-requests/${currentUser.employee_id}`);
+      const endpoint =
+        role === "admin"
+          ? "https://thesisprogram-production.up.railway.app/coverage-requests-admin"
+          : `https://thesisprogram-production.up.railway.app/coverage-requests/${currentUser.employee_id}`;
+
+      const res = await fetch(endpoint);
       const data = await res.json();
 
       console.log("COVER REQUESTS:", data);
