@@ -755,6 +755,18 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
         # OPERATORS
         # --------------------------------
 
+        account_policy = (
+            context["account_settings"]
+            .get(shift["account"], {})
+        )
+
+        require_operator = (
+            account_policy.get(
+                "require_operator",
+                True
+            )
+        )
+
         assigned_ops = fill_role(
             shift,
             "operator",
@@ -763,7 +775,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
             context
         )
 
-        if assigned_ops < shift.get("required_operator_count", 1):
+        if require_operator and assigned_ops < shift.get("required_operator_count", 1):
 
             for _ in range(
                 shift.get("required_operator_count", 1)
@@ -851,7 +863,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                 context
             )
 
-            if assigned_ops < shift.get("required_operator_count", 1):
+            if require_operator and assigned_ops < shift.get("required_operator_count", 1):
 
                 for _ in range(
                     shift.get("required_operator_count", 1)
@@ -932,7 +944,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                 context
             )
 
-            if assigned_ops < shift.get("required_operator_count", 1):
+            if require_operator and assigned_ops < shift.get("required_operator_count", 1):
 
                 for _ in range(
                     shift.get("required_operator_count", 1)
@@ -1016,7 +1028,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                 context
             )
 
-            if assigned_ops < shift.get("required_operator_count", 1):
+            if require_operator and assigned_ops < shift.get("required_operator_count", 1):
 
                 for _ in range(
                     shift.get("required_operator_count", 1)
