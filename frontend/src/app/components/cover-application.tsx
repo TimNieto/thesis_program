@@ -61,6 +61,7 @@ import { toast } from "sonner";
 interface ShiftApplication {
   id: string;
   coverage_request_id?: string;
+  employee_id?: number;
   applicant: string;
   livestream: string;
   day: string;
@@ -282,6 +283,8 @@ const fetchAllLeaves = async () => {
         coverage_request_id: String(a.coverage_request_id),
 
         applicant: a.applicant,
+
+        employee_id: a.employee_id,
 
         livestream: a.livestream,
 
@@ -1039,7 +1042,7 @@ const updateApplicationStatus = async (
                         .filter(
                           (app) =>
                             role === "admin" ||
-                            app.applicant === currentUser.name
+                            app.employee_id === currentUser.employee_id
                         )
                         .map((application) => {
                           const shiftInfo = getShiftInfo(

@@ -467,19 +467,19 @@ def get_shift_applications():
         for r in rows:
 
             result.append({
-                "id": r[0],
-                "requester": r[1],
-                "requested_by": r[2],
-                "livestream": r[3],
-                "day": str(r[4]),
-                "shift": r[5],
-                "role": r[6],
-                "reason": r[7],
-                "status": r[8],
-                "request_type": r[9],
-                "created_at": str(r[10]),
-                "is_targeted": r[11]
-            })
+            "id": r[0],
+            "applicant": r[1],
+            "requested_by": r[2],
+            "livestream": r[3],
+            "day": str(r[4]),
+            "shift": r[5],
+            "role": r[6],
+            "reason": r[7],
+            "status": r[8],
+            "coverage_request_id": r[9],
+            "schedule_id": r[10],
+            "employee_id": r[11]
+        })
 
         return result
 
