@@ -111,6 +111,7 @@ def get_account_settings():
                 priority_level,
                 require_host,
                 require_operator,
+                operator_policy,
                 allow_partial_staffing
             FROM account_settings
             ORDER BY priority_level
@@ -125,7 +126,8 @@ def get_account_settings():
                 "priority_level": r[2],
                 "require_host": r[3],
                 "require_operator": r[4],
-                "allow_partial_staffing": r[5]
+                "operator_policy": r[5],
+                "allow_partial_staffing": r[6]
             }
             for r in rows
         ]
@@ -152,6 +154,7 @@ def update_account_settings(
                 priority_level = %s,
                 require_host = %s,
                 require_operator = %s,
+                operator_policy = %s,
                 allow_partial_staffing = %s,
                 updated_at = NOW()
             WHERE account_setting_id = %s
@@ -159,6 +162,7 @@ def update_account_settings(
             payload["priority_level"],
             payload["require_host"],
             payload["require_operator"],
+            payload["operator_policy"],
             payload["allow_partial_staffing"],
             account_setting_id
         ))
