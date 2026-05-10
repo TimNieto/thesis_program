@@ -193,6 +193,18 @@ def score_employee(employee, shift, role, context):
 
     score = 0
 
+    account_policy = (
+        context["account_settings"]
+        .get(shift["account"], {})
+    )
+
+    operator_policy = (
+        account_policy.get(
+            "operator_policy",
+            "required"
+        )
+    )
+
     # --------------------------------
     # 1. FAIRNESS
     # --------------------------------
@@ -226,6 +238,27 @@ def score_employee(employee, shift, role, context):
             score += 4
         else:
             score -= 6
+
+
+    # --------------------------------
+    # OPERATOR POLICY
+    # --------------------------------
+
+    if (
+        role == "operator"
+        and
+        operator_policy == "avoid"
+    ):
+
+        # discourage assigning operators
+        # unless necessary
+        score -= 10
+
+        print(
+            f"⚠️ AVOIDING OPERATOR "
+            f"{employee['employee_id']} "
+            f"for {shift['account']}"
+        )
 
     # --------------------------------
     # 2. PRESERVE FLEXIBLE EMPLOYEES
