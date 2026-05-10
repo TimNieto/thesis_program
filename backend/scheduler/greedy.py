@@ -120,8 +120,28 @@ def sort_shifts_by_difficulty(shifts, employees, context):
 
         total_candidates = host_candidates + op_candidates
 
+        account_name = shift["account"]
+
+        account_policy = (
+            context["account_settings"]
+            .get(account_name, {})
+        )
+
+        priority_level = (
+            account_policy.get(
+                "priority_level",
+                999
+            )
+        )
+
         # fewer candidates → higher priority
         difficulty_score = total_candidates
+
+        # Higher priority accounts
+        # scheduled FIRST
+        difficulty_score += (
+            priority_level * 100
+        )
 
         # GY harder
         if shift["shift_type"].upper() == "GY":
