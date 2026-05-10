@@ -64,9 +64,13 @@ export function CompanySettings() {
 
   const [gyPenalty, setGyPenalty] =
     useState("5");
+  const [accountPolicies, setAccountPolicies] =
+  useState<any[]>([]);
+
 
   useEffect(() => {
   fetchSettings();
+  fetchAccountSettings();
 }, []);
 
 const fetchSettings = async () => {
@@ -110,6 +114,27 @@ const fetchSettings = async () => {
 
   } catch (err) {
     console.error("Failed to fetch settings", err);
+  }
+};
+
+const fetchAccountSettings = async () => {
+
+  try {
+
+    const res = await fetch(
+      "https://thesisprogram-production.up.railway.app/account-settings"
+    );
+
+    const data = await res.json();
+
+    setAccountPolicies(data);
+
+  } catch (err) {
+
+    console.error(
+      "Failed to fetch account settings",
+      err
+    );
   }
 };
 
@@ -200,6 +225,53 @@ const fetchSettings = async () => {
   } catch (err) {
     console.error(err);
     toast.error("Failed to save settings");
+  }
+};
+
+const saveAccountPolicies = async () => {
+
+  try {
+
+    for (const policy of accountPolicies) {
+
+      await fetch(
+        `https://thesisprogram-production.up.railway.app/account-settings/${policy.account_setting_id}`,
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+
+            priority_level:
+              policy.priority_level,
+
+            require_host:
+              policy.require_host,
+
+            require_operator:
+              policy.require_operator,
+
+            allow_partial_staffing:
+              policy.allow_partial_staffing
+          })
+        }
+      );
+    }
+
+    toast.success(
+      "Account policies saved"
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    toast.error(
+      "Failed to save account policies"
+    );
   }
 };
 
@@ -620,7 +692,159 @@ const fetchSettings = async () => {
 
         </CardContent>
       </Card>
+      {/* Account Scheduling Policies */}
+      <Card>
 
+        <CardHeader>
+
+          <div className="flex items-center gap-2">
+            <SettingsIcon className="size-5 text-blue-600" />
+
+            <CardTitle>
+              Account Scheduling Policies
+            </CardTitle>
+          </div>
+
+          <CardDescription>
+            Configure account priority and
+            staffing requirements
+          </CardDescription>
+
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+
+          {accountPolicies.map((policy, index) => (
+
+            <div
+              key={policy.account_setting_id}
+              className="border rounded-lg p-4 space-y-4"
+            >
+
+              <div className="font-semibold">
+                {policy.account_name}
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-2">
+
+                <Label>
+                  Priority Level
+                </Label>
+
+                <Select
+                  value={String(policy.priority_level)}
+
+                  onValueChange={(value) => {
+
+                    const updated = [...accountPolicies];
+
+                    updated[index].priority_level =
+                      Number(value);
+
+                    setAccountPolicies(updated);
+                  }}
+                >
+
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+
+                  <SelectContent>
+
+                    <SelectItem value="1">
+                      High Priority
+                    </SelectItem>
+
+                    <SelectItem value="2">
+                      Medium Priority
+                    </SelectItem>
+
+                    <SelectItem value="3">
+                      Low Priority
+                    </SelectItem>
+
+                  </SelectContent>
+
+                </Select>
+
+              </div>
+
+              {/* Require Operator */}
+              <div className="flex items-center justify-between">
+
+                <div>
+
+                  <Label>
+                    Require Operator
+                  </Label>
+
+                  <p className="text-xs text-gray-500">
+                    Scheduler must fill operator role
+                  </p>
+
+                </div>
+
+                <Switch
+                  checked={policy.require_operator}
+
+                  onCheckedChange={(checked) => {
+
+                    const updated = [...accountPolicies];
+
+                    updated[index].require_operator =
+                      checked;
+
+                    setAccountPolicies(updated);
+                  }}
+                />
+
+              </div>
+
+              {/* Partial Staffing */}
+              <div className="flex items-center justify-between">
+
+                <div>
+
+                  <Label>
+                    Allow Partial Staffing
+                  </Label>
+
+                  <p className="text-xs text-gray-500">
+                    Scheduler may leave some slots unfilled
+                  </p>
+
+                </div>
+
+                <Switch
+                  checked={policy.allow_partial_staffing}
+
+                  onCheckedChange={(checked) => {
+
+                    const updated = [...accountPolicies];
+
+                    updated[index].allow_partial_staffing =
+                      checked;
+
+                    setAccountPolicies(updated);
+                  }}
+                />
+
+              </div>
+
+            </div>
+
+          ))}
+
+          <Button onClick={saveAccountPolicies}>
+
+            Save Account Policies
+
+          </Button>
+
+        </CardContent>
+
+      </Card>
       {/* Scheduling Behavior */}
       <Card>
         <CardHeader>
