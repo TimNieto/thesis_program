@@ -205,6 +205,13 @@ def score_employee(employee, shift, role, context):
         )
     )
 
+    print(
+        "ACCOUNT:",
+        shift["account"],
+        "POLICY:",
+        operator_policy
+    )
+
     # --------------------------------
     # 1. FAIRNESS
     # --------------------------------
