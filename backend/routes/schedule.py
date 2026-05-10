@@ -3,8 +3,15 @@
 from fastapi import APIRouter, HTTPException
 from services.schedule_service import generate_weekly_schedule, get_generated_schedule
 from db.database import get_connection
+from datetime import datetime
 
 router = APIRouter()
+SHIFT_STARTS = {
+    "GY": 1,
+    "AM": 7,
+    "NN": 13,
+    "PM": 19,
+}
 
 
 @router.get("/generate-schedule")
@@ -41,86 +48,230 @@ def get_schedule():
     
 @router.post("/request-cover/{schedule_id}")
 def request_cover(schedule_id: int, payload: dict):
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    user_id = payload.get("user_id")
-    reason = payload.get("reason")
+    try:
 
-    if not user_id:
+        user_id = payload.get("user_id")
+        reason = payload.get("reason")
+
+        if not user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="user_id required"
+            )
+
+        # GET SHIFT INFO
+        cursor.execute("""
+            SELECT
+                shift_date,
+                shift_type
+            FROM generated_schedule
+            WHERE schedule_id = %s
+        """, (schedule_id,))
+
+        schedule = cursor.fetchone()
+
+        if not schedule:
+            raise HTTPException(
+                status_code=404,
+                detail="Schedule not found"
+            )
+
+        shift_date = schedule[0]
+        shift_type = schedule[1]
+
+        # DETERMINE SHIFT START
+        shift_hour = SHIFT_STARTS.get(shift_type, 7)
+
+        shift_datetime = datetime.combine(
+            shift_date,
+            datetime.min.time()
+        ).replace(hour=shift_hour)
+
+        now = datetime.now()
+
+        diff_hours = (
+            shift_datetime - now
+        ).total_seconds() / 3600
+
+        # DETERMINE REQUEST TYPE
+        request_type = (
+            "emergency"
+            if diff_hours <= 12
+            else "normal"
+        )
+
+        # PREVENT DUPLICATES
+        cursor.execute("""
+            SELECT id
+            FROM coverage_requests
+            WHERE schedule_id = %s
+            AND requested_by = %s
+            AND status = 'pending'
+        """, (
+            schedule_id,
+            user_id
+        ))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            return {
+                "message": "Already requested"
+            }
+
+        # CREATE REQUEST
+        cursor.execute("""
+            INSERT INTO coverage_requests (
+                schedule_id,
+                requested_by,
+                reason,
+                request_type
+            )
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        """, (
+            schedule_id,
+            user_id,
+            reason,
+            request_type
+        ))
+
+        request_id = cursor.fetchone()[0]
+
+        # EMERGENCY LOGIC
+        if request_type == "emergency":
+
+            # FIND EMPLOYEES WORKING SAME DAY
+            cursor.execute("""
+                SELECT DISTINCT employee_id
+                FROM generated_schedule
+                WHERE shift_date = %s
+                AND employee_id != %s
+            """, (
+                shift_date,
+                user_id
+            ))
+
+            employees = cursor.fetchall()
+
+            # SAVE TARGETS
+            for emp in employees:
+
+                cursor.execute("""
+                    INSERT INTO emergency_cover_targets (
+                        coverage_request_id,
+                        employee_id
+                    )
+                    VALUES (%s, %s)
+                """, (
+                    request_id,
+                    emp[0]
+                ))
+
+        conn.commit()
+
+        return {
+            "message": "Cover request submitted",
+            "request_type": request_type
+        }
+
+    finally:
         cursor.close()
         conn.close()
-        raise HTTPException(status_code=400, detail="user_id is required")
 
-    # prevent duplicate pending request
-    cursor.execute("""
-        SELECT 1 FROM coverage_requests
-        WHERE schedule_id = %s
-        AND requested_by = %s
-        AND status = 'pending'
-    """, (schedule_id, user_id))
+@router.get("/coverage-requests/{employee_id}")
+def get_requests(employee_id: int):
 
-    existing = cursor.fetchone()
-
-    if existing:
-        cursor.close()
-        conn.close()
-        return {"message": "Already requested"}
-
-    # insert request
-    cursor.execute("""
-        INSERT INTO coverage_requests (schedule_id, requested_by, reason)
-        VALUES (%s, %s, %s)
-    """, (schedule_id, user_id, reason))
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return {"message": "Cover request submitted"}
-
-@router.get("/coverage-requests")
-def get_requests():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT 
-            cr.id,
-            e.full_name,
-            s.name,
-            s.start_time,
-            s.end_time,
-            gs.role,
-            cr.reason,
-            cr.status
-        FROM coverage_requests cr
-        JOIN employees e ON cr.requested_by = e.employee_id
-        JOIN generated_schedule gs ON cr.schedule_id = gs.schedule_id
-        JOIN shifts s ON gs.shift_id = s.shift_id
-        ORDER BY cr.created_at DESC
-    """)
+    try:
 
-    rows = cursor.fetchall()
+        cursor.execute("""
 
-    cursor.close()
-    conn.close()
+            SELECT DISTINCT
 
-    result = []
-    for r in rows:
-        result.append({
-            "id": r[0],
-            "requester": r[1],
-            "shift": r[2],
-            "start_time": str(r[3]),
-            "end_time": str(r[4]),
-            "role": r[5],
-            "reason": r[6],
-            "status": r[7],
-        })
+                cr.id,
 
-    return result
+                e.full_name,
+
+                gs.account,
+
+                gs.shift_date,
+
+                gs.shift_type,
+
+                gs.role,
+
+                cr.reason,
+
+                cr.status,
+
+                cr.request_type,
+
+                CASE
+                    WHEN ect.employee_id IS NOT NULL
+                    THEN TRUE
+                    ELSE FALSE
+                END AS is_targeted
+
+            FROM coverage_requests cr
+
+            JOIN employees e
+                ON cr.requested_by = e.employee_id
+
+            JOIN generated_schedule gs
+                ON cr.schedule_id = gs.schedule_id
+
+            LEFT JOIN emergency_cover_targets ect
+                ON ect.coverage_request_id = cr.id
+                AND ect.employee_id = %s
+
+            WHERE
+
+                (
+                    cr.request_type = 'normal'
+                )
+
+                OR
+
+                (
+                    cr.request_type = 'emergency'
+                    AND ect.employee_id IS NOT NULL
+                )
+
+            ORDER BY cr.created_at DESC
+
+        """, (employee_id,))
+
+        rows = cursor.fetchall()
+
+        result = []
+
+        for r in rows:
+
+            result.append({
+                "id": r[0],
+                "requester": r[1],
+                "livestream": r[2],
+                "day": str(r[3]),
+                "shift": r[4],
+                "role": r[5],
+                "reason": r[6],
+                "status": r[7],
+                "request_type": r[8],
+                "is_targeted": r[9]
+            })
+
+        return result
+
+    finally:
+        cursor.close()
+        conn.close()
 
 @router.post("/coverage-requests/{id}/approve")
 def approve_request(id: int):
@@ -157,6 +308,72 @@ def deny_request(id: int):
     conn.close()
 
     return {"message": "Denied"}
+
+@router.post("/coverage-requests/{id}/accept")
+def accept_cover(id: int, payload: dict):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        employee_id = payload.get("employee_id")
+
+        if not employee_id:
+            raise HTTPException(
+                status_code=400,
+                detail="employee_id required"
+            )
+
+        # GET SCHEDULE
+        cursor.execute("""
+            SELECT schedule_id
+            FROM coverage_requests
+            WHERE id = %s
+        """, (id,))
+
+        request = cursor.fetchone()
+
+        if not request:
+            raise HTTPException(
+                status_code=404,
+                detail="Request not found"
+            )
+
+        schedule_id = request[0]
+
+        # TRANSFER SHIFT
+        cursor.execute("""
+            UPDATE generated_schedule
+            SET employee_id = %s
+            WHERE schedule_id = %s
+        """, (
+            employee_id,
+            schedule_id
+        ))
+
+        # UPDATE REQUEST
+        cursor.execute("""
+            UPDATE coverage_requests
+            SET
+                status = 'approved',
+                accepted_by = %s,
+                approved_at = NOW()
+            WHERE id = %s
+        """, (
+            employee_id,
+            id
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "Cover accepted"
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
 
 @router.post("/save-schedule")
 def save_schedule(assignments: list):

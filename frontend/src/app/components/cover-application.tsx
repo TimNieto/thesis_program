@@ -78,7 +78,13 @@ interface CoverRequest {
   shift: string;
   role: "Host" | "Operator";
   reason: string;
+
   status: "pending" | "approved" | "denied";
+
+  request_type: "normal" | "emergency";
+
+  is_targeted: boolean;
+
   submittedAt: string;
 }
 
@@ -237,23 +243,44 @@ const fetchAllLeaves = async () => {
 
   const fetchCoverRequests = async () => {
     try {
-      const res = await fetch("https://thesisprogram-production.up.railway.app/coverage-requests");
+      const res = await fetch(`https://thesisprogram-production.up.railway.app/coverage-requests/${currentUser.employee_id}`);
       const data = await res.json();
 
       console.log("COVER REQUESTS:", data);
 
       setCoverRequests(
         data.map((r: any) => ({
-          id: String(r.id),
-          requester: r.requester,
-          livestream: "N/A", // temporary (we improve later)
-          day: "N/A",
-          shift: r.shift,
-          role: r.role === "host" ? "Host" : "Operator",
-          reason: r.reason,
-          status: r.status,
-          submittedAt: new Date().toISOString()
-        }))
+        id: String(r.id),
+
+        requester: r.requester,
+
+        livestream: r.livestream,
+
+        day: new Date(r.day).toLocaleDateString(
+          "en-US",
+          {
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+          }
+        ),
+
+        shift: r.shift,
+
+        role: r.role === "host"
+          ? "Host"
+          : "Operator",
+
+        reason: r.reason,
+
+        status: r.status,
+
+        request_type: r.request_type,
+
+        is_targeted: r.is_targeted,
+
+        submittedAt: new Date().toISOString()
+      }))
       );
 
     } catch (err) {
@@ -571,6 +598,42 @@ const fetchAllLeaves = async () => {
       toast.error("Failed to update request");
     }
   };
+
+  const acceptCover = async (id: string) => {
+
+  try {
+
+    const res = await fetch(
+      `https://thesisprogram-production.up.railway.app/coverage-requests/${id}/accept`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          employee_id: currentUser.employee_id
+        }),
+      }
+    );
+
+    const data = await res.json();
+
+    toast.success(data.message);
+
+    fetchCoverRequests();
+
+    fetchMyShifts();
+
+  } catch (err) {
+
+    console.error(err);
+
+    toast.error("Failed to accept cover");
+
+  }
+};
 
   const updateLeaveStatus = async (
     requestId: string,
@@ -1128,20 +1191,13 @@ const fetchAllLeaves = async () => {
                         <TableHead>Shift</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Reason</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead>Status</TableHead>
-                        {role === "admin" && (
-                          <TableHead>Actions</TableHead>
-                        )}
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {coverRequests
-                        .filter(
-                          (req) =>
-                            role === "admin" ||
-                            req.requester === currentUser.name
-                        )
-                        .map((request) => {
+                      {coverRequests.map((request) => {
                           const shiftInfo = getShiftInfo(
                             request.shift,
                           );
@@ -1182,6 +1238,28 @@ const fetchAllLeaves = async () => {
                                 {request.reason}
                               </TableCell>
                               <TableCell>
+                              <Badge
+                                variant={
+                                  request.request_type === "emergency"
+                                    ? "destructive"
+                                    : "secondary"
+                                }
+                              >
+                                {request.request_type}
+                              </Badge>
+                            </TableCell>
+                              <TableCell>
+                              <Badge
+                                variant={
+                                  request.request_type === "emergency"
+                                    ? "destructive"
+                                    : "secondary"
+                                }
+                              >
+                                {request.request_type}
+                              </Badge>
+                            </TableCell>
+                              <TableCell>
                                 <div className="flex items-center gap-2">
                                   {getStatusIcon(
                                     request.status,
@@ -1191,38 +1269,58 @@ const fetchAllLeaves = async () => {
                                   )}
                                 </div>
                               </TableCell>
-                              {role === "admin" && (
-                                <TableCell>
-                                  {request.status ===
-                                    "pending" && (
+                              <TableCell>
+                                {role === "admin" ? (
+
+                                  request.status === "pending" && (
                                     <div className="flex gap-2">
+
                                       <Button
                                         size="sm"
                                         onClick={() =>
                                           updateCoverStatus(
                                             request.id,
-                                            "approved",
+                                            "approved"
                                           )
                                         }
                                       >
                                         Approve
                                       </Button>
+
                                       <Button
                                         size="sm"
                                         variant="destructive"
                                         onClick={() =>
                                           updateCoverStatus(
                                             request.id,
-                                            "denied",
+                                            "denied"
                                           )
                                         }
                                       >
                                         Deny
                                       </Button>
+
                                     </div>
-                                  )}
-                                </TableCell>
-                              )}
+                                  )
+
+                                ) : (
+
+                                  request.status === "pending"
+                                  && request.requester !== currentUser.name
+                                  && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        acceptCover(request.id)
+                                      }
+                                    >
+                                      Accept Cover
+                                    </Button>
+                                  )
+
+                                )}
+
+                              </TableCell>
                             </TableRow>
                           );
                         })}
