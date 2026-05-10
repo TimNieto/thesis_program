@@ -220,6 +220,34 @@ def generate_weekly_schedule():
             "gy_shift_penalty": settings_row[5]
         }
 
+        # -------------------------
+        # FETCH ACCOUNT SETTINGS
+        # -------------------------
+        cursor.execute("""
+            SELECT
+                account_name,
+                priority_level,
+                require_host,
+                require_operator,
+                allow_partial_staffing
+            FROM account_settings
+        """)
+
+        account_rows = cursor.fetchall()
+
+        account_settings = {}
+
+        for row in account_rows:
+
+            account_name = row[0]
+
+            account_settings[account_name] = {
+                "priority_level": row[1],
+                "require_host": row[2],
+                "require_operator": row[3],
+                "allow_partial_staffing": row[4]
+            }
+
         # Run scheduler
         result = generate_schedule(
             employees,
@@ -227,7 +255,8 @@ def generate_weekly_schedule():
             availability,
             leaves_map,
             absences_map,
-            settings   
+            settings,
+            account_settings   
            # absences
         )
  

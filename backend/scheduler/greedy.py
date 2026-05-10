@@ -18,7 +18,7 @@ from scheduler.constraints import (
 # CONTEXT PREPARATION
 # -------------------------------
 
-def prepare_context(employees, shifts, availability, leaves, absences,settings):
+def prepare_context(employees, shifts, availability, leaves, absences, settings, account_settings):
     """
     Converts raw DB data into fast lookup structures
     """
@@ -58,6 +58,7 @@ def prepare_context(employees, shifts, availability, leaves, absences,settings):
         "leaves_map": leaves_map,
         "absences_map": absences_map,
         "settings": settings,
+         "account_settings": account_settings,
         "assignments": [],
         "assignment_counts": defaultdict(int),
         "context_assignments_by_employee": defaultdict(list),
@@ -560,12 +561,12 @@ def repair_schedule(unfilled, employees, shifts, context):
 # MAIN GENERATOR
 # -------------------------------
 
-def generate_schedule(employees, shifts, availability, leaves, absences,settings):
+def generate_schedule(employees, shifts, availability, leaves, absences, settings, account_settings):
     """
     Main entry point
     """
 
-    context = prepare_context(employees, shifts, availability, leaves, absences,settings)
+    context = prepare_context(employees, shifts, availability, leaves, absences, settings, account_settings)
 
     context["shift_map"] = {s["shift_id"]: s for s in shifts}
     

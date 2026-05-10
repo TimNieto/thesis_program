@@ -93,3 +93,82 @@ def update_settings(payload: dict):
     finally:
         cursor.close()
         conn.close()
+
+
+
+@router.get("/account-settings")
+def get_account_settings():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        cursor.execute("""
+            SELECT
+                account_setting_id,
+                account_name,
+                priority_level,
+                require_host,
+                require_operator,
+                allow_partial_staffing
+            FROM account_settings
+            ORDER BY priority_level
+        """)
+
+        rows = cursor.fetchall()
+
+        return [
+            {
+                "account_setting_id": r[0],
+                "account_name": r[1],
+                "priority_level": r[2],
+                "require_host": r[3],
+                "require_operator": r[4],
+                "allow_partial_staffing": r[5]
+            }
+            for r in rows
+        ]
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.put("/account-settings/{account_setting_id}")
+def update_account_settings(
+    account_setting_id: int,
+    payload: dict
+):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        cursor.execute("""
+            UPDATE account_settings
+            SET
+                priority_level = %s,
+                require_host = %s,
+                require_operator = %s,
+                allow_partial_staffing = %s,
+                updated_at = NOW()
+            WHERE account_setting_id = %s
+        """, (
+            payload["priority_level"],
+            payload["require_host"],
+            payload["require_operator"],
+            payload["allow_partial_staffing"],
+            account_setting_id
+        ))
+
+        conn.commit()
+
+        return {
+            "status": "success"
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
