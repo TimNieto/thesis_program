@@ -233,20 +233,30 @@ def get_requests(employee_id: int):
 
             WHERE
 
-                (
-                    cr.request_type = 'normal'
-                )
+            -- employee always sees own requests
+            cr.requested_by = %s
 
-                OR
+            OR
 
-                (
-                    cr.request_type = 'emergency'
-                    AND ect.employee_id IS NOT NULL
-                )
+            -- all normal requests visible
+            (
+                cr.request_type = 'normal'
+            )
+
+            OR
+
+            -- emergency requests only visible to targets
+            (
+                cr.request_type = 'emergency'
+                AND ect.employee_id IS NOT NULL
+            )
 
             ORDER BY cr.created_at DESC
 
-        """, (employee_id,))
+        """, (
+            employee_id,  # for LEFT JOIN
+            employee_id   # for own requests
+        ))
 
         rows = cursor.fetchall()
 
