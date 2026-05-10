@@ -252,7 +252,14 @@ def score_employee(employee, shift, role, context):
 
         # discourage assigning operators
         # unless necessary
-        score -= 10
+        score -= 50
+
+    if (
+        role == "host"
+        and
+        operator_policy == "avoid"
+    ):
+        score += 15
 
         print(
             f"⚠️ AVOIDING OPERATOR "
