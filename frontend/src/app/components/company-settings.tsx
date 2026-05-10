@@ -253,6 +253,9 @@ const saveAccountPolicies = async () => {
 
             require_operator:
               policy.require_operator,
+            
+            operator_policy:
+             policy.operator_policy,
 
             allow_partial_staffing:
               policy.allow_partial_staffing
@@ -770,34 +773,53 @@ const saveAccountPolicies = async () => {
 
               </div>
 
-              {/* Require Operator */}
-              <div className="flex items-center justify-between">
+             {/* Operator Policy */}
+              <div className="space-y-2">
 
-                <div>
+                <Label>
+                  Operator Policy
+                </Label>
 
-                  <Label>
-                    Require Operator
-                  </Label>
+                <Select
+                  value={policy.operator_policy}
 
-                  <p className="text-xs text-gray-500">
-                    Scheduler must fill operator role
-                  </p>
-
-                </div>
-
-                <Switch
-                  checked={policy.require_operator}
-
-                  onCheckedChange={(checked) => {
+                  onValueChange={(value) => {
 
                     const updated = [...accountPolicies];
 
-                    updated[index].require_operator =
-                      checked;
+                    updated[index].operator_policy =
+                      value;
 
                     setAccountPolicies(updated);
                   }}
-                />
+                >
+
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+
+                  <SelectContent>
+
+                    <SelectItem value="required">
+                      Required
+                    </SelectItem>
+
+                    <SelectItem value="optional">
+                      Optional
+                    </SelectItem>
+
+                    <SelectItem value="avoid">
+                      Avoid
+                    </SelectItem>
+
+                  </SelectContent>
+
+                </Select>
+
+                <p className="text-xs text-gray-500">
+                  Configure how strongly the scheduler
+                  should assign operators
+                </p>
 
               </div>
 
