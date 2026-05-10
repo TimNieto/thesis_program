@@ -96,7 +96,10 @@ def request_cover(schedule_id: int, payload: dict):
         diff_hours = (
             shift_datetime - now
         ).total_seconds() / 3600
-
+        print("SHIFT DATETIME:", shift_datetime)
+        print("NOW:", now)
+        print("DIFF HOURS:", diff_hours)
+        
         # DETERMINE REQUEST TYPE
         request_type = (
             "emergency"
