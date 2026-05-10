@@ -357,6 +357,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         },
         body: JSON.stringify({
           employee_id: employeeId,
+          account: "default",
           day_of_week: day.toLowerCase(),
           preferred_shift: shift.toLowerCase(),
           is_available: isCurrentlyUnavailable // invert
