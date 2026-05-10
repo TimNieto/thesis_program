@@ -229,6 +229,7 @@ def generate_weekly_schedule():
                 priority_level,
                 require_host,
                 require_operator,
+                operator_policy,
                 allow_partial_staffing
             FROM account_settings
         """)
@@ -245,7 +246,8 @@ def generate_weekly_schedule():
                 "priority_level": row[1],
                 "require_host": row[2],
                 "require_operator": row[3],
-                "allow_partial_staffing": row[4]
+                "operator_policy": row[4],
+                "allow_partial_staffing": row[5]
             }
 
         # Run scheduler
