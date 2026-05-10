@@ -99,7 +99,7 @@ def request_cover(schedule_id: int, payload: dict):
         print("SHIFT DATETIME:", shift_datetime)
         print("NOW:", now)
         print("DIFF HOURS:", diff_hours)
-        
+
         # DETERMINE REQUEST TYPE
         request_type = (
             "emergency"
@@ -196,7 +196,7 @@ def get_requests(employee_id: int):
 
         cursor.execute("""
 
-            SELECT DISTINCT
+            SELECT  
 
                 cr.id,
 
@@ -215,6 +215,8 @@ def get_requests(employee_id: int):
                 cr.status,
 
                 cr.request_type,
+                       
+                cr.created_at,
 
                 CASE
                     WHEN ect.employee_id IS NOT NULL
@@ -277,7 +279,8 @@ def get_requests(employee_id: int):
                 "reason": r[6],
                 "status": r[7],
                 "request_type": r[8],
-                "is_targeted": r[9]
+                "created_at": str(r[9]),
+                "is_targeted": r[10]
             })
 
         return result
@@ -421,6 +424,8 @@ def get_shift_applications():
                 sa.id,
 
                 e.full_name,
+                       
+                cr.requested_by,
 
                 gs.account,
 
@@ -463,16 +468,17 @@ def get_shift_applications():
 
             result.append({
                 "id": r[0],
-                "applicant": r[1],
-                "livestream": r[2],
-                "day": str(r[3]),
-                "shift": r[4],
-                "role": r[5],
-                "reason": r[6],
-                "status": r[7],
-                "coverage_request_id": r[8],
-                "schedule_id": r[9],
-                "employee_id": r[10]
+                "requester": r[1],
+                "requested_by": r[2],
+                "livestream": r[3],
+                "day": str(r[4]),
+                "shift": r[5],
+                "role": r[6],
+                "reason": r[7],
+                "status": r[8],
+                "request_type": r[9],
+                "created_at": str(r[10]),
+                "is_targeted": r[11]
             })
 
         return result
