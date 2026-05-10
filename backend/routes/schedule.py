@@ -309,8 +309,9 @@ def deny_request(id: int):
 
     return {"message": "Denied"}
 
-@router.post("/coverage-requests/{id}/accept")
-def accept_cover(id: int, payload: dict):
+
+@router.post("/coverage-requests/{id}/apply")
+def apply_for_cover(id: int, payload: dict):
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -318,6 +319,7 @@ def accept_cover(id: int, payload: dict):
     try:
 
         employee_id = payload.get("employee_id")
+        reason = payload.get("reason", "")
 
         if not employee_id:
             raise HTTPException(
@@ -325,11 +327,12 @@ def accept_cover(id: int, payload: dict):
                 detail="employee_id required"
             )
 
-        # GET SCHEDULE
+        # CHECK REQUEST EXISTS
         cursor.execute("""
-            SELECT schedule_id
+            SELECT id, requested_by
             FROM coverage_requests
             WHERE id = %s
+            AND status = 'pending'
         """, (id,))
 
         request = cursor.fetchone()
@@ -337,10 +340,170 @@ def accept_cover(id: int, payload: dict):
         if not request:
             raise HTTPException(
                 status_code=404,
-                detail="Request not found"
+                detail="Cover request not found"
             )
 
-        schedule_id = request[0]
+        # PREVENT SELF APPLICATION
+        if request[1] == employee_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot apply to own request"
+            )
+
+        # PREVENT DUPLICATES
+        cursor.execute("""
+            SELECT id
+            FROM shift_applications
+            WHERE coverage_request_id = %s
+            AND applicant_id = %s
+        """, (
+            id,
+            employee_id
+        ))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail="Already applied"
+            )
+
+        # CREATE APPLICATION
+        cursor.execute("""
+            INSERT INTO shift_applications (
+                coverage_request_id,
+                applicant_id,
+                reason
+            )
+            VALUES (%s, %s, %s)
+        """, (
+            id,
+            employee_id,
+            reason
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "Applied successfully"
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.get("/shift-applications")
+def get_shift_applications():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        cursor.execute("""
+
+            SELECT
+
+                sa.id,
+
+                e.full_name,
+
+                gs.account,
+
+                gs.shift_date,
+
+                gs.shift_type,
+
+                gs.role,
+
+                sa.reason,
+
+                sa.status,
+
+                cr.id AS coverage_request_id,
+
+                gs.schedule_id,
+
+                e.employee_id
+
+            FROM shift_applications sa
+
+            JOIN employees e
+                ON sa.applicant_id = e.employee_id
+
+            JOIN coverage_requests cr
+                ON sa.coverage_request_id = cr.id
+
+            JOIN generated_schedule gs
+                ON cr.schedule_id = gs.schedule_id
+
+            ORDER BY sa.applied_at DESC
+
+        """)
+
+        rows = cursor.fetchall()
+
+        result = []
+
+        for r in rows:
+
+            result.append({
+                "id": r[0],
+                "applicant": r[1],
+                "livestream": r[2],
+                "day": str(r[3]),
+                "shift": r[4],
+                "role": r[5],
+                "reason": r[6],
+                "status": r[7],
+                "coverage_request_id": r[8],
+                "schedule_id": r[9],
+                "employee_id": r[10]
+            })
+
+        return result
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.post("/shift-applications/{id}/approve")
+def approve_application(id: int):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        # GET APPLICATION INFO
+        cursor.execute("""
+
+            SELECT
+                sa.applicant_id,
+                cr.schedule_id,
+                cr.id
+
+            FROM shift_applications sa
+
+            JOIN coverage_requests cr
+                ON sa.coverage_request_id = cr.id
+
+            WHERE sa.id = %s
+
+        """, (id,))
+
+        app = cursor.fetchone()
+
+        if not app:
+            raise HTTPException(
+                status_code=404,
+                detail="Application not found"
+            )
+
+        applicant_id = app[0]
+        schedule_id = app[1]
+        coverage_request_id = app[2]
 
         # TRANSFER SHIFT
         cursor.execute("""
@@ -348,11 +511,11 @@ def accept_cover(id: int, payload: dict):
             SET employee_id = %s
             WHERE schedule_id = %s
         """, (
-            employee_id,
+            applicant_id,
             schedule_id
         ))
 
-        # UPDATE REQUEST
+        # APPROVE COVER REQUEST
         cursor.execute("""
             UPDATE coverage_requests
             SET
@@ -361,14 +524,72 @@ def accept_cover(id: int, payload: dict):
                 approved_at = NOW()
             WHERE id = %s
         """, (
-            employee_id,
+            applicant_id,
+            coverage_request_id
+        ))
+
+        # APPROVE APPLICATION
+        cursor.execute("""
+            UPDATE shift_applications
+            SET status = 'approved'
+            WHERE id = %s
+        """, (id,))
+
+        # DENY OTHER APPLICATIONS
+        cursor.execute("""
+            UPDATE shift_applications
+            SET status = 'denied'
+            WHERE coverage_request_id = %s
+            AND id != %s
+        """, (
+            coverage_request_id,
             id
         ))
 
         conn.commit()
 
         return {
-            "message": "Cover accepted"
+            "message": "Application approved"
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.post("/shift-applications/{id}/deny")
+def deny_application(id: int):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        # CHECK EXISTS
+        cursor.execute("""
+            SELECT id
+            FROM shift_applications
+            WHERE id = %s
+        """, (id,))
+
+        app = cursor.fetchone()
+
+        if not app:
+            raise HTTPException(
+                status_code=404,
+                detail="Application not found"
+            )
+
+        # DENY APPLICATION
+        cursor.execute("""
+            UPDATE shift_applications
+            SET status = 'denied'
+            WHERE id = %s
+        """, (id,))
+
+        conn.commit()
+
+        return {
+            "message": "Application denied"
         }
 
     finally:

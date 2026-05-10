@@ -60,6 +60,7 @@ import { toast } from "sonner";
 
 interface ShiftApplication {
   id: string;
+  coverage_request_id?: string;
   applicant: string;
   livestream: string;
   day: string;
@@ -139,32 +140,8 @@ export function CoverApplication({
   currentUser,
   role,
 }: CoverApplicationProps) {
-  const [applications, setApplications] = useState<
-    ShiftApplication[]
-  >([
-    {
-      id: "1",
-      applicant: "Mike Davis",
-      livestream: "Mommypoko",
-      day: "Thursday",
-      shift: "GY",
-      role: "Host",
-      reason: "Looking for extra hours",
-      status: "pending",
-      appliedAt: "2026-01-25T10:30:00",
-    },
-    {
-      id: "2",
-      applicant: "Emma Wilson",
-      livestream: "Sofy",
-      day: "Friday",
-      shift: "NN",
-      role: "Operator",
-      reason: "Can cover this shift",
-      status: "approved",
-      appliedAt: "2026-01-24T14:20:00",
-    },
-  ]);
+  const [applications, setApplications] =
+  useState<ShiftApplication[]>([]);
 
   const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
@@ -288,6 +265,60 @@ const fetchAllLeaves = async () => {
     }
   };
 
+  const fetchApplications = async () => {
+
+  try {
+
+    const res = await fetch(
+      "https://thesisprogram-production.up.railway.app/shift-applications"
+    );
+
+    const data = await res.json();
+
+    setApplications(
+      data.map((a: any) => ({
+        id: String(a.id),
+
+        coverage_request_id: String(a.coverage_request_id),
+
+        applicant: a.applicant,
+
+        livestream: a.livestream,
+
+        day: new Date(a.day).toLocaleDateString(
+          "en-US",
+          {
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+          }
+        ),
+
+        shift: a.shift,
+
+        role:
+          a.role === "host"
+            ? "Host"
+            : "Operator",
+
+        reason: a.reason,
+
+        status: a.status,
+
+        appliedAt: new Date().toISOString()
+      }))
+    );
+
+  } catch (err) {
+
+    console.error(
+      "Failed to fetch applications",
+      err
+    );
+
+  }
+};
+
   const fetchEmployees = () => {
   fetch("https://thesisprogram-production.up.railway.app/employees")
     .then(res => res.json())
@@ -299,6 +330,8 @@ const fetchAllLeaves = async () => {
   useEffect(() => {
     fetchMyShifts();
     fetchEmployees();
+    fetchApplications();
+    fetchCoverRequests();
 
     if (role !== "admin") {
   fetchMyLeaves();
@@ -311,53 +344,21 @@ const fetchAllLeaves = async () => {
   }
 }, [employees]);
 
-  useEffect(() => {
-    fetchCoverRequests();
-  }, []);
-
-  // Available shifts (mock data)
-  const [availableShifts] = useState([
-    {
-      livestream: "Mommypoko",
-      day: "Thursday",
-      shift: "PM",
-      role: "Host" as const,
-    },
-    {
-      livestream: "Mommypoko",
-      day: "Friday",
-      shift: "GY",
-      role: "Operator" as const,
-    },
-    {
-      livestream: "Sofy",
-      day: "Wednesday",
-      shift: "AM",
-      role: "Host" as const,
-    },
-    {
-      livestream: "Sofy",
-      day: "Thursday",
-      shift: "PM",
-      role: "Operator" as const,
-    },
-    {
-      livestream: "Mommypoko",
-      day: "Saturday",
-      shift: "GY",
-      role: "Host" as const,
-    },
-    {
-      livestream: "Sofy",
-      day: "Sunday",
-      shift: "AM",
-      role: "Operator" as const,
-    },
-  ]);
+  // Available shifts
+const availableShifts = coverRequests.filter(
+  (r) =>
+    r.status === "pending"
+    && r.requester !== currentUser.name
+    && !applications.some(
+      (a) =>
+        a.applicant === currentUser.name
+        && a.coverage_request_id === r.id
+        && a.status === "pending"
+    )
+);
 
 
-  const [isApplicationDialogOpen, setIsApplicationDialogOpen] =
-    useState(false);
+
 
   const [isCoverDialogOpen, setIsCoverDialogOpen] =
     useState(false);
@@ -371,8 +372,6 @@ const fetchAllLeaves = async () => {
   role: "Host" | "Operator";
 } | null>(null);
 
-  const [applicationReason, setApplicationReason] =
-    useState("");
 
   const [coverReason, setCoverReason] = useState("");
 
@@ -386,18 +385,8 @@ const fetchAllLeaves = async () => {
 
   const [standaloneLeaveType, setStandaloneLeaveType] = useState(LEAVE_TYPES[0]);
 
-  const openApplicationDialog = (slot: any) => {
-    setSelectedShift({
-      schedule_id: slot.schedule_id, // ⚠️ may be undefined for now (OK)
-      livestream: slot.livestream,
-      day: slot.day,
-      shift: slot.shift,
-      role: slot.role,
-    });
 
-    setApplicationReason("");
-    setIsApplicationDialogOpen(true);
-  };
+  
 
   const openCoverDialog = (shiftObj: {
     schedule_id: number;
@@ -417,32 +406,6 @@ const fetchAllLeaves = async () => {
   };
 
 
-  const submitApplication = () => {
-    if (!selectedShift || !applicationReason.trim()) {
-      toast.error(
-        "Please provide a reason for your application",
-      );
-      return;
-    }
-
-    const application: ShiftApplication = {
-      id: Date.now().toString(),
-      applicant: currentUser.name,
-      livestream: selectedShift.livestream,
-      day: selectedShift.day,
-      shift: selectedShift.shift,
-      role: selectedShift.role,
-      reason: applicationReason,
-      status: "pending",
-      appliedAt: new Date().toISOString(),
-    };
-
-    setApplications([application, ...applications]);
-    setIsApplicationDialogOpen(false);
-    setApplicationReason("");
-    setSelectedShift(null);
-    toast.success("Shift application submitted successfully");
-  };
 
   const submitCoverRequest = async () => {
     if (!selectedShift || !coverReason.trim()) {
@@ -566,61 +529,30 @@ const fetchAllLeaves = async () => {
     return date < oneWeekFromNow;
   };
 
-  const updateApplicationStatus = (
-    id: string,
-    status: "approved" | "denied",
-  ) => {
-    setApplications(
-      applications.map((app) =>
-        app.id === id ? { ...app, status } : app,
-      ),
-    );
-    toast.success(`Application ${status}`);
-  };
-
-  const updateCoverStatus = async (id: string, status: "approved" | "denied") => {
-    try {
-      const endpoint =
-        status === "approved"
-          ? `/coverage-requests/${id}/approve`
-          : `/coverage-requests/${id}/deny`;
-
-      await fetch(`https://thesisprogram-production.up.railway.app${endpoint}`, {
-        method: "POST",
-      });
-
-      // refresh data after update
-      fetchCoverRequests();
-
-      toast.success(`Cover request ${status}`);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to update request");
-    }
-  };
-
-  const acceptCover = async (id: string) => {
+const updateApplicationStatus = async (
+  id: string,
+  status: "approved" | "denied",
+) => {
 
   try {
 
-    const res = await fetch(
-      `https://thesisprogram-production.up.railway.app/coverage-requests/${id}/accept`,
+    const endpoint =
+      status === "approved"
+        ? `/shift-applications/${id}/approve`
+        : `/shift-applications/${id}/deny`;
+
+    await fetch(
+      `https://thesisprogram-production.up.railway.app${endpoint}`,
       {
         method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          employee_id: currentUser.employee_id
-        }),
       }
     );
 
-    const data = await res.json();
+    toast.success(
+      `Application ${status}`
+    );
 
-    toast.success(data.message);
+    fetchApplications();
 
     fetchCoverRequests();
 
@@ -630,7 +562,46 @@ const fetchAllLeaves = async () => {
 
     console.error(err);
 
-    toast.error("Failed to accept cover");
+    toast.error(
+      "Failed to update application"
+    );
+
+  }
+};
+
+
+  const applyForCover = async (id: string) => {
+
+  try {
+
+    const res = await fetch(
+      `https://thesisprogram-production.up.railway.app/coverage-requests/${id}/apply`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          employee_id: currentUser.employee_id,
+          reason: "Can cover this shift"
+        }),
+      }
+    );
+
+    const data = await res.json();
+
+    toast.success(data.message);
+
+    fetchCoverRequests();
+    fetchApplications();
+
+  } catch (err) {
+
+    console.error(err);
+
+    toast.error("Failed to apply");
 
   }
 };
@@ -828,11 +799,11 @@ const fetchAllLeaves = async () => {
                               </div>
                             </div>
                             <Button
-                              onClick={() => openApplicationDialog(slot)}
+                              onClick={() => applyForCover(slot.id)}
                               className="w-full"
                               size="sm"
                             >
-                              Apply for Shift
+                              applying to cover
                             </Button>
                           </div>
                         </CardContent>
@@ -1175,7 +1146,7 @@ const fetchAllLeaves = async () => {
               </CardTitle>
               <CardDescription>
                 {role === "admin"
-                  ? "Review and approve coverage requests"
+                  ? "View employee coverage requests"
                   : "Track your coverage request status"}
               </CardDescription>
             </CardHeader>
@@ -1197,7 +1168,13 @@ const fetchAllLeaves = async () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {coverRequests.map((request) => {
+                      {coverRequests
+                        .filter(
+                          (request) =>
+                            role === "admin"
+                            || request.requester === currentUser.name
+                        )
+                        .map((request) => {
                           const shiftInfo = getShiftInfo(
                             request.shift,
                           );
@@ -1249,17 +1226,6 @@ const fetchAllLeaves = async () => {
                               </Badge>
                             </TableCell>
                               <TableCell>
-                              <Badge
-                                variant={
-                                  request.request_type === "emergency"
-                                    ? "destructive"
-                                    : "secondary"
-                                }
-                              >
-                                {request.request_type}
-                              </Badge>
-                            </TableCell>
-                              <TableCell>
                                 <div className="flex items-center gap-2">
                                   {getStatusIcon(
                                     request.status,
@@ -1270,56 +1236,19 @@ const fetchAllLeaves = async () => {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                {role === "admin" ? (
-
-                                  request.status === "pending" && (
-                                    <div className="flex gap-2">
-
-                                      <Button
-                                        size="sm"
-                                        onClick={() =>
-                                          updateCoverStatus(
-                                            request.id,
-                                            "approved"
-                                          )
-                                        }
-                                      >
-                                        Approve
-                                      </Button>
-
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() =>
-                                          updateCoverStatus(
-                                            request.id,
-                                            "denied"
-                                          )
-                                        }
-                                      >
-                                        Deny
-                                      </Button>
-
-                                    </div>
-                                  )
-
-                                ) : (
-
-                                  request.status === "pending"
+                                {role !== "admin"
+                                  && request.status === "pending"
                                   && request.requester !== currentUser.name
                                   && (
                                     <Button
                                       size="sm"
                                       onClick={() =>
-                                        acceptCover(request.id)
+                                        applyForCover(request.id)
                                       }
                                     >
                                       Accept Cover
                                     </Button>
-                                  )
-
-                                )}
-
+                                  )}
                               </TableCell>
                             </TableRow>
                           );
@@ -1374,9 +1303,6 @@ const fetchAllLeaves = async () => {
                             req.requester === currentUser.name
                         )
                         .map((request) => {
-                          const shiftInfo = getShiftInfo(
-                            request.shift,
-                          );
                           return (
                             <TableRow key={request.id}>
                               <TableCell>
@@ -1449,64 +1375,6 @@ const fetchAllLeaves = async () => {
       </Tabs>
 
       {/* Shift Application Dialog */}
-      <Dialog
-        open={isApplicationDialogOpen}
-        onOpenChange={setIsApplicationDialogOpen}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Apply for Shift</DialogTitle>
-            <DialogDescription>
-              {selectedShift && (
-                <div className="space-y-1 mt-2">
-                  <div>
-                    <strong>Livestream:</strong>{" "}
-                    {selectedShift.livestream}
-                  </div>
-                  <div>
-                    <strong>Day:</strong> {selectedShift.day}
-                  </div>
-                  <div>
-                    <strong>Shift:</strong>{" "}
-                    {getShiftInfo(selectedShift.shift)?.name} (
-                    {getShiftInfo(selectedShift.shift)?.time})
-                  </div>
-                  <div>
-                    <strong>Role:</strong> {selectedShift.role}
-                  </div>
-                </div>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="applicationReason">
-                Reason for Application
-              </Label>
-              <Textarea
-                id="applicationReason"
-                placeholder="Please explain why you'd like this shift..."
-                value={applicationReason}
-                onChange={(e) =>
-                  setApplicationReason(e.target.value)
-                }
-                rows={4}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsApplicationDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitApplication}>
-              Submit Application
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Cover Request Dialog */}
       <Dialog
