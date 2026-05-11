@@ -422,22 +422,65 @@ useEffect(() => {
     }
   };
 
-  const saveSchedule = async () => {
-    try {
-      await fetch("https://thesisprogram-production.up.railway.app/save-schedule", {
+const saveSchedule = async () => {
+
+  try {
+
+    const payload = assignments.map((a) => {
+
+      const dayIndex = DAYS.indexOf(a.day);
+
+      return {
+
+        shift_id: a.shift_id,
+
+        employee_id: a.employee_id,
+
+        role: a.role.toLowerCase(),
+
+        shift_date: formatDate(
+          weekDates[dayIndex]
+        ),
+
+        shift_type: a.shift,
+
+        account: a.livestream
+
+      };
+
+    });
+
+    console.log(payload);
+
+    const res = await fetch(
+      "https://thesisprogram-production.up.railway.app/save-schedule",
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(assignments),
-      });
+        body: JSON.stringify(payload),
+      }
+    );
 
-      toast.success("Schedule saved");
-    } catch (err) {
+    if (!res.ok) {
+
+      const err = await res.text();
+
       console.error(err);
-      toast.error("Failed to save");
+
+      throw new Error(err);
     }
-  };
+
+    toast.success("Schedule saved");
+
+  } catch (err) {
+
+    console.error(err);
+
+    toast.error("Failed to save");
+  }
+};
 
   const getShiftColor = (shift: string) => {
     const colors = {

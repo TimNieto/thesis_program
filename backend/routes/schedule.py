@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from services.schedule_service import generate_weekly_schedule, get_generated_schedule
 from db.database import get_connection
 from datetime import datetime
+from fastapi import Body
 
 router = APIRouter()
 SHIFT_STARTS = {
@@ -704,7 +705,7 @@ def deny_application(id: int):
         conn.close()
 
 @router.post("/save-schedule")
-def save_schedule(assignments: list):
+def save_schedule(assignments: list=Body):
     conn = get_connection()
     cursor = conn.cursor()
 
