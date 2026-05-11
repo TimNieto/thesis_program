@@ -757,7 +757,14 @@ def save_schedule(assignments: List[dict] = Body(...)):
         conn.commit()
 
         return {"message": "Schedule saved"}
+    
+    except Exception as e:
+        conn.rollback()
+        print("SAVE SCHEDULE ERROR:", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         cursor.close()
         conn.close()
+
+        
