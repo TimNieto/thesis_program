@@ -273,42 +273,6 @@ def generate_weekly_schedule():
             emp_id = a["employee_id"]
             a["employee_name"] = employee_lookup.get(emp_id, f"Employee {emp_id}")
 
-        # -------------------------------
-        # RESET OLD DATA
-        # -------------------------------
-
-        # 🧹 delete ALL cover requests (IMPORTANT)
-        cursor.execute("DELETE FROM coverage_requests")
-
-        # -------------------------------
-        # SAVE GENERATED SCHEDULE (DRAFT)
-        # -------------------------------
-
-        # clear previous draft schedule
-        cursor.execute("DELETE FROM generated_schedule")
-
-        # insert new generated schedule
-        for a in result["assignments"]:
-            cursor.execute("""
-                INSERT INTO generated_schedule (
-                    shift_id,
-                    employee_id,
-                    role,
-                    shift_date,
-                    shift_type,
-                    account
-                )
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                a["shift_id"],
-                a["employee_id"],
-                a["role"],
-                a["shift_date"],   # ✅ ADD THIS
-                a["shift_type"],   # ✅ ADD THIS
-                a["account"]       # ✅ ADD THIS
-            ))
-
-        conn.commit()
 
         grouped = group_schedule(result["assignments"])
 
