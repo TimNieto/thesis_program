@@ -1,12 +1,34 @@
+// src/app/components/company-settings.tsx
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 import { Switch } from "@/app/components/ui/switch";
 import { Separator } from "@/app/components/ui/separator";
-import { Building2, Clock, Users, Settings as SettingsIcon, Bell, Plus, X } from "lucide-react";
+import {
+  Building2,
+  Clock,
+  Users,
+  Settings as SettingsIcon,
+  Bell,
+  Plus,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface ShiftTiming {
@@ -26,17 +48,17 @@ export function CompanySettings() {
   // Company Profile
   const [companyType, setCompanyType] = useState("Live Selling");
   const [companyName, setCompanyName] = useState("Live Stream Operations");
-  const [accountCount, setAccountCount] = useState("50");
-  const [branchCount, setBranchCount] = useState("2");
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [branchCount] = useState("0");
 
   // Scheduling Rules
   const [shiftsPerDay, setShiftsPerDay] = useState("4");
   const [maxShiftsPerEmployee, setMaxShiftsPerEmployee] = useState("5");
   const [maxAbsencePerEmployee, setMaxAbsencePerEmployee] = useState("3");
-  const [maxConsecutiveWorkingDays, setMaxConsecutiveWorkingDays] = useState("6");
+  const [maxConsecutiveWorkingDays, setMaxConsecutiveWorkingDays] =
+    useState("6");
   const [minRestPeriod, setMinRestPeriod] = useState("8");
   const [doubleShiftAllowance, setDoubleShiftAllowance] = useState(true);
-  
 
   // Shift Timings
   const [shiftTimings, setShiftTimings] = useState<ShiftTiming[]>([
@@ -52,91 +74,201 @@ export function CompanySettings() {
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
 
   // Scheduling Behavior
-  const [absenceReplacementMode, setAbsenceReplacementMode] = useState("Automatic");
+  const [absenceReplacementMode, setAbsenceReplacementMode] =
+    useState("Automatic");
 
   // Notification Preferences
   const [inAppNotifications, setInAppNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
 
-  const [fairnessWeight, setFairnessWeight] =
-    useState("3");
+  const [fairnessWeight, setFairnessWeight] = useState("3");
 
-  const [gyPenalty, setGyPenalty] =
-    useState("5");
-  const [accountPolicies, setAccountPolicies] =
-  useState<any[]>([]);
+  const [gyPenalty, setGyPenalty] = useState("5");
+  const [accountPolicies, setAccountPolicies] = useState<any[]>([]);
 
+  const [creatingAccount, setCreatingAccount] = useState(false);
+
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const [newAccountName, setNewAccountName] = useState("");
+
+  const [newPriorityLevel, setNewPriorityLevel] = useState("2");
+
+  const [newRequireHost, setNewRequireHost] = useState(true);
+
+  const [newRequireOperator, setNewRequireOperator] = useState(true);
+
+  const [newAllowPartial, setNewAllowPartial] = useState(false);
+
+  const [newOperatorPolicy, setNewOperatorPolicy] = useState("required");
+
+  const [selectedDeleteAccount, setSelectedDeleteAccount] = useState("");
 
   useEffect(() => {
-  fetchSettings();
-  fetchAccountSettings();
-}, []);
+    fetchSettings();
+    fetchAccountSettings();
+    fetchAccounts();
+  }, []);
 
-const fetchSettings = async () => {
-  try {
-    const res = await fetch(
-      "https://thesisprogram-production.up.railway.app/settings"
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/settings",
+      );
+
+      const data = await res.json();
+
+      setCompanyName(data.company_name);
+      setCompanyType(data.company_type);
+
+      setMaxConsecutiveWorkingDays(String(data.max_working_days));
+
+      setMaxShiftsPerEmployee(String(data.max_shifts_per_week));
+
+      setShiftsPerDay(String(data.max_shifts_per_day));
+
+      setDoubleShiftAllowance(data.allow_double_shifts);
+
+      setAbsenceReplacementMode(data.absence_replacement_mode);
+
+      setFairnessWeight(String(data.fairness_weight));
+
+      setGyPenalty(String(data.gy_shift_penalty));
+    } catch (err) {
+      console.error("Failed to fetch settings", err);
+    }
+  };
+
+  const fetchAccountSettings = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/account-settings",
+      );
+
+      const data = await res.json();
+
+      setAccountPolicies(data);
+    } catch (err) {
+      console.error("Failed to fetch account settings", err);
+    }
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/accounts",
+      );
+
+      const data = await res.json();
+
+      setAccounts(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const createAccount = async () => {
+    if (!newAccountName.trim()) {
+      toast.error("Account name required");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Are you sure you want to create account "${newAccountName}"?`,
     );
 
-    const data = await res.json();
+    if (!confirmed) {
+      return;
+    }
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/accounts",
+        {
+          method: "POST",
 
-    setCompanyName(data.company_name);
-    setCompanyType(data.company_type);
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-    setMaxConsecutiveWorkingDays(
-      String(data.max_working_days)
+          body: JSON.stringify({
+            account_name: newAccountName,
+
+            priority_level: Number(newPriorityLevel),
+
+            require_host: newRequireHost,
+
+            require_operator: newRequireOperator,
+
+            allow_partial_staffing: newAllowPartial,
+
+            operator_policy: newOperatorPolicy,
+          }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail);
+      }
+
+      toast.success("Account created");
+
+      setCreatingAccount(false);
+
+      setNewAccountName("");
+      setNewPriorityLevel("2");
+      setNewRequireHost(true);
+      setNewRequireOperator(true);
+      setNewAllowPartial(false);
+      setNewOperatorPolicy("required");
+      fetchAccounts();
+      fetchAccountSettings();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create account");
+    }
+  };
+
+  const removeAccount = async () => {
+    if (!selectedDeleteAccount) {
+      toast.error("Select account");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ${selectedDeleteAccount}?`,
     );
 
-    setMaxShiftsPerEmployee(
-      String(data.max_shifts_per_week)
-    );
+    if (!confirmed) {
+      return;
+    }
 
-    setShiftsPerDay(
-      String(data.max_shifts_per_day)
-    );
+    try {
+      const res = await fetch(
+        `https://thesisprogram-production.up.railway.app/accounts/${encodeURIComponent(selectedDeleteAccount)}`,
+        {
+          method: "DELETE",
+        },
+      );
 
-    setDoubleShiftAllowance(
-      data.allow_double_shifts
-    );
+      const data = await res.json();
 
-    setAbsenceReplacementMode(
-      data.absence_replacement_mode
-    );
+      if (!res.ok) {
+        throw new Error(data.detail);
+      }
 
-    setFairnessWeight(
-      String(data.fairness_weight)
-    );
+      toast.success("Account removed");
 
-    setGyPenalty(
-      String(data.gy_shift_penalty)
-    );
+      setDeletingAccount(false);
 
-  } catch (err) {
-    console.error("Failed to fetch settings", err);
-  }
-};
+      setSelectedDeleteAccount("");
 
-const fetchAccountSettings = async () => {
-
-  try {
-
-    const res = await fetch(
-      "https://thesisprogram-production.up.railway.app/account-settings"
-    );
-
-    const data = await res.json();
-
-    setAccountPolicies(data);
-
-  } catch (err) {
-
-    console.error(
-      "Failed to fetch account settings",
-      err
-    );
-  }
-};
+      fetchAccounts();
+      fetchAccountSettings();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove account");
+    }
+  };
 
   const handleAddShift = () => {
     const newShift: ShiftTiming = {
@@ -152,11 +284,15 @@ const fetchAccountSettings = async () => {
     setShiftTimings(shiftTimings.filter((shift) => shift.id !== id));
   };
 
-  const handleUpdateShift = (id: string, field: keyof ShiftTiming, value: string) => {
+  const handleUpdateShift = (
+    id: string,
+    field: keyof ShiftTiming,
+    value: string,
+  ) => {
     setShiftTimings(
       shiftTimings.map((shift) =>
-        shift.id === id ? { ...shift, [field]: value } : shift
-      )
+        shift.id === id ? { ...shift, [field]: value } : shift,
+      ),
     );
   };
 
@@ -173,110 +309,93 @@ const fetchAccountSettings = async () => {
     setCustomRoles(customRoles.filter((role) => role.id !== id));
   };
 
-  const handleUpdateRole = (id: string, field: keyof CustomRole, value: string | number) => {
+  const handleUpdateRole = (
+    id: string,
+    field: keyof CustomRole,
+    value: string | number,
+  ) => {
     setCustomRoles(
       customRoles.map((role) =>
-        role.id === id ? { ...role, [field]: value } : role
-      )
+        role.id === id ? { ...role, [field]: value } : role,
+      ),
     );
   };
 
   const handleSaveChanges = async () => {
-  try {
-    const res = await fetch(
-      "https://thesisprogram-production.up.railway.app/settings",
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          company_name: companyName,
-          company_type: companyType,
-
-          max_working_days:
-            Number(maxConsecutiveWorkingDays),
-
-          max_shifts_per_day:
-            Number(shiftsPerDay),
-
-          max_shifts_per_week:
-            Number(maxShiftsPerEmployee),
-
-          allow_double_shifts:
-            doubleShiftAllowance,
-
-          fairness_weight: Number(fairnessWeight),
-
-          gy_shift_penalty: Number(gyPenalty),
-
-          absence_replacement_mode:
-            absenceReplacementMode
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      throw new Error("Failed to save settings");
-    }
-
-    toast.success("Company settings saved successfully");
-
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to save settings");
-  }
-};
-
-const saveAccountPolicies = async () => {
-
-  try {
-
-    for (const policy of accountPolicies) {
-
-      await fetch(
-        `https://thesisprogram-production.up.railway.app/account-settings/${policy.account_setting_id}`,
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/settings",
         {
           method: "PUT",
-
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
+            company_name: companyName,
+            company_type: companyType,
 
-            priority_level:
-              policy.priority_level,
+            max_working_days: Number(maxConsecutiveWorkingDays),
 
-            require_host:
-              policy.require_host,
+            max_shifts_per_day: Number(shiftsPerDay),
 
-            require_operator:
-              policy.require_operator,
-            
-            operator_policy:
-             policy.operator_policy,
+            max_shifts_per_week: Number(maxShiftsPerEmployee),
 
-            allow_partial_staffing:
-              policy.allow_partial_staffing
-          })
-        }
+            allow_double_shifts: doubleShiftAllowance,
+
+            fairness_weight: Number(fairnessWeight),
+
+            gy_shift_penalty: Number(gyPenalty),
+
+            absence_replacement_mode: absenceReplacementMode,
+          }),
+        },
       );
+
+      if (!res.ok) {
+        throw new Error("Failed to save settings");
+      }
+
+      toast.success("Company settings saved successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save settings");
     }
+  };
 
-    toast.success(
-      "Account policies saved"
-    );
+  const saveAccountPolicies = async () => {
+    try {
+      for (const policy of accountPolicies) {
+        await fetch(
+          `https://thesisprogram-production.up.railway.app/account-settings/${policy.account_setting_id}`,
+          {
+            method: "PUT",
 
-  } catch (err) {
+            headers: {
+              "Content-Type": "application/json",
+            },
 
-    console.error(err);
+            body: JSON.stringify({
+              priority_level: policy.priority_level,
 
-    toast.error(
-      "Failed to save account policies"
-    );
-  }
-};
+              require_host: policy.require_host,
+
+              require_operator: policy.require_operator,
+
+              operator_policy: policy.operator_policy,
+
+              allow_partial_staffing: policy.allow_partial_staffing,
+            }),
+          },
+        );
+      }
+
+      toast.success("Account policies saved");
+    } catch (err) {
+      console.error(err);
+
+      toast.error("Failed to save account policies");
+    }
+  };
 
   const handleCancel = () => {
     toast.info("Changes discarded");
@@ -287,17 +406,159 @@ const saveAccountPolicies = async () => {
       {/* Header */}
       <div>
         <h2 className="text-3xl">Company Settings</h2>
-        <p className="text-gray-600">Configure scheduling rules, shifts, and notification preferences</p>
+        <p className="text-gray-600">
+          Configure scheduling rules, shifts, and notification preferences
+        </p>
       </div>
 
       {/* Company Profile Settings */}
+      {creatingAccount && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Create Account</CardTitle>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Account Name</Label>
+
+              <Input
+                value={newAccountName}
+                onChange={(e) => setNewAccountName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Priority Level</Label>
+
+              <Select
+                value={newPriorityLevel}
+                onValueChange={setNewPriorityLevel}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="1">High</SelectItem>
+
+                  <SelectItem value="2">Medium</SelectItem>
+
+                  <SelectItem value="3">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label>Require Host</Label>
+
+              <Switch
+                checked={newRequireHost}
+                onCheckedChange={setNewRequireHost}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label>Require Operator</Label>
+
+              <Switch
+                checked={newRequireOperator}
+                onCheckedChange={setNewRequireOperator}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label>Allow Partial Staffing</Label>
+
+              <Switch
+                checked={newAllowPartial}
+                onCheckedChange={setNewAllowPartial}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Operator Policy</Label>
+
+              <Select
+                value={newOperatorPolicy}
+                onValueChange={setNewOperatorPolicy}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="required">Required</SelectItem>
+
+                  <SelectItem value="optional">Optional</SelectItem>
+
+                  <SelectItem value="avoid">Avoid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={createAccount}>Confirm Add</Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setCreatingAccount(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {deletingAccount && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Remove Account</CardTitle>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <Select
+              value={selectedDeleteAccount}
+              onValueChange={setSelectedDeleteAccount}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+
+              <SelectContent>
+                {accounts.map((account) => (
+                  <SelectItem key={account.name} value={account.name}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex gap-2">
+              <Button variant="destructive" onClick={removeAccount}>
+                Confirm Remove
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setDeletingAccount(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Building2 className="size-5 text-blue-600" />
             <CardTitle>Company Profile</CardTitle>
           </div>
-          <CardDescription>Basic information about your organization</CardDescription>
+          <CardDescription>
+            Basic information about your organization
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -327,27 +588,67 @@ const saveAccountPolicies = async () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="accountCount">Account Count</Label>
-              <Input
-                id="accountCount"
-                type="number"
-                value={accountCount}
-                onChange={(e) => setAccountCount(e.target.value)}
-                placeholder="Enter account count"
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="accountCount">Account Count</Label>
+
+                <Input
+                  id="accountCount"
+                  value={accounts.length}
+                  disabled
+                  className="bg-gray-50 cursor-not-allowed"
+                />
+
+                <p className="text-xs text-gray-500">
+                  Automatically based on existing accounts
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (deletingAccount) {
+                      toast.error("Finish remove operation first");
+
+                      return;
+                    }
+
+                    setCreatingAccount(true);
+                  }}
+                >
+                  + Add Account
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    if (creatingAccount) {
+                      toast.error("Finish add operation first");
+
+                      return;
+                    }
+
+                    setDeletingAccount(true);
+                  }}
+                >
+                  Remove Account
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="branchCount">Branch / Department Count</Label>
+
               <Input
                 id="branchCount"
-                type="number"
                 value={branchCount}
-                onChange={(e) => setBranchCount(e.target.value)}
-                placeholder="Optional"
+                disabled
+                className="bg-gray-50 cursor-not-allowed"
               />
-              <p className="text-xs text-gray-500">Leave empty if not applicable</p>
+
+              <p className="text-xs text-gray-500">Currently not applicable</p>
             </div>
           </div>
         </CardContent>
@@ -360,7 +661,9 @@ const saveAccountPolicies = async () => {
             <SettingsIcon className="size-5 text-blue-600" />
             <CardTitle>Scheduling Rules</CardTitle>
           </div>
-          <CardDescription>Define constraints and limits for employee scheduling</CardDescription>
+          <CardDescription>
+            Define constraints and limits for employee scheduling
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -400,11 +703,15 @@ const saveAccountPolicies = async () => {
                 onChange={(e) => setMaxAbsencePerEmployee(e.target.value)}
                 placeholder="Enter max absences"
               />
-              <p className="text-xs text-gray-500">Maximum absences per month</p>
+              <p className="text-xs text-gray-500">
+                Maximum absences per month
+              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="maxConsecutive">Max Consecutive Working Days</Label>
+              <Label htmlFor="maxConsecutive">
+                Max Consecutive Working Days
+              </Label>
               <Input
                 id="maxConsecutive"
                 type="number"
@@ -416,7 +723,9 @@ const saveAccountPolicies = async () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="minRest">Minimum Rest Period Between Shifts</Label>
+              <Label htmlFor="minRest">
+                Minimum Rest Period Between Shifts
+              </Label>
               <Input
                 id="minRest"
                 type="number"
@@ -431,7 +740,9 @@ const saveAccountPolicies = async () => {
               <div className="flex items-center justify-between pt-6">
                 <div className="space-y-0.5">
                   <Label htmlFor="doubleShift">Double Shift Allowance</Label>
-                  <p className="text-xs text-gray-500">Allow employees to work consecutive shifts</p>
+                  <p className="text-xs text-gray-500">
+                    Allow employees to work consecutive shifts
+                  </p>
                 </div>
                 <Switch
                   id="doubleShift"
@@ -453,9 +764,16 @@ const saveAccountPolicies = async () => {
                 <Clock className="size-5 text-blue-600" />
                 <CardTitle>Shift Timing Configuration</CardTitle>
               </div>
-              <CardDescription>Define shift schedules and operating hours</CardDescription>
+              <CardDescription>
+                Define shift schedules and operating hours
+              </CardDescription>
             </div>
-            <Button onClick={handleAddShift} variant="outline" size="sm" className="gap-2">
+            <Button
+              onClick={handleAddShift}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
               <Plus className="size-4" />
               Add Shift
             </Button>
@@ -472,7 +790,9 @@ const saveAccountPolicies = async () => {
                     <Input
                       id={`shiftName-${shift.id}`}
                       value={shift.name}
-                      onChange={(e) => handleUpdateShift(shift.id, "name", e.target.value)}
+                      onChange={(e) =>
+                        handleUpdateShift(shift.id, "name", e.target.value)
+                      }
                       placeholder="e.g., AM, PM, GY"
                     />
                   </div>
@@ -482,7 +802,9 @@ const saveAccountPolicies = async () => {
                       id={`startTime-${shift.id}`}
                       type="time"
                       value={shift.startTime}
-                      onChange={(e) => handleUpdateShift(shift.id, "startTime", e.target.value)}
+                      onChange={(e) =>
+                        handleUpdateShift(shift.id, "startTime", e.target.value)
+                      }
                     />
                   </div>
                   <div className="space-y-2">
@@ -491,7 +813,9 @@ const saveAccountPolicies = async () => {
                       id={`endTime-${shift.id}`}
                       type="time"
                       value={shift.endTime}
-                      onChange={(e) => handleUpdateShift(shift.id, "endTime", e.target.value)}
+                      onChange={(e) =>
+                        handleUpdateShift(shift.id, "endTime", e.target.value)
+                      }
                     />
                   </div>
                   {shiftTimings.length > 1 && (
@@ -517,7 +841,9 @@ const saveAccountPolicies = async () => {
             <Users className="size-5 text-blue-600" />
             <CardTitle>Staffing Requirements</CardTitle>
           </div>
-          <CardDescription>Define required roles and headcount per shift</CardDescription>
+          <CardDescription>
+            Define required roles and headcount per shift
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -533,7 +859,9 @@ const saveAccountPolicies = async () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="requiredOperators">Required Operators per Shift</Label>
+              <Label htmlFor="requiredOperators">
+                Required Operators per Shift
+              </Label>
               <Input
                 id="requiredOperators"
                 type="number"
@@ -550,23 +878,36 @@ const saveAccountPolicies = async () => {
               <div className="space-y-4">
                 <Label>Custom Roles</Label>
                 {customRoles.map((role) => (
-                  <div key={role.id} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
+                  <div
+                    key={role.id}
+                    className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end"
+                  >
                     <div className="space-y-2">
                       <Label htmlFor={`roleName-${role.id}`}>Role Name</Label>
                       <Input
                         id={`roleName-${role.id}`}
                         value={role.roleName}
-                        onChange={(e) => handleUpdateRole(role.id, "roleName", e.target.value)}
+                        onChange={(e) =>
+                          handleUpdateRole(role.id, "roleName", e.target.value)
+                        }
                         placeholder="e.g., Moderator, Tech Support"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`roleCount-${role.id}`}>Required Count</Label>
+                      <Label htmlFor={`roleCount-${role.id}`}>
+                        Required Count
+                      </Label>
                       <Input
                         id={`roleCount-${role.id}`}
                         type="number"
                         value={role.requiredCount}
-                        onChange={(e) => handleUpdateRole(role.id, "requiredCount", parseInt(e.target.value) || 1)}
+                        onChange={(e) =>
+                          handleUpdateRole(
+                            role.id,
+                            "requiredCount",
+                            parseInt(e.target.value) || 1,
+                          )
+                        }
                         placeholder="Count"
                       />
                     </div>
@@ -583,7 +924,12 @@ const saveAccountPolicies = async () => {
             </>
           )}
 
-          <Button onClick={handleAddRole} variant="outline" size="sm" className="gap-2">
+          <Button
+            onClick={handleAddRole}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
             <Plus className="size-4" />
             Add Role
           </Button>
@@ -598,49 +944,30 @@ const saveAccountPolicies = async () => {
           </div>
 
           <CardDescription>
-            Configure assignment balancing and
-            night shift weighting
+            Configure assignment balancing and night shift weighting
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-
           {/* Fairness Weight */}
           <div className="space-y-2">
-            <Label>
-              Fairness Weight
-            </Label>
+            <Label>Fairness Weight</Label>
 
-            <Select
-              value={fairnessWeight}
-              onValueChange={setFairnessWeight}
-            >
+            <Select value={fairnessWeight} onValueChange={setFairnessWeight}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
 
               <SelectContent>
+                <SelectItem value="1">1 - Loose Balancing</SelectItem>
 
-                <SelectItem value="1">
-                  1 - Loose Balancing
-                </SelectItem>
+                <SelectItem value="2">2 - Mild Balancing</SelectItem>
 
-                <SelectItem value="2">
-                  2 - Mild Balancing
-                </SelectItem>
+                <SelectItem value="3">3 - Normal Balancing</SelectItem>
 
-                <SelectItem value="3">
-                  3 - Normal Balancing
-                </SelectItem>
+                <SelectItem value="4">4 - Strong Balancing</SelectItem>
 
-                <SelectItem value="4">
-                  4 - Strong Balancing
-                </SelectItem>
-
-                <SelectItem value="5">
-                  5 - Very Strict Balancing
-                </SelectItem>
-
+                <SelectItem value="5">5 - Very Strict Balancing</SelectItem>
               </SelectContent>
             </Select>
 
@@ -651,40 +978,23 @@ const saveAccountPolicies = async () => {
 
           {/* GY Penalty */}
           <div className="space-y-2">
-            <Label>
-              GY Shift Penalty
-            </Label>
+            <Label>GY Shift Penalty</Label>
 
-            <Select
-              value={gyPenalty}
-              onValueChange={setGyPenalty}
-            >
+            <Select value={gyPenalty} onValueChange={setGyPenalty}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
 
               <SelectContent>
+                <SelectItem value="0">0 - No Penalty</SelectItem>
 
-                <SelectItem value="0">
-                  0 - No Penalty
-                </SelectItem>
+                <SelectItem value="2">2 - Low Penalty</SelectItem>
 
-                <SelectItem value="2">
-                  2 - Low Penalty
-                </SelectItem>
+                <SelectItem value="5">5 - Moderate Penalty</SelectItem>
 
-                <SelectItem value="5">
-                  5 - Moderate Penalty
-                </SelectItem>
+                <SelectItem value="8">8 - High Penalty</SelectItem>
 
-                <SelectItem value="8">
-                  8 - High Penalty
-                </SelectItem>
-
-                <SelectItem value="10">
-                  10 - Very High Penalty
-                </SelectItem>
-
+                <SelectItem value="10">10 - Very High Penalty</SelectItem>
               </SelectContent>
             </Select>
 
@@ -692,180 +1002,116 @@ const saveAccountPolicies = async () => {
               Higher values avoid assigning GY shifts
             </p>
           </div>
-
         </CardContent>
       </Card>
       {/* Account Scheduling Policies */}
       <Card>
-
         <CardHeader>
-
           <div className="flex items-center gap-2">
             <SettingsIcon className="size-5 text-blue-600" />
 
-            <CardTitle>
-              Account Scheduling Policies
-            </CardTitle>
+            <CardTitle>Account Scheduling Policies</CardTitle>
           </div>
 
           <CardDescription>
-            Configure account priority and
-            staffing requirements
+            Configure account priority and staffing requirements
           </CardDescription>
-
         </CardHeader>
 
         <CardContent className="space-y-6">
-
           {accountPolicies.map((policy, index) => (
-
             <div
               key={policy.account_setting_id}
               className="border rounded-lg p-4 space-y-4"
             >
-
-              <div className="font-semibold">
-                {policy.account_name}
-              </div>
+              <div className="font-semibold">{policy.account_name}</div>
 
               {/* Priority */}
               <div className="space-y-2">
-
-                <Label>
-                  Priority Level
-                </Label>
+                <Label>Priority Level</Label>
 
                 <Select
                   value={String(policy.priority_level)}
-
                   onValueChange={(value) => {
-
                     const updated = [...accountPolicies];
 
-                    updated[index].priority_level =
-                      Number(value);
+                    updated[index].priority_level = Number(value);
 
                     setAccountPolicies(updated);
                   }}
                 >
-
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
 
                   <SelectContent>
+                    <SelectItem value="1">High Priority</SelectItem>
 
-                    <SelectItem value="1">
-                      High Priority
-                    </SelectItem>
+                    <SelectItem value="2">Medium Priority</SelectItem>
 
-                    <SelectItem value="2">
-                      Medium Priority
-                    </SelectItem>
-
-                    <SelectItem value="3">
-                      Low Priority
-                    </SelectItem>
-
+                    <SelectItem value="3">Low Priority</SelectItem>
                   </SelectContent>
-
                 </Select>
-
               </div>
 
-             {/* Operator Policy */}
+              {/* Operator Policy */}
               <div className="space-y-2">
-
-                <Label>
-                  Operator Policy
-                </Label>
+                <Label>Operator Policy</Label>
 
                 <Select
                   value={policy.operator_policy}
-
                   onValueChange={(value) => {
-
                     const updated = [...accountPolicies];
 
-                    updated[index].operator_policy =
-                      value;
+                    updated[index].operator_policy = value;
 
                     setAccountPolicies(updated);
                   }}
                 >
-
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
 
                   <SelectContent>
+                    <SelectItem value="required">Required</SelectItem>
 
-                    <SelectItem value="required">
-                      Required
-                    </SelectItem>
+                    <SelectItem value="optional">Optional</SelectItem>
 
-                    <SelectItem value="optional">
-                      Optional
-                    </SelectItem>
-
-                    <SelectItem value="avoid">
-                      Avoid
-                    </SelectItem>
-
+                    <SelectItem value="avoid">Avoid</SelectItem>
                   </SelectContent>
-
                 </Select>
 
                 <p className="text-xs text-gray-500">
-                  Configure how strongly the scheduler
-                  should assign operators
+                  Configure how strongly the scheduler should assign operators
                 </p>
-
               </div>
 
               {/* Partial Staffing */}
               <div className="flex items-center justify-between">
-
                 <div>
-
-                  <Label>
-                    Allow Partial Staffing
-                  </Label>
+                  <Label>Allow Partial Staffing</Label>
 
                   <p className="text-xs text-gray-500">
                     Scheduler may leave some slots unfilled
                   </p>
-
                 </div>
 
                 <Switch
                   checked={policy.allow_partial_staffing}
-
                   onCheckedChange={(checked) => {
-
                     const updated = [...accountPolicies];
 
-                    updated[index].allow_partial_staffing =
-                      checked;
+                    updated[index].allow_partial_staffing = checked;
 
                     setAccountPolicies(updated);
                   }}
                 />
-
               </div>
-
             </div>
-
           ))}
 
-          <Button onClick={saveAccountPolicies}>
-
-            Save Account Policies
-
-          </Button>
-
+          <Button onClick={saveAccountPolicies}>Save Account Policies</Button>
         </CardContent>
-
       </Card>
       {/* Scheduling Behavior */}
       <Card>
@@ -874,12 +1120,17 @@ const saveAccountPolicies = async () => {
             <SettingsIcon className="size-5 text-blue-600" />
             <CardTitle>Scheduling Behavior</CardTitle>
           </div>
-          <CardDescription>Configure how the system handles scheduling decisions</CardDescription>
+          <CardDescription>
+            Configure how the system handles scheduling decisions
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             <Label htmlFor="absenceMode">Absence Replacement Mode</Label>
-            <Select value={absenceReplacementMode} onValueChange={setAbsenceReplacementMode}>
+            <Select
+              value={absenceReplacementMode}
+              onValueChange={setAbsenceReplacementMode}
+            >
               <SelectTrigger id="absenceMode">
                 <SelectValue />
               </SelectTrigger>
@@ -890,9 +1141,12 @@ const saveAccountPolicies = async () => {
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500">
-              {absenceReplacementMode === "Automatic" && "System automatically assigns replacements when someone is absent"}
-              {absenceReplacementMode === "Manual" && "Admin must manually approve all replacement assignments"}
-              {absenceReplacementMode === "Hybrid" && "System suggests replacements but requires admin approval"}
+              {absenceReplacementMode === "Automatic" &&
+                "System automatically assigns replacements when someone is absent"}
+              {absenceReplacementMode === "Manual" &&
+                "Admin must manually approve all replacement assignments"}
+              {absenceReplacementMode === "Hybrid" &&
+                "System suggests replacements but requires admin approval"}
             </p>
           </div>
         </CardContent>
@@ -905,13 +1159,17 @@ const saveAccountPolicies = async () => {
             <Bell className="size-5 text-blue-600" />
             <CardTitle>Notification Preferences</CardTitle>
           </div>
-          <CardDescription>Choose how you receive system notifications</CardDescription>
+          <CardDescription>
+            Choose how you receive system notifications
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="inAppNotif">In-app Notifications</Label>
-              <p className="text-xs text-gray-500">Receive notifications within the application</p>
+              <p className="text-xs text-gray-500">
+                Receive notifications within the application
+              </p>
             </div>
             <Switch
               id="inAppNotif"
@@ -925,7 +1183,9 @@ const saveAccountPolicies = async () => {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="emailNotif">Email Notifications</Label>
-              <p className="text-xs text-gray-500">Receive notifications via email</p>
+              <p className="text-xs text-gray-500">
+                Receive notifications via email
+              </p>
             </div>
             <Switch
               id="emailNotif"
@@ -939,7 +1199,9 @@ const saveAccountPolicies = async () => {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="smsNotif">SMS Notifications</Label>
-              <p className="text-xs text-gray-500">Receive notifications via text message</p>
+              <p className="text-xs text-gray-500">
+                Receive notifications via text message
+              </p>
             </div>
             <Switch
               id="smsNotif"
@@ -956,9 +1218,7 @@ const saveAccountPolicies = async () => {
           <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button onClick={handleSaveChanges}>
-            Save Changes
-          </Button>
+          <Button onClick={handleSaveChanges}>Save Changes</Button>
         </div>
       </div>
     </div>
