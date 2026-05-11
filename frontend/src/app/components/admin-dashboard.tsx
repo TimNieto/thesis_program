@@ -10,11 +10,9 @@ import { Badge } from "@/app/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { EmployeeProfile } from "@/app/components/employee-profile";
 
 import {
   Users,
-  User,
   UserPlus,
   UserMinus,
   CheckCircle,
@@ -547,7 +545,7 @@ const openAvailabilityDialog = (
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="employees" className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-2">
           <TabsTrigger value="employees" className="gap-2">
             <Users className="size-4" />
             Employees
@@ -555,10 +553,6 @@ const openAvailabilityDialog = (
           <TabsTrigger value="assignments" className="gap-2">
             <Calendar className="size-4" />
             Assignments
-          </TabsTrigger>
-          <TabsTrigger value="profile" className="gap-2">
-            <User className="size-4" />
-            Profile
           </TabsTrigger>
         </TabsList>
 
@@ -860,14 +854,6 @@ const openAvailabilityDialog = (
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-6">
-          <EmployeeProfile
-            userId={currentUser.id}
-            role={currentUser.displayRole}
-            onProfileUpdated={fetchEmployees}
-          />
         </TabsContent>
       </Tabs>
 

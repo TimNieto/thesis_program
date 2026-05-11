@@ -580,10 +580,12 @@ const saveSchedule = async () => {
             <Calendar className="size-4" />
             Weekly Schedule
           </TabsTrigger>
+          {role === "admin" && (
           <TabsTrigger value="leaves" className="gap-2">
             <CalendarDays className="size-4" />
             Approved Leaves
           </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Weekly Schedule Tab */}
@@ -730,6 +732,7 @@ const saveSchedule = async () => {
         </TabsContent>
 
         {/* Approved Leaves Tab */}
+        {role === "admin" && (
         <TabsContent value="leaves" className="space-y-6">
           <Card>
             <CardHeader>
@@ -848,8 +851,11 @@ const saveSchedule = async () => {
               </div>
             </CardContent>
           </Card>
+          
         </TabsContent>
+        )}
       </Tabs>
+      
 
       {/* Assignment Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
