@@ -705,7 +705,7 @@ def deny_application(id: int):
         conn.close()
 
 @router.post("/save-schedule")
-def save_schedule(assignments: list=Body):
+def save_schedule(assignments: list = Body(...)):
     conn = get_connection()
     cursor = conn.cursor()
 
