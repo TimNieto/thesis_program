@@ -192,6 +192,7 @@ def delete_account(account_name: str):
 
     try:
 
+        # PREVENT DELETING ACCOUNTS USED IN SAVED SCHEDULES
         cursor.execute("""
             SELECT schedule_id
             FROM generated_schedule
@@ -206,31 +207,19 @@ def delete_account(account_name: str):
                 detail="Cannot remove account with generated schedules"
             )
 
-        cursor.execute("""
-            SELECT shift_id
-            FROM shifts
-            WHERE account = %s
-            AND shift_date != '2026-01-01'
-            LIMIT 1
-        """, (account_name,))
-
-        if cursor.fetchone():
-
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot remove account with active shifts"
-            )
-
+        # DELETE AVAILABILITY
         cursor.execute("""
             DELETE FROM availability
             WHERE account = %s
         """, (account_name,))
-        
+
+        # DELETE SHIFTS
         cursor.execute("""
             DELETE FROM shifts
             WHERE account = %s
         """, (account_name,))
-        
+
+        # DELETE ACCOUNT
         cursor.execute("""
             DELETE FROM account_settings
             WHERE account_name = %s
