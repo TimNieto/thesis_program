@@ -426,29 +426,31 @@ const saveSchedule = async () => {
 
   try {
 
-    const payload = assignments.map((a) => {
+    const payload = assignments
+  .filter((a) => a.shift_id && a.employee_id)
+  .map((a) => {
 
-      const dayIndex = DAYS.indexOf(a.day);
+    const dayIndex = DAYS.indexOf(a.day);
 
-      return {
+    return {
 
-        shift_id: a.shift_id,
+      shift_id: a.shift_id,
 
-        employee_id: a.employee_id,
+      employee_id: a.employee_id,
 
-        role: a.role.toLowerCase(),
+      role: a.role.toLowerCase(),
 
-        shift_date: formatDate(
-          weekDates[dayIndex]
-        ),
+      shift_date: formatDate(
+        weekDates[dayIndex]
+      ),
 
-        shift_type: a.shift,
+      shift_type: a.shift,
 
-        account: a.livestream
+      account: a.livestream
 
-      };
+    };
 
-    });
+});
 
     console.log(payload);
 
