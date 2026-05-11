@@ -137,6 +137,14 @@ const getWeekDatesFromAssignments = (assignments: any[]) => {
   const [leaveWeekOffset, setLeaveWeekOffset] = useState(0); // 0 = current week, 1 = next week
   const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
 
+useEffect(() => {
+
+  setWeekDates(
+    getWeekDates(leaveWeekOffset)
+  );
+
+}, [leaveWeekOffset]);
+
   useEffect(() => {
   const loadSchedule = async () => {
     try {
