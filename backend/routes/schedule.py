@@ -493,7 +493,7 @@ def apply_for_cover(id: int, payload: dict):
 
         # GET ABSENT REPLACEMENT MODE
         cursor.execute("""
-            SELECT absent_replacement_mode
+            SELECT absence_replacement_mode
             FROM company_settings
             LIMIT 1
         """)
