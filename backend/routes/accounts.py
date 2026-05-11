@@ -132,6 +132,47 @@ def create_account(payload: dict):
             operator_policy
         ))
 
+        # CREATE TEMPLATE SHIFTS
+        template_date = "2026-01-01"
+
+        shift_templates = [
+            ("AM", "08:00", "12:00"),
+            ("NN", "12:00", "16:00"),
+            ("PM", "16:00", "20:00"),
+            ("GY", "20:00", "00:00"),
+        ]
+
+        for shift_type, start_time, end_time in shift_templates:
+
+            cursor.execute("""
+                INSERT INTO shifts (
+                    shift_date,
+                    account,
+                    shift_type,
+                    start_time,
+                    end_time,
+                    required_host_count,
+                    required_operator_count
+                )
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+            """, (
+                template_date,
+                account_name,
+                shift_type,
+                start_time,
+                end_time,
+                1 if require_host else 0,
+                1 if require_operator else 0
+            ))
+
         conn.commit()
 
         return {
@@ -169,6 +210,7 @@ def delete_account(account_name: str):
             SELECT shift_id
             FROM shifts
             WHERE account = %s
+            AND shift_date != '2026-01-01'
             LIMIT 1
         """, (account_name,))
 
@@ -176,14 +218,19 @@ def delete_account(account_name: str):
 
             raise HTTPException(
                 status_code=400,
-                detail="Cannot remove account with shifts"
+                detail="Cannot remove account with active shifts"
             )
 
         cursor.execute("""
             DELETE FROM availability
             WHERE account = %s
         """, (account_name,))
-
+        
+        cursor.execute("""
+            DELETE FROM shifts
+            WHERE account = %s
+        """, (account_name,))
+        
         cursor.execute("""
             DELETE FROM account_settings
             WHERE account_name = %s
