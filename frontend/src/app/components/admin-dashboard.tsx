@@ -4,12 +4,43 @@ import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/app/components/ui/table";
 import { Badge } from "@/app/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
 
 import {
   Users,
@@ -22,7 +53,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Calendar,
-  CalendarOff
+  CalendarOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -89,7 +120,15 @@ const SHIFTS = [
   { code: "PM", name: "Evening", time: "19:00 - 01:00" },
 ];
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 const LIVESTREAMS = ["Mommypoko", "Sofy", "Shopee"];
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
@@ -150,10 +189,44 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   ]);
 
   const [assignments, setAssignments] = useState<Assignment[]>([
-    { id: "1", livestream: "Mommypoko", day: "Monday", shift: "AM", role: "Host", employee: "John Smith", approvedBy: "Admin", approvedAt: "2026-01-20" },
-    { id: "2", livestream: "Mommypoko", day: "Monday", shift: "AM", role: "Operator", employee: "Sarah Johnson", approvedBy: "Admin", approvedAt: "2026-01-20" },
-    { id: "3", livestream: "Sofy", day: "Tuesday", shift: "NN", role: "Host", employee: "Mike Davis" },
-    { id: "4", livestream: "Sofy", day: "Wednesday", shift: "PM", role: "Operator", employee: "Emma Wilson", approvedBy: "Admin", approvedAt: "2026-01-22" },
+    {
+      id: "1",
+      livestream: "Mommypoko",
+      day: "Monday",
+      shift: "AM",
+      role: "Host",
+      employee: "John Smith",
+      approvedBy: "Admin",
+      approvedAt: "2026-01-20",
+    },
+    {
+      id: "2",
+      livestream: "Mommypoko",
+      day: "Monday",
+      shift: "AM",
+      role: "Operator",
+      employee: "Sarah Johnson",
+      approvedBy: "Admin",
+      approvedAt: "2026-01-20",
+    },
+    {
+      id: "3",
+      livestream: "Sofy",
+      day: "Tuesday",
+      shift: "NN",
+      role: "Host",
+      employee: "Mike Davis",
+    },
+    {
+      id: "4",
+      livestream: "Sofy",
+      day: "Wednesday",
+      shift: "PM",
+      role: "Operator",
+      employee: "Emma Wilson",
+      approvedBy: "Admin",
+      approvedAt: "2026-01-22",
+    },
   ]);
 
   // Employee Management States
@@ -161,29 +234,36 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newEmployeeName, setNewEmployeeName] = useState("");
   const [newEmployeeEmail, setNewEmployeeEmail] = useState("");
   const [newEmployeeContactNumber, setNewEmployeeContactNumber] = useState("");
-  const [newEmployeeRole, setNewEmployeeRole] = useState<"Host" | "Operator" | "Both" | "Team Leader">("Host");
+  const [newEmployeeRole, setNewEmployeeRole] = useState<
+    "Host" | "Operator" | "Both" | "Team Leader"
+  >("Host");
 
   // Override Dialog States
   const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [selectedAssignment, setSelectedAssignment] =
+    useState<Assignment | null>(null);
   const [overrideEmployee, setOverrideEmployee] = useState("");
 
   // Day Off Management States
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<number | null>(null);
 
-  const [selectedEmployeeForDayOff, setSelectedEmployeeForDayOff] = useState<number | null>(null);
+  const [selectedEmployeeForDayOff, setSelectedEmployeeForDayOff] = useState<
+    number | null
+  >(null);
   const [employeeAvailability, setEmployeeAvailability] = useState<any>({});
 
-  const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
-  const [selectedEmployeeForAvailability, setSelectedEmployeeForAvailability] = useState<Employee | null>(null);
+  const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] =
+    useState(false);
+  const [selectedEmployeeForAvailability, setSelectedEmployeeForAvailability] =
+    useState<Employee | null>(null);
 
   const fetchEmployees = () => {
     setIsLoading(true);
 
     fetch("https://thesisprogram-production.up.railway.app/employees")
-      .then(res => res.json())
-      .then(data => setEmployees(data))
+      .then((res) => res.json())
+      .then((data) => setEmployees(data))
       .catch(() => console.log("Failed to load employees"))
       .finally(() => setIsLoading(false));
   };
@@ -194,7 +274,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   }, [currentUser.role]);
 
-
   // Add Employee
   const handleAddEmployee = async () => {
     if (!newEmployeeName || !newEmployeeEmail.includes("@")) {
@@ -203,32 +282,34 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
 
     try {
-      const res = await fetch("https://thesisprogram-production.up.railway.app/employees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newEmployeeName,
-          email: newEmployeeEmail,
-          contactNumber: newEmployeeContactNumber,
-          role: newEmployeeRole
-        })
-      });
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/employees",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: newEmployeeName,
+            email: newEmployeeEmail,
+            contactNumber: newEmployeeContactNumber,
+            role: newEmployeeRole,
+          }),
+        },
+      );
 
       if (!res.ok) {
         const errorData = await res.text();
         throw new Error(errorData || "Failed to add employee");
       }
 
-   fetchEmployees();
-     setIsAddEmployeeOpen(false);
+      fetchEmployees();
+      setIsAddEmployeeOpen(false);
 
-    setNewEmployeeName("");
-    setNewEmployeeEmail("");
-    setNewEmployeeContactNumber("");
-    setNewEmployeeRole("Host");
+      setNewEmployeeName("");
+      setNewEmployeeEmail("");
+      setNewEmployeeContactNumber("");
+      setNewEmployeeRole("Host");
 
       toast.success("Employee added");
-
     } catch (err) {
       console.error(err);
       toast.error("Failed to add employee");
@@ -236,12 +317,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   // Remove Employee
- const confirmRemoveEmployee = async () => {
+  const confirmRemoveEmployee = async () => {
     if (!employeeToDelete) return;
 
-    await fetch(`https://thesisprogram-production.up.railway.app/employees/${employeeToDelete}`, {
-      method: "DELETE"
-    });
+    await fetch(
+      `https://thesisprogram-production.up.railway.app/employees/${employeeToDelete}`,
+      {
+        method: "DELETE",
+      },
+    );
 
     fetchEmployees();
     setIsConfirmDeleteOpen(false);
@@ -256,32 +340,33 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       employees.map((emp) =>
         emp.id === id
           ? { ...emp, status: emp.status === "Active" ? "Inactive" : "Active" }
-          : emp
-      )
+          : emp,
+      ),
     );
     toast.success("Employee status updated");
   };
 
   // Update Employee Role
   const updateEmployeeRole = async (
-    id: number, 
-    role: "Host" | "Operator" | "Both" | "Team Leader"
+    id: number,
+    role: "Host" | "Operator" | "Both" | "Team Leader",
   ) => {
-    await fetch(`https://thesisprogram-production.up.railway.app/employees/${id}/role`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role })
-    });
+    await fetch(
+      `https://thesisprogram-production.up.railway.app/employees/${id}/role`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      },
+    );
 
-    fetchEmployees(); 
+    fetchEmployees();
   };
 
   // Approve/Decline Request
   const updateRequestStatus = (id: string, status: "approved" | "denied") => {
     setRequests(
-      requests.map((req) =>
-        req.id === id ? { ...req, status } : req
-      )
+      requests.map((req) => (req.id === id ? { ...req, status } : req)),
     );
     toast.success(`Request ${status}`);
   };
@@ -302,9 +387,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     setAssignments(
       assignments.map((a) =>
         a.id === selectedAssignment.id
-          ? { ...a, employee: overrideEmployee, approvedBy: currentUser.name, approvedAt: new Date().toISOString().split('T')[0] }
-          : a
-      )
+          ? {
+              ...a,
+              employee: overrideEmployee,
+              approvedBy: currentUser.name,
+              approvedAt: new Date().toISOString().split("T")[0],
+            }
+          : a,
+      ),
     );
 
     setIsOverrideDialogOpen(false);
@@ -322,7 +412,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   // Day Off Management Functions
-  const isSlotUnavailable = (employeeId: number, day: string, shift: string): boolean => {
+  const isSlotUnavailable = (
+    employeeId: number,
+    day: string,
+    shift: string,
+  ): boolean => {
     const emp = employeeAvailability[employeeId];
 
     // ❗ No employee record → UNAVAILABLE
@@ -342,38 +436,45 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     return !shiftData;
   };
 
-  const toggleSlotAvailability = async (employeeId: number, day: string, shift: string) => {
+  const toggleSlotAvailability = async (
+    employeeId: number,
+    day: string,
+    shift: string,
+  ) => {
     // 🔥 STEP 1: determine current state
     const isCurrentlyUnavailable = isSlotUnavailable(employeeId, day, shift);
 
     // 🔥 STEP 2: send to backend FIRST
     try {
-      await fetch("https://thesisprogram-production.up.railway.app/availability", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      await fetch(
+        "https://thesisprogram-production.up.railway.app/availability",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            employee_id: employeeId,
+            account: "default",
+            day_of_week: day.toLowerCase(),
+            preferred_shift: shift.toLowerCase(),
+            is_available: isCurrentlyUnavailable, // invert
+          }),
         },
-        body: JSON.stringify({
-          employee_id: employeeId,
-          account: "default",
-          day_of_week: day.toLowerCase(),
-          preferred_shift: shift.toLowerCase(),
-          is_available: isCurrentlyUnavailable // invert
-        })
-      });
+      );
 
-    await fetchAvailability();
-
+      await fetchAvailability();
     } catch (err) {
       console.error("Failed to update availability", err);
       return; // ❗ stop if backend fails
     }
-
   };
 
   const fetchAvailability = async () => {
     try {
-      const res = await fetch("https://thesisprogram-production.up.railway.app/availability");
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/availability",
+      );
       const data = await res.json();
 
       const transformed: any = {};
@@ -399,27 +500,23 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       console.log("STRICT AVAILABILITY MAP:", transformed);
 
       setEmployeeAvailability(transformed);
-
     } catch (err) {
       console.error("Failed to load availability", err);
     }
   };
 
+  const openAvailabilityDialog = (
+    employee: Employee,
+    openDialog: boolean = true,
+  ) => {
+    setSelectedEmployeeForAvailability(employee);
 
+    if (openDialog) {
+      setIsAvailabilityDialogOpen(true);
+    }
 
-
-const openAvailabilityDialog = (
-  employee: Employee,
-  openDialog: boolean = true
-) => {
-  setSelectedEmployeeForAvailability(employee);
-
-  if (openDialog) {
-    setIsAvailabilityDialogOpen(true);
-  }
-
-  fetchAvailability(); // pass id directly if possible
-};
+    fetchAvailability(); // pass id directly if possible
+  };
 
   // Statistics
   const totalEmployees = employees.length;
@@ -465,31 +562,33 @@ const openAvailabilityDialog = (
     return SHIFTS.find((s) => s.code === code);
   };
 
-    if (currentUser.role.toLowerCase() !== "admin") {
-      return (
-        <div className="p-6">
-          <p className="text-red-500 text-lg font-semibold">
-            Access denied. Admins only.
-          </p>
-        </div>
-      );
-    }
+  if (currentUser.role.toLowerCase() !== "admin") {
+    return (
+      <div className="p-6">
+        <p className="text-red-500 text-lg font-semibold">
+          Access denied. Admins only.
+        </p>
+      </div>
+    );
+  }
 
-    // 🟡 THEN: handle loading
-    if (isLoading) {
-      return <div className="p-6">Loading...</div>;
-    }
+  // 🟡 THEN: handle loading
+  if (isLoading) {
+    return <div className="p-6">Loading...</div>;
+  }
 
-    // (optional logs after checks)
-    console.log("currentUser:", currentUser);
-    console.log("employees:", employees);
+  // (optional logs after checks)
+  console.log("currentUser:", currentUser);
+  console.log("employees:", employees);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-3xl">Admin Dashboard</h2>
-        <p className="text-gray-600">Manage employees, schedules, and approvals</p>
+        <p className="text-gray-600">
+          Manage employees, schedules, and approvals
+        </p>
       </div>
 
       {/* Statistics Overview */}
@@ -535,7 +634,9 @@ const openAvailabilityDialog = (
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Filled Slots</p>
-                <p className="text-2xl font-bold">{totalAssignments} / {totalSlots}</p>
+                <p className="text-2xl font-bold">
+                  {totalAssignments} / {totalSlots}
+                </p>
               </div>
               <BarChart3 className="size-8 text-purple-600" />
             </div>
@@ -563,9 +664,14 @@ const openAvailabilityDialog = (
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Employee Management</CardTitle>
-                  <CardDescription>Add, remove, or modify employee details</CardDescription>
+                  <CardDescription>
+                    Add, remove, or modify employee details
+                  </CardDescription>
                 </div>
-                <Button onClick={() => setIsAddEmployeeOpen(true)} className="gap-2">
+                <Button
+                  onClick={() => setIsAddEmployeeOpen(true)}
+                  className="gap-2"
+                >
                   <UserPlus className="size-4" />
                   Add Employee
                 </Button>
@@ -587,8 +693,12 @@ const openAvailabilityDialog = (
                   <TableBody>
                     {employees.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-gray-500 py-6">
-                          No employees found. Click "Add Employee" to get started.
+                        <TableCell
+                          colSpan={6}
+                          className="text-center text-gray-500 py-6"
+                        >
+                          No employees found. Click "Add Employee" to get
+                          started.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -596,69 +706,97 @@ const openAvailabilityDialog = (
                         .sort((a, b) => {
                           const rolePriority: Record<string, number> = {
                             "Team Leader": 1,
-                            "Host": 2,
-                            "Operator": 3,
-                            "Both": 4
+                            Host: 2,
+                            Operator: 3,
+                            Both: 4,
                           };
 
-                          return (rolePriority[a.role] || 99) - (rolePriority[b.role] || 99);
+                          return (
+                            (rolePriority[a.role] || 99) -
+                            (rolePriority[b.role] || 99)
+                          );
                         })
                         .map((employee) => (
                           <TableRow key={employee.id}>
-                            <TableCell className="font-medium">{employee.name}</TableCell>
+                            <TableCell className="font-medium">
+                              {employee.name}
+                            </TableCell>
                             <TableCell>
                               <Select
                                 value={employee.role}
                                 onValueChange={(value) =>
-                                  updateEmployeeRole(employee.id, value as "Host" | "Operator" | "Both" | "Team Leader")
+                                  updateEmployeeRole(
+                                    employee.id,
+                                    value as
+                                      | "Host"
+                                      | "Operator"
+                                      | "Both"
+                                      | "Team Leader",
+                                  )
                                 }
                               >
                                 <SelectTrigger className="w-[180px]">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="Team Leader">Team Leader</SelectItem>
+                                  <SelectItem value="Team Leader">
+                                    Team Leader
+                                  </SelectItem>
                                   <SelectItem value="Host">Host</SelectItem>
-                                  <SelectItem value="Operator">Operator</SelectItem>
+                                  <SelectItem value="Operator">
+                                    Operator
+                                  </SelectItem>
                                   <SelectItem value="Both">Both</SelectItem>
                                 </SelectContent>
                               </Select>
                             </TableCell>
                             <TableCell>
                               <Badge
-                                variant={employee.status === "Active" ? "default" : "secondary"}
+                                variant={
+                                  employee.status === "Active"
+                                    ? "default"
+                                    : "secondary"
+                                }
                                 className="cursor-pointer"
-                                onClick={() => toggleEmployeeStatus(employee.id)}
+                                onClick={() =>
+                                  toggleEmployeeStatus(employee.id)
+                                }
                               >
                                 {employee.status}
                               </Badge>
                             </TableCell>
                             <TableCell>{employee.totalShifts}</TableCell>
-                            <TableCell>{new Date(employee.joinedDate).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              {new Date(
+                                employee.joinedDate,
+                              ).toLocaleDateString()}
+                            </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => openAvailabilityDialog(employee)}
+                                  onClick={() =>
+                                    openAvailabilityDialog(employee)
+                                  }
                                   className="gap-2"
-                            >
+                                >
                                   <CalendarOff className="size-4" />
                                   Availability
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => {
-                                  setEmployeeToDelete(employee.id);
-                                  setIsConfirmDeleteOpen(true);
-                                }}
-                                className="gap-2"
-                              >
-                                <UserMinus className="size-4" />
-                                Deactivate
-                              </Button>
-                              </div> 
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEmployeeToDelete(employee.id);
+                                    setIsConfirmDeleteOpen(true);
+                                  }}
+                                  className="gap-2"
+                                >
+                                  <UserMinus className="size-4" />
+                                  Deactivate
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -678,7 +816,9 @@ const openAvailabilityDialog = (
                     <CalendarOff className="size-5 text-blue-600" />
                     Day Offs
                   </CardTitle>
-                  <CardDescription>Manage weekly unavailable shifts for employees</CardDescription>
+                  <CardDescription>
+                    Manage weekly unavailable shifts for employees
+                  </CardDescription>
                 </div>
                 <div className="w-64">
                   <Select
@@ -688,7 +828,9 @@ const openAvailabilityDialog = (
 
                       setSelectedEmployeeForDayOff(employeeId);
 
-                      const employee = employees.find(e => e.id === employeeId);
+                      const employee = employees.find(
+                        (e) => e.id === employeeId,
+                      );
 
                       if (employee) {
                         openAvailabilityDialog(employee, false); // 👈 KEY LINE
@@ -700,7 +842,10 @@ const openAvailabilityDialog = (
                     </SelectTrigger>
                     <SelectContent>
                       {employees.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id.toString()}>
+                        <SelectItem
+                          key={employee.id}
+                          value={employee.id.toString()}
+                        >
                           {employee.name}
                         </SelectItem>
                       ))}
@@ -713,41 +858,63 @@ const openAvailabilityDialog = (
               {selectedEmployeeForDayOff !== null ? (
                 <div className="space-y-4">
                   <p className="text-sm text-gray-600">
-                    Click on any shift to toggle availability. Greyed out shifts are unavailable.
+                    Click on any shift to toggle availability. Greyed out shifts
+                    are unavailable.
                   </p>
                   <div className="overflow-x-auto">
                     <div className="min-w-max">
                       <div className="grid grid-cols-8 gap-2">
                         <div className="font-medium p-3"></div>
                         {DAYS.map((day) => (
-                          <div key={day} className="font-medium p-3 text-center bg-gray-100 rounded">
+                          <div
+                            key={day}
+                            className="font-medium p-3 text-center bg-gray-100 rounded"
+                          >
                             {day}
                           </div>
                         ))}
                       </div>
 
                       {SHIFTS.map((shift) => (
-                        <div key={shift.code} className="grid grid-cols-8 gap-2 mt-2">
+                        <div
+                          key={shift.code}
+                          className="grid grid-cols-8 gap-2 mt-2"
+                        >
                           <div className="p-3 font-medium bg-gray-100 rounded flex flex-col justify-center">
-                            <div>{shift.code} - {shift.name}</div>
-                            <div className="text-xs text-gray-600">{shift.time}</div>
+                            <div>
+                              {shift.code} - {shift.name}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {shift.time}
+                            </div>
                           </div>
                           {DAYS.map((day) => {
-                            const isUnavailable = isSlotUnavailable(selectedEmployeeForDayOff, day, shift.code);
+                            const isUnavailable = isSlotUnavailable(
+                              selectedEmployeeForDayOff,
+                              day,
+                              shift.code,
+                            );
                             return (
                               <div
                                 key={`${day}-${shift.code}`}
-                                onClick={() => toggleSlotAvailability(selectedEmployeeForDayOff, day, shift.code)}
+                                onClick={() =>
+                                  toggleSlotAvailability(
+                                    selectedEmployeeForDayOff,
+                                    day,
+                                    shift.code,
+                                  )
+                                }
                                 className={`
                                   p-3 rounded border-2 cursor-pointer transition-all min-h-[60px] flex items-center justify-center
-                                  ${isUnavailable
-                                    ? 'bg-gray-300 border-gray-400 text-gray-500'
-                                    : 'bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                                  ${
+                                    isUnavailable
+                                      ? "bg-gray-300 border-gray-400 text-gray-500"
+                                      : "bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50"
                                   }
                                 `}
                               >
                                 <span className="text-sm font-medium">
-                                  {isUnavailable ? 'Unavailable' : 'Available'}
+                                  {isUnavailable ? "Unavailable" : "Available"}
                                 </span>
                               </div>
                             );
@@ -760,7 +927,9 @@ const openAvailabilityDialog = (
               ) : (
                 <div className="text-center py-12 text-gray-500">
                   <CalendarOff className="size-12 mx-auto mb-3 text-gray-400" />
-                  <p>Select an employee to view and manage their day off schedule</p>
+                  <p>
+                    Select an employee to view and manage their day off schedule
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -772,7 +941,9 @@ const openAvailabilityDialog = (
           <Card>
             <CardHeader>
               <CardTitle>Schedule Assignments</CardTitle>
-              <CardDescription>Override or remove existing assignments</CardDescription>
+              <CardDescription>
+                Override or remove existing assignments
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {assignments.length > 0 ? (
@@ -796,29 +967,45 @@ const openAvailabilityDialog = (
                         return (
                           <TableRow key={assignment.id}>
                             <TableCell>
-                              <span className="font-semibold text-blue-700">{assignment.livestream}</span>
+                              <span className="font-semibold text-blue-700">
+                                {assignment.livestream}
+                              </span>
                             </TableCell>
                             <TableCell>{assignment.day}</TableCell>
                             <TableCell>
                               <div className="flex flex-col">
-                                <span className="font-medium">{assignment.shift} - {shiftInfo?.name}</span>
-                                <span className="text-xs text-gray-600">{shiftInfo?.time}</span>
+                                <span className="font-medium">
+                                  {assignment.shift} - {shiftInfo?.name}
+                                </span>
+                                <span className="text-xs text-gray-600">
+                                  {shiftInfo?.time}
+                                </span>
                               </div>
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">{assignment.role}</Badge>
                             </TableCell>
-                            <TableCell className="font-medium">{assignment.employee}</TableCell>
+                            <TableCell className="font-medium">
+                              {assignment.employee}
+                            </TableCell>
                             <TableCell>
                               {assignment.approvedBy ? (
-                                <span className="text-sm">{assignment.approvedBy}</span>
+                                <span className="text-sm">
+                                  {assignment.approvedBy}
+                                </span>
                               ) : (
-                                <span className="text-sm text-gray-400">Not approved</span>
+                                <span className="text-sm text-gray-400">
+                                  Not approved
+                                </span>
                               )}
                             </TableCell>
                             <TableCell>
                               {assignment.approvedAt ? (
-                                <span className="text-sm">{new Date(assignment.approvedAt).toLocaleDateString()}</span>
+                                <span className="text-sm">
+                                  {new Date(
+                                    assignment.approvedAt,
+                                  ).toLocaleDateString()}
+                                </span>
                               ) : (
                                 <span className="text-sm text-gray-400">-</span>
                               )}
@@ -837,7 +1024,9 @@ const openAvailabilityDialog = (
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() => handleRemoveAssignment(assignment.id)}
+                                  onClick={() =>
+                                    handleRemoveAssignment(assignment.id)
+                                  }
                                 >
                                   Remove
                                 </Button>
@@ -850,7 +1039,9 @@ const openAvailabilityDialog = (
                   </Table>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 py-4">No assignments found</p>
+                <p className="text-sm text-gray-500 py-4">
+                  No assignments found
+                </p>
               )}
             </CardContent>
           </Card>
@@ -896,7 +1087,9 @@ const openAvailabilityDialog = (
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="employeeContactNumber">Contact Number (Optional)</Label>
+              <Label htmlFor="employeeContactNumber">
+                Contact Number (Optional)
+              </Label>
               <Input
                 id="employeeContactNumber"
                 placeholder="Enter employee contact number"
@@ -911,7 +1104,14 @@ const openAvailabilityDialog = (
             </div>
             <div className="space-y-2">
               <Label htmlFor="employeeRole">Role</Label>
-              <Select value={newEmployeeRole} onValueChange={(value) => setNewEmployeeRole(value as "Host" | "Operator" | "Both" | "Team Leader")}>
+              <Select
+                value={newEmployeeRole}
+                onValueChange={(value) =>
+                  setNewEmployeeRole(
+                    value as "Host" | "Operator" | "Both" | "Team Leader",
+                  )
+                }
+              >
                 <SelectTrigger id="employeeRole">
                   <SelectValue />
                 </SelectTrigger>
@@ -925,7 +1125,10 @@ const openAvailabilityDialog = (
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddEmployeeOpen(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleAddEmployee}>Add Employee</Button>
@@ -934,18 +1137,34 @@ const openAvailabilityDialog = (
       </Dialog>
 
       {/* Override Assignment Dialog */}
-      <Dialog open={isOverrideDialogOpen} onOpenChange={setIsOverrideDialogOpen}>
+      <Dialog
+        open={isOverrideDialogOpen}
+        onOpenChange={setIsOverrideDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Override Assignment</DialogTitle>
             <DialogDescription>
               {selectedAssignment && (
                 <div className="space-y-1 mt-2">
-                  <div><strong>Livestream:</strong> {selectedAssignment.livestream}</div>
-                  <div><strong>Day:</strong> {selectedAssignment.day}</div>
-                  <div><strong>Shift:</strong> {getShiftInfo(selectedAssignment.shift)?.name} ({getShiftInfo(selectedAssignment.shift)?.time})</div>
-                  <div><strong>Role:</strong> {selectedAssignment.role}</div>
-                  <div><strong>Current Employee:</strong> {selectedAssignment.employee}</div>
+                  <div>
+                    <strong>Livestream:</strong> {selectedAssignment.livestream}
+                  </div>
+                  <div>
+                    <strong>Day:</strong> {selectedAssignment.day}
+                  </div>
+                  <div>
+                    <strong>Shift:</strong>{" "}
+                    {getShiftInfo(selectedAssignment.shift)?.name} (
+                    {getShiftInfo(selectedAssignment.shift)?.time})
+                  </div>
+                  <div>
+                    <strong>Role:</strong> {selectedAssignment.role}
+                  </div>
+                  <div>
+                    <strong>Current Employee:</strong>{" "}
+                    {selectedAssignment.employee}
+                  </div>
                 </div>
               )}
             </DialogDescription>
@@ -967,124 +1186,134 @@ const openAvailabilityDialog = (
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsOverrideDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsOverrideDialogOpen(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleOverrideAssignment}>Override Assignment</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      
-{/* Confirm Delete Employee Dialog */}
-<Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Deactivate Employee</DialogTitle>
-      <DialogDescription>
-        Are you sure you want to deactivate this employee? They will no longer be scheduled but their data will be preserved.
-      </DialogDescription>
-    </DialogHeader>
-
-    <DialogFooter>
-      <Button
-        variant="outline"
-        onClick={() => {
-          setIsConfirmDeleteOpen(false);
-          setEmployeeToDelete(null);
-        }}
-      >
-        No
-      </Button>
-
-      <Button
-        variant="destructive"
-        onClick={confirmRemoveEmployee}
-      >
-        Yes, Deactivate
-      </Button>
+            <Button onClick={handleOverrideAssignment}>
+              Override Assignment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-    <Dialog open={isAvailabilityDialogOpen} onOpenChange={setIsAvailabilityDialogOpen}>
-  <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto">
-    <DialogHeader>
-      <DialogTitle>
-        Manage Weekly Availability - {selectedEmployeeForAvailability?.name}
-      </DialogTitle>
-      <DialogDescription>
-        Click on any shift to toggle availability
-      </DialogDescription>
-    </DialogHeader>
+      {/* Confirm Delete Employee Dialog */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Employee</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this employee? They will no
+              longer be scheduled but their data will be preserved.
+            </DialogDescription>
+          </DialogHeader>
 
-    <div className="py-6">
-      {selectedEmployeeForAvailability && (
-        <div className="overflow-x-auto">
-          <div className="min-w-max">
-            
-            {/* DAYS HEADER */}
-            <div className="grid grid-cols-8 gap-3">
-              <div></div>
-              {DAYS.map((day) => (
-                <div key={day} className="p-4 text-center bg-gray-100 rounded">
-                  {day}
-                </div>
-              ))}
-            </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsConfirmDeleteOpen(false);
+                setEmployeeToDelete(null);
+              }}
+            >
+              No
+            </Button>
 
-            {/* SHIFTS GRID */}
-            {SHIFTS.map((shift) => (
-              <div key={shift.code} className="grid grid-cols-8 gap-3 mt-3">
-                
-                {/* SHIFT LABEL */}
-                <div className="p-4 bg-gray-100 rounded">
-                  {shift.code} - {shift.name}
-                </div>
+            <Button variant="destructive" onClick={confirmRemoveEmployee}>
+              Yes, Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-                {/* CELLS */}
-                {DAYS.map((day) => {
-                  const isUnavailable = isSlotUnavailable(
-                    selectedEmployeeForAvailability.id,
-                    day,
-                    shift.code
-                  );
+      <Dialog
+        open={isAvailabilityDialogOpen}
+        onOpenChange={setIsAvailabilityDialogOpen}
+      >
+        <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Manage Weekly Availability -{" "}
+              {selectedEmployeeForAvailability?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Click on any shift to toggle availability
+            </DialogDescription>
+          </DialogHeader>
 
-                  return (
+          <div className="py-6">
+            {selectedEmployeeForAvailability && (
+              <div className="overflow-x-auto">
+                <div className="min-w-max">
+                  {/* DAYS HEADER */}
+                  <div className="grid grid-cols-8 gap-3">
+                    <div></div>
+                    {DAYS.map((day) => (
+                      <div
+                        key={day}
+                        className="p-4 text-center bg-gray-100 rounded"
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* SHIFTS GRID */}
+                  {SHIFTS.map((shift) => (
                     <div
-                      key={`${day}-${shift.code}`}
-                      onClick={() =>
-                        toggleSlotAvailability(
+                      key={shift.code}
+                      className="grid grid-cols-8 gap-3 mt-3"
+                    >
+                      {/* SHIFT LABEL */}
+                      <div className="p-4 bg-gray-100 rounded">
+                        {shift.code} - {shift.name}
+                      </div>
+
+                      {/* CELLS */}
+                      {DAYS.map((day) => {
+                        const isUnavailable = isSlotUnavailable(
                           selectedEmployeeForAvailability.id,
                           day,
-                          shift.code
-                        )
-                      }
-                      className={`p-4 rounded border cursor-pointer
+                          shift.code,
+                        );
+
+                        return (
+                          <div
+                            key={`${day}-${shift.code}`}
+                            onClick={() =>
+                              toggleSlotAvailability(
+                                selectedEmployeeForAvailability.id,
+                                day,
+                                shift.code,
+                              )
+                            }
+                            className={`p-4 rounded border cursor-pointer
                         ${
                           isUnavailable
                             ? "bg-gray-300"
                             : "bg-white hover:bg-blue-50"
                         }`}
-                    >
-                      {isUnavailable ? "Unavailable" : "Available"}
+                          >
+                            {isUnavailable ? "Unavailable" : "Available"}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
-    </div>
 
-    <DialogFooter>
-      <Button onClick={() => setIsAvailabilityDialogOpen(false)}>
-        Done
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>  
+          <DialogFooter>
+            <Button onClick={() => setIsAvailabilityDialogOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

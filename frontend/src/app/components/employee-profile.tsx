@@ -1,7 +1,13 @@
 // src/app/components/employee-profile.tsx
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import { Button } from "@/app/components/ui/button";
@@ -9,14 +15,17 @@ import { Separator } from "@/app/components/ui/separator";
 import { toast } from "sonner";
 import { User, Mail, Phone, Shield, Lock, Save } from "lucide-react";
 
-
 interface EmployeeProfileProps {
   userId: number;
   role: string;
   onProfileUpdated: () => void;
 }
 
-export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProfileProps) {
+export function EmployeeProfile({
+  userId,
+  role,
+  onProfileUpdated,
+}: EmployeeProfileProps) {
   // Mock initial data - in a real app, this would be fetched from the backend
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -31,20 +40,19 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-  fetch(`https://thesisprogram-production.up.railway.app/employees/${userId}`)
-    .then(res => res.json())
-    .then(data => {
-      setName(data.name || "");
-      setEmail(data.email || "");
-      setContactNumber(data.contactNumber || "");
-    })
-    .catch(() => {
-      toast.error("Failed to load profile");
-    });
-}, [userId]);
+    fetch(`https://thesisprogram-production.up.railway.app/employees/${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setName(data.name || "");
+        setEmail(data.email || "");
+        setContactNumber(data.contactNumber || "");
+      })
+      .catch(() => {
+        toast.error("Failed to load profile");
+      });
+  }, [userId]);
 
   const handleSaveProfile = async () => {
-
     if (!name.trim()) {
       toast.error("Name cannot be empty");
       return;
@@ -57,16 +65,19 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
     setSavingProfile(true);
 
     try {
-      const response = await fetch(`https://thesisprogram-production.up.railway.app/employees/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `https://thesisprogram-production.up.railway.app/employees/${userId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            contactNumber,
+          }),
         },
-        body: JSON.stringify({
-          name,
-          contactNumber,
-        }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error("Failed to update profile");
@@ -74,7 +85,6 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
 
       toast.success("Profile updated successfully");
       onProfileUpdated();
-
     } catch (error) {
       console.error(error);
       toast.error("Failed to update profile");
@@ -115,9 +125,9 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
           body: JSON.stringify({
             user_id: userId,
             current_password: currentPassword.trim(),
-            new_password: newPassword.trim()
+            new_password: newPassword.trim(),
           }),
-        }
+        },
       );
 
       if (!res.ok) {
@@ -219,7 +229,11 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
             </p>
           </div>
 
-          <Button onClick={handleSaveProfile} className="gap-2" disabled={savingProfile}>
+          <Button
+            onClick={handleSaveProfile}
+            className="gap-2"
+            disabled={savingProfile}
+          >
             <Save className="size-4" />
             Save Changes
           </Button>
@@ -233,9 +247,7 @@ export function EmployeeProfile({ userId, role, onProfileUpdated }: EmployeeProf
             <Lock className="size-5" />
             Change Password
           </CardTitle>
-          <CardDescription>
-            Update your account password
-          </CardDescription>
+          <CardDescription>Update your account password</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Current Password */}

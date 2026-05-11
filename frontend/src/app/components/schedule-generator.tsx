@@ -4,11 +4,36 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
 import { Badge } from "@/app/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { Calendar, Download, Trash2, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
+import {
+  Calendar,
+  Download,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface ShiftAssignment {
@@ -45,236 +70,254 @@ const SHIFTS = [
   { code: "PM", name: "Evening", time: "19:00 - 01:00" },
 ];
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const LIVESTREAMS = ["Mommypoko", "Sofy", "Shopee"];
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
 const ROLES = ["Host", "Operator"] as const;
 
-export function ScheduleGenerator({ currentUser, role }: ScheduleGeneratorProps) {
+export function ScheduleGenerator({
+  currentUser,
+  role,
+}: ScheduleGeneratorProps) {
+  const [livestreams, setLivestreams] = useState<string[]>([]);
+
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
 
   const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([]);
-  
-    const formatDate = (date: Date) => {
+
+  const formatDate = (date: Date) => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
   const getWeekDates = (offset: number = 0) => {
-  const today = new Date();
-  const currentDay = today.getDay() || 7;
-  const mondayOffset = currentDay === 1 ? 0 : -(currentDay - 1);
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + mondayOffset + (offset * 7));
+    const today = new Date();
+    const currentDay = today.getDay() || 7;
+    const mondayOffset = currentDay === 1 ? 0 : -(currentDay - 1);
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset + offset * 7);
 
-  const dates: Date[] = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
-    dates.push(date);
-  }
-  return dates;
-};
+    const dates: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
 
-const parseLocalDate = (dateStr: string) => {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day);
-};
+  const parseLocalDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
 
-const getWeekDatesFromAssignments = (assignments: any[]) => {
-  if (!assignments || assignments.length === 0) {
-    return getWeekDates(0);
-  }
+  const getWeekDatesFromAssignments = (assignments: any[]) => {
+    if (!assignments || assignments.length === 0) {
+      return getWeekDates(0);
+    }
 
-  const sortedDates = assignments
-    .map((a: any) => a.shift_date)
-    .filter(Boolean)
-    .sort();
+    const sortedDates = assignments
+      .map((a: any) => a.shift_date)
+      .filter(Boolean)
+      .sort();
 
-  const firstDate = parseLocalDate(sortedDates[0]);
+    const firstDate = parseLocalDate(sortedDates[0]);
 
-  const currentDay = firstDate.getDay() || 7;
-  const monday = new Date(firstDate);
-  monday.setDate(firstDate.getDate() - (currentDay - 1));
+    const currentDay = firstDate.getDay() || 7;
+    const monday = new Date(firstDate);
+    monday.setDate(firstDate.getDate() - (currentDay - 1));
 
-  const dates: Date[] = [];
+    const dates: Date[] = [];
 
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
-    dates.push(date);
-  }
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      dates.push(date);
+    }
 
-  return dates;
-};
+    return dates;
+  };
 
   const leaveMap = React.useMemo(() => {
-      const map = new Map<string, LeaveRequest[]>();
-  
-      approvedLeaves.forEach(leave => {
-        let current = new Date(leave.startDate);
-        const end = new Date(leave.endDate);
-  
-        while (current <= end) {
-          const key = formatDate(current);
-          if (!map.has(key)) map.set(key, []);
-          map.get(key)!.push(leave);
-          current.setDate(current.getDate() + 1);
-        }
-      });
-  
-      return map;
-    }, [approvedLeaves]);
-  
-    const uniqueEmployeesOnLeave = React.useMemo(() => {
-      return Array.from(new Set(approvedLeaves.map(l => l.employee)));
-    }, [approvedLeaves]);
+    const map = new Map<string, LeaveRequest[]>();
 
-  const [selectedCell, setSelectedCell] = useState<{ livestream: string; day: string; shift: string; role: "Host" | "Operator" } | null>(null);
+    approvedLeaves.forEach((leave) => {
+      let current = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+
+      while (current <= end) {
+        const key = formatDate(current);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(leave);
+        current.setDate(current.getDate() + 1);
+      }
+    });
+
+    return map;
+  }, [approvedLeaves]);
+
+  const uniqueEmployeesOnLeave = React.useMemo(() => {
+    return Array.from(new Set(approvedLeaves.map((l) => l.employee)));
+  }, [approvedLeaves]);
+
+  const [selectedCell, setSelectedCell] = useState<{
+    livestream: string;
+    day: string;
+    shift: string;
+    role: "Host" | "Operator";
+  } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [leaveWeekOffset, setLeaveWeekOffset] = useState(0); // 0 = current week, 1 = next week
   const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
 
-useEffect(() => {
-
-  setWeekDates(
-    getWeekDates(leaveWeekOffset)
-  );
-
-}, [leaveWeekOffset]);
+  useEffect(() => {
+    setWeekDates(getWeekDates(leaveWeekOffset));
+  }, [leaveWeekOffset]);
 
   useEffect(() => {
-  const loadSchedule = async () => {
+    const loadSchedule = async () => {
+      try {
+        const res = await fetch(
+          "https://thesisprogram-production.up.railway.app/generated-schedule",
+        );
+        const data = await res.json();
+
+        setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
+
+        if (!data.grouped_schedule) return;
+
+        setLivestreams(Object.keys(data.grouped_schedule));
+
+        const transformed: ShiftAssignment[] = [];
+
+        Object.entries(data.grouped_schedule).forEach(
+          ([livestream, days]: any) => {
+            Object.entries(days).forEach(([day, shifts]: any) => {
+              Object.entries(shifts).forEach(([shift, roles]: any) => {
+                (roles.host || []).forEach((emp: any) => {
+                  transformed.push({
+                    id: `${livestream}-${day}-${shift}-host-${emp.employee_id}`,
+                    schedule_id: emp.schedule_id,
+                    shift_id: emp.shift_id,
+                    employee_id: emp.employee_id,
+                    livestream,
+                    day,
+                    shift,
+                    role: "Host",
+                    employee: emp.employee_name,
+                  });
+                });
+
+                (roles.operator || []).forEach((emp: any) => {
+                  transformed.push({
+                    id: `${livestream}-${day}-${shift}-operator-${emp.employee_id}`,
+                    schedule_id: emp.schedule_id,
+                    shift_id: emp.shift_id,
+                    employee_id: emp.employee_id,
+                    livestream,
+                    day,
+                    shift,
+                    role: "Operator",
+                    employee: emp.employee_name,
+                  });
+                });
+              });
+            });
+          },
+        );
+
+        setAssignments(transformed);
+      } catch (err) {
+        console.error("Failed to load schedule", err);
+      }
+    };
+
+    loadSchedule();
+  }, []);
+
+  useEffect(() => {
+    fetchApprovedLeaves();
+  }, [weekDates]);
+
+  const fetchApprovedLeaves = async () => {
     try {
-      const res = await fetch("https://thesisprogram-production.up.railway.app/generated-schedule");
+      const start = weekDates[0];
+      const end = weekDates[6];
+
+      const res = await fetch(
+        `https://thesisprogram-production.up.railway.app/leaves-approved?start=${formatDate(start)}&end=${formatDate(end)}`,
+      );
+
       const data = await res.json();
 
-      setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
+      const mapped: LeaveRequest[] = data.map((l: any) => ({
+        id: `${l.employee_id}-${l.date}`,
+        employee: l.employee_name,
+        leaveType: l.leave_type,
+        startDate: l.date,
+        endDate: l.date,
+        status: "approved",
+        reason: l.reason,
+      }));
 
-      if (!data.grouped_schedule) return;
-
-      const transformed: ShiftAssignment[] = [];
-
-      Object.entries(data.grouped_schedule).forEach(([livestream, days]: any) => {
-        Object.entries(days).forEach(([day, shifts]: any) => {
-          Object.entries(shifts).forEach(([shift, roles]: any) => {
-
-            (roles.host || []).forEach((emp: any) => {
-              transformed.push({
-                id: `${livestream}-${day}-${shift}-host-${emp.employee_id}`,
-                schedule_id: emp.schedule_id,
-                shift_id: emp.shift_id,
-                employee_id: emp.employee_id,
-                livestream,
-                day,
-                shift,
-                role: "Host",
-                employee: emp.employee_name
-              });
-            });
-
-            (roles.operator || []).forEach((emp: any) => {
-              transformed.push({
-                id: `${livestream}-${day}-${shift}-operator-${emp.employee_id}`,
-                schedule_id: emp.schedule_id,
-                shift_id: emp.shift_id,
-                employee_id: emp.employee_id,
-                livestream,
-                day,
-                shift,
-                role: "Operator",
-                employee: emp.employee_name
-              });
-            });
-
-          });
-        });
-      });
-
-      setAssignments(transformed);
-
+      setApprovedLeaves(mapped);
     } catch (err) {
-      console.error("Failed to load schedule", err);
+      console.error("Failed to fetch leaves", err);
     }
   };
 
-  loadSchedule();
-}, []);
-
-useEffect(() => {
-  fetchApprovedLeaves();
-}, [weekDates]);
-
-
-  const fetchApprovedLeaves = async () => {
-  try {
-    const start = weekDates[0];
-    const end = weekDates[6];
-
-    const res = await fetch(
-      `https://thesisprogram-production.up.railway.app/leaves-approved?start=${formatDate(start)}&end=${formatDate(end)}`
-    );
-
-    const data = await res.json();
-
-    const mapped: LeaveRequest[] = data.map((l: any) => ({
-      id: `${l.employee_id}-${l.date}`,
-      employee: l.employee_name,
-      leaveType: l.leave_type,
-      startDate: l.date,
-      endDate: l.date,
-      status: "approved",
-      reason: l.reason
-    }));
-
-    setApprovedLeaves(mapped);
-
-  } catch (err) {
-    console.error("Failed to fetch leaves", err);
-  }
-};
-
-
   const isEmployeeOnLeave = (employeeName: string, date: Date) => {
     const dateStr = formatDate(date);
-    return approvedLeaves.some(leave => {
+    return approvedLeaves.some((leave) => {
       if (leave.employee !== employeeName) return false;
       return dateStr >= leave.startDate && dateStr <= leave.endDate;
     });
   };
 
-
-   const getLeavesForDate = (date: Date) => {
+  const getLeavesForDate = (date: Date) => {
     return leaveMap.get(formatDate(date)) || [];
   };
 
-/*const getAssignment = (
+  /*const getAssignment = (
     livestream: string,
     day: string,
     shift: string,
     role: "Host" | "Operator"
   ) => {
     return assignmentMap.get(`${livestream}-${day}-${shift}-${role}`);
-  };*/  
+  };*/
 
   const getAssignment = (
-  livestream: string,
-  day: string,
-  shift: string,
-  role: "Host" | "Operator"
-) => {
-  return assignments.find(
-    (a) =>
-      a.livestream === livestream &&
-      a.day === day &&
-      a.shift === shift &&
-      a.role === role
-  );
-};
+    livestream: string,
+    day: string,
+    shift: string,
+    role: "Host" | "Operator",
+  ) => {
+    return assignments.find(
+      (a) =>
+        a.livestream === livestream &&
+        a.day === day &&
+        a.shift === shift &&
+        a.role === role,
+    );
+  };
 
-  const openAssignDialog = (livestream: string, day: string, shift: string, role: "Host" | "Operator") => {
+  const openAssignDialog = (
+    livestream: string,
+    day: string,
+    shift: string,
+    role: "Host" | "Operator",
+  ) => {
     setSelectedCell({ livestream, day, shift, role });
     const existing = getAssignment(livestream, day, shift, role);
     setEmployeeName(existing?.employee || "");
@@ -287,13 +330,18 @@ useEffect(() => {
       return;
     }
 
-    const existing = getAssignment(selectedCell.livestream, selectedCell.day, selectedCell.shift, selectedCell.role);
-    
+    const existing = getAssignment(
+      selectedCell.livestream,
+      selectedCell.day,
+      selectedCell.shift,
+      selectedCell.role,
+    );
+
     if (existing) {
       setAssignments(
         assignments.map((a) =>
-          a.id === existing.id ? { ...a, employee: employeeName } : a
-        )
+          a.id === existing.id ? { ...a, employee: employeeName } : a,
+        ),
       );
       toast.success("Shift updated successfully");
     } else {
@@ -317,7 +365,12 @@ useEffect(() => {
   const handleRemove = () => {
     if (!selectedCell) return;
 
-    const existing = getAssignment(selectedCell.livestream, selectedCell.day, selectedCell.shift, selectedCell.role);
+    const existing = getAssignment(
+      selectedCell.livestream,
+      selectedCell.day,
+      selectedCell.shift,
+      selectedCell.role,
+    );
     if (existing) {
       setAssignments(assignments.filter((a) => a.id !== existing.id));
       toast.success("Assignment removed");
@@ -333,7 +386,14 @@ useEffect(() => {
       ["Livestream", "Day", "Shift", "Time", "Role", "Employee"],
       ...assignments.map((a) => {
         const shiftInfo = SHIFTS.find((s) => s.code === a.shift);
-        return [a.livestream, a.day, a.shift, shiftInfo?.time || "", a.role, a.employee];
+        return [
+          a.livestream,
+          a.day,
+          a.shift,
+          shiftInfo?.time || "",
+          a.role,
+          a.employee,
+        ];
       }),
     ]
       .map((row) => row.join(","))
@@ -346,11 +406,12 @@ useEffect(() => {
     link.download = "schedule.csv";
     link.click();
   };
-  
+
   const generateSchedule = async () => {
     try {
-
-      const res = await fetch("https://thesisprogram-production.up.railway.app/generate-schedule");
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/generate-schedule",
+      );
       const data = await res.json();
 
       setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
@@ -362,10 +423,11 @@ useEffect(() => {
       }
 
       const grouped = data.grouped_schedule || {};
+      setLivestreams(Object.keys(grouped));
       console.log("GROUPED:", grouped);
       const unfilled = data.unfilled_slots || [];
 
-     //const unfilled: any[] = [];
+      //const unfilled: any[] = [];
 
       const transformed: ShiftAssignment[] = [];
 
@@ -408,7 +470,6 @@ useEffect(() => {
                 employee: emp.employee_name,
               });
             });
-
           });
         });
       });
@@ -423,74 +484,62 @@ useEffect(() => {
       } else {
         toast.success("Schedule generated successfully");
       }
-
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate schedule");
     }
   };
 
-const saveSchedule = async () => {
+  const saveSchedule = async () => {
+    try {
+      const payload = assignments
+        .filter((a) => a.shift_id && a.employee_id)
+        .map((a) => {
+          const dayIndex = DAYS.indexOf(a.day);
 
-  try {
+          return {
+            shift_id: a.shift_id,
 
-    const payload = assignments
-  .filter((a) => a.shift_id && a.employee_id)
-  .map((a) => {
+            employee_id: a.employee_id,
 
-    const dayIndex = DAYS.indexOf(a.day);
+            role: a.role.toLowerCase(),
 
-    return {
+            shift_date: formatDate(weekDates[dayIndex]),
 
-      shift_id: a.shift_id,
+            shift_type: a.shift,
 
-      employee_id: a.employee_id,
+            account: a.livestream,
+          };
+        });
 
-      role: a.role.toLowerCase(),
+      console.log(payload);
 
-      shift_date: formatDate(
-        weekDates[dayIndex]
-      ),
-
-      shift_type: a.shift,
-
-      account: a.livestream
-
-    };
-
-});
-
-    console.log(payload);
-
-    const res = await fetch(
-      "https://thesisprogram-production.up.railway.app/save-schedule",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/save-schedule",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+
+        console.error(err);
+
+        throw new Error(err);
       }
-    );
 
-    if (!res.ok) {
-
-      const err = await res.text();
-
+      toast.success("Schedule saved");
+    } catch (err) {
       console.error(err);
 
-      throw new Error(err);
+      toast.error("Failed to save");
     }
-
-    toast.success("Schedule saved");
-
-  } catch (err) {
-
-    console.error(err);
-
-    toast.error("Failed to save");
-  }
-};
+  };
 
   const getShiftColor = (shift: string) => {
     const colors = {
@@ -519,10 +568,11 @@ const saveSchedule = async () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl">Schedule Generator</h2>
-          <p className="text-gray-600">Weekly livestream shift allocation and leave management</p>
+          <p className="text-gray-600">
+            Weekly livestream shift allocation and leave management
+          </p>
         </div>
         <div className="flex items-center gap-4">
-          
           <Badge variant="secondary">{role}</Badge>
           {role === "admin" && (
             <>
@@ -548,8 +598,14 @@ const saveSchedule = async () => {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             {SHIFTS.map((shift) => (
               <div key={shift.code} className="flex items-center gap-2">
-                <div className={`w-10 h-10 rounded border-2 ${getShiftColor(shift.code)} flex items-center justify-center`}>
-                  <span className={`font-semibold text-xs ${getShiftTextColor(shift.code)}`}>{shift.code}</span>
+                <div
+                  className={`w-10 h-10 rounded border-2 ${getShiftColor(shift.code)} flex items-center justify-center`}
+                >
+                  <span
+                    className={`font-semibold text-xs ${getShiftTextColor(shift.code)}`}
+                  >
+                    {shift.code}
+                  </span>
                 </div>
                 <div>
                   <div className="text-sm font-medium">{shift.name}</div>
@@ -581,10 +637,10 @@ const saveSchedule = async () => {
             Weekly Schedule
           </TabsTrigger>
           {role === "admin" && (
-          <TabsTrigger value="leaves" className="gap-2">
-            <CalendarDays className="size-4" />
-            Approved Leaves
-          </TabsTrigger>
+            <TabsTrigger value="leaves" className="gap-2">
+              <CalendarDays className="size-4" />
+              Approved Leaves
+            </TabsTrigger>
           )}
         </TabsList>
 
@@ -597,18 +653,20 @@ const saveSchedule = async () => {
                 Weekly Schedule
               </CardTitle>
               <CardDescription>
-                {role === "admin" 
+                {role === "admin"
                   ? "Click on any cell to assign or modify shifts"
                   : "View shift assignments for all livestreams"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                {LIVESTREAMS.map((livestream) => (
+                {livestreams.map((livestream) => (
                   <div key={livestream} className="mb-8">
                     {/* Livestream Header */}
                     <div className="bg-blue-600 text-white p-3 rounded-t-lg">
-                      <h3 className="text-lg font-bold text-center">{livestream}</h3>
+                      <h3 className="text-lg font-bold text-center">
+                        {livestream}
+                      </h3>
                     </div>
 
                     {/* Schedule Table for this Livestream */}
@@ -622,20 +680,20 @@ const saveSchedule = async () => {
                             Role
                           </th>
                           {DAYS.map((day, index) => (
-                          <th
-                            key={day}
-                            className="border border-gray-300 bg-gray-100 p-3 text-center font-semibold min-w-[120px]"
-                          >
-                            <div>{day}</div>
-                            <div className="text-xs text-gray-600">
-                              {weekDates[index].toLocaleDateString("en-US", {
-                                month: "long",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </div>
-                          </th>
-                        ))}
+                            <th
+                              key={day}
+                              className="border border-gray-300 bg-gray-100 p-3 text-center font-semibold min-w-[120px]"
+                            >
+                              <div>{day}</div>
+                              <div className="text-xs text-gray-600">
+                                {weekDates[index].toLocaleDateString("en-US", {
+                                  month: "long",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </div>
+                            </th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
@@ -643,17 +701,27 @@ const saveSchedule = async () => {
                           <React.Fragment key={shift.code}>
                             {/* Host Row */}
                             <tr key={`${livestream}-${shift.code}-host`}>
-                              <td 
-                                rowSpan={2} 
+                              <td
+                                rowSpan={2}
                                 className={`border border-gray-300 p-3 ${getShiftColor(shift.code)}`}
                               >
                                 <div className="flex items-center gap-2">
-                                  <div className={`w-10 h-10 rounded border-2 ${getShiftColor(shift.code)} flex items-center justify-center`}>
-                                    <span className={`font-semibold text-sm ${getShiftTextColor(shift.code)}`}>{shift.code}</span>
+                                  <div
+                                    className={`w-10 h-10 rounded border-2 ${getShiftColor(shift.code)} flex items-center justify-center`}
+                                  >
+                                    <span
+                                      className={`font-semibold text-sm ${getShiftTextColor(shift.code)}`}
+                                    >
+                                      {shift.code}
+                                    </span>
                                   </div>
                                   <div>
-                                    <div className="font-semibold text-sm">{shift.name}</div>
-                                    <div className="text-xs text-gray-600">{shift.time}</div>
+                                    <div className="font-semibold text-sm">
+                                      {shift.name}
+                                    </div>
+                                    <div className="text-xs text-gray-600">
+                                      {shift.time}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -661,20 +729,37 @@ const saveSchedule = async () => {
                                 Host
                               </td>
                               {DAYS.map((day) => {
-                                const assignment = getAssignment(livestream, day, shift.code, "Host");
+                                const assignment = getAssignment(
+                                  livestream,
+                                  day,
+                                  shift.code,
+                                  "Host",
+                                );
                                 const isClickable = role === "admin";
-                                
+
                                 return (
                                   <td
                                     key={`${livestream}-${day}-${shift.code}-host`}
                                     className={`border border-gray-300 p-2 ${
-                                      assignment ? getShiftColor(shift.code) : "bg-white"
+                                      assignment
+                                        ? getShiftColor(shift.code)
+                                        : "bg-white"
                                     } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
-                                    onClick={() => isClickable && openAssignDialog(livestream, day, shift.code, "Host")}
+                                    onClick={() =>
+                                      isClickable &&
+                                      openAssignDialog(
+                                        livestream,
+                                        day,
+                                        shift.code,
+                                        "Host",
+                                      )
+                                    }
                                   >
                                     {assignment ? (
                                       <div className="text-center">
-                                        <div className={`font-medium text-sm ${getShiftTextColor(shift.code)}`}>
+                                        <div
+                                          className={`font-medium text-sm ${getShiftTextColor(shift.code)}`}
+                                        >
                                           {assignment.employee}
                                         </div>
                                       </div>
@@ -687,27 +772,44 @@ const saveSchedule = async () => {
                                 );
                               })}
                             </tr>
-                            
+
                             {/* Operator Row */}
                             <tr key={`${livestream}-${shift.code}-operator`}>
                               <td className="border border-gray-300 bg-purple-50 p-2 text-center font-semibold text-sm">
                                 Operator
                               </td>
                               {DAYS.map((day) => {
-                                const assignment = getAssignment(livestream, day, shift.code, "Operator");
+                                const assignment = getAssignment(
+                                  livestream,
+                                  day,
+                                  shift.code,
+                                  "Operator",
+                                );
                                 const isClickable = role === "admin";
-                                
+
                                 return (
                                   <td
                                     key={`${livestream}-${day}-${shift.code}-operator`}
                                     className={`border border-gray-300 p-2 ${
-                                      assignment ? getShiftColor(shift.code) : "bg-white"
+                                      assignment
+                                        ? getShiftColor(shift.code)
+                                        : "bg-white"
                                     } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
-                                    onClick={() => isClickable && openAssignDialog(livestream, day, shift.code, "Operator")}
+                                    onClick={() =>
+                                      isClickable &&
+                                      openAssignDialog(
+                                        livestream,
+                                        day,
+                                        shift.code,
+                                        "Operator",
+                                      )
+                                    }
                                   >
                                     {assignment ? (
                                       <div className="text-center">
-                                        <div className={`font-medium text-sm ${getShiftTextColor(shift.code)}`}>
+                                        <div
+                                          className={`font-medium text-sm ${getShiftTextColor(shift.code)}`}
+                                        >
                                           {assignment.employee}
                                         </div>
                                       </div>
@@ -733,147 +835,170 @@ const saveSchedule = async () => {
 
         {/* Approved Leaves Tab */}
         {role === "admin" && (
-        <TabsContent value="leaves" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <CalendarDays className="size-5" />
-                    Approved Leaves - {weekLabel}
-                  </CardTitle>
-                  <CardDescription>
-                    View approved employee leave requests for the week
-                  </CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLeaveWeekOffset(0)}
-                    disabled={leaveWeekOffset === 0}
-                    className="gap-2"
-                  >
-                    <ChevronLeft className="size-4" />
-                    This Week
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLeaveWeekOffset(1)}
-                    disabled={leaveWeekOffset === 1}
-                    className="gap-2"
-                  >
-                    Next Week
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="border border-gray-300 bg-gray-100 p-3 text-left font-semibold min-w-[150px]">
-                        Employee
-                      </th>
-                      {weekDates.map((date, index) => (
-                        <th
-                          key={index}
-                          className="border border-gray-300 bg-gray-100 p-3 text-center font-semibold min-w-[120px]"
-                        >
-                          <div>{DAYS[index]}</div>
-                          <div className="text-xs font-normal text-gray-600">
-                            {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Get unique employees from approved leaves */}
-                    {uniqueEmployeesOnLeave.map((employee) => {
-                      const hasLeaveThisWeek = weekDates.some(date => {
-                        const leaves = getLeavesForDate(date);
-                        return leaves.some(l => l.employee === employee);
-                      });
-                      if (!hasLeaveThisWeek) return null;
-
-                      return (
-                        <tr key={employee}>
-                          <td className="border border-gray-300 p-3 font-medium">
-                            {employee}
-                          </td>
-                          {weekDates.map((date, index) => {
-                            const leaves = getLeavesForDate(date);
-                            const leave = leaves.find(l => l.employee === employee);
-                            const isOnLeave = !!leave;
-
-                            return (
-                              <td
-                                key={index}
-                                className={`border border-gray-300 p-2 ${
-                                  isOnLeave ? "bg-red-100" : "bg-white"
-                                }`}
-                              >
-                                {isOnLeave && leave ? (
-                                  <div className="text-center">
-                                    <Badge variant="destructive" className="text-xs">
-                                      {leave.leaveType}
-                                    </Badge>
-                                    <div className="text-xs text-gray-600 mt-1">
-                                      {leave.reason}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-center text-gray-300 text-xs py-1">-</div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-
-                {/* Show message if no leaves */}
-                {!approvedLeaves.some(leave =>
-                  weekDates.some(date =>
-                    formatDate(date) === leave.startDate
-                  )
-                ) && (
-                  <div className="text-center py-8 text-gray-500">
-                    No approved leaves for {weekLabel.toLowerCase()}
+          <TabsContent value="leaves" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarDays className="size-5" />
+                      Approved Leaves - {weekLabel}
+                    </CardTitle>
+                    <CardDescription>
+                      View approved employee leave requests for the week
+                    </CardDescription>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          
-        </TabsContent>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLeaveWeekOffset(0)}
+                      disabled={leaveWeekOffset === 0}
+                      className="gap-2"
+                    >
+                      <ChevronLeft className="size-4" />
+                      This Week
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLeaveWeekOffset(1)}
+                      disabled={leaveWeekOffset === 1}
+                      className="gap-2"
+                    >
+                      Next Week
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-300 bg-gray-100 p-3 text-left font-semibold min-w-[150px]">
+                          Employee
+                        </th>
+                        {weekDates.map((date, index) => (
+                          <th
+                            key={index}
+                            className="border border-gray-300 bg-gray-100 p-3 text-center font-semibold min-w-[120px]"
+                          >
+                            <div>{DAYS[index]}</div>
+                            <div className="text-xs font-normal text-gray-600">
+                              {date.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Get unique employees from approved leaves */}
+                      {uniqueEmployeesOnLeave.map((employee) => {
+                        const hasLeaveThisWeek = weekDates.some((date) => {
+                          const leaves = getLeavesForDate(date);
+                          return leaves.some((l) => l.employee === employee);
+                        });
+                        if (!hasLeaveThisWeek) return null;
+
+                        return (
+                          <tr key={employee}>
+                            <td className="border border-gray-300 p-3 font-medium">
+                              {employee}
+                            </td>
+                            {weekDates.map((date, index) => {
+                              const leaves = getLeavesForDate(date);
+                              const leave = leaves.find(
+                                (l) => l.employee === employee,
+                              );
+                              const isOnLeave = !!leave;
+
+                              return (
+                                <td
+                                  key={index}
+                                  className={`border border-gray-300 p-2 ${
+                                    isOnLeave ? "bg-red-100" : "bg-white"
+                                  }`}
+                                >
+                                  {isOnLeave && leave ? (
+                                    <div className="text-center">
+                                      <Badge
+                                        variant="destructive"
+                                        className="text-xs"
+                                      >
+                                        {leave.leaveType}
+                                      </Badge>
+                                      <div className="text-xs text-gray-600 mt-1">
+                                        {leave.reason}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center text-gray-300 text-xs py-1">
+                                      -
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {/* Show message if no leaves */}
+                  {!approvedLeaves.some((leave) =>
+                    weekDates.some(
+                      (date) => formatDate(date) === leave.startDate,
+                    ),
+                  ) && (
+                    <div className="text-center py-8 text-gray-500">
+                      No approved leaves for {weekLabel.toLowerCase()}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         )}
       </Tabs>
-      
 
       {/* Assignment Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedCell && getAssignment(selectedCell.livestream, selectedCell.day, selectedCell.shift, selectedCell.role)
+              {selectedCell &&
+              getAssignment(
+                selectedCell.livestream,
+                selectedCell.day,
+                selectedCell.shift,
+                selectedCell.role,
+              )
                 ? "Modify Assignment"
                 : "Assign Shift"}
             </DialogTitle>
             <DialogDescription>
               {selectedCell && (
                 <div className="space-y-1 mt-2">
-                  <div><strong>Livestream:</strong> {selectedCell.livestream}</div>
-                  <div><strong>Day:</strong> {selectedCell.day}</div>
-                  <div><strong>Shift:</strong> {SHIFTS.find((s) => s.code === selectedCell.shift)?.name} (
-                  {SHIFTS.find((s) => s.code === selectedCell.shift)?.time})</div>
-                  <div><strong>Role:</strong> {selectedCell.role}</div>
+                  <div>
+                    <strong>Livestream:</strong> {selectedCell.livestream}
+                  </div>
+                  <div>
+                    <strong>Day:</strong> {selectedCell.day}
+                  </div>
+                  <div>
+                    <strong>Shift:</strong>{" "}
+                    {SHIFTS.find((s) => s.code === selectedCell.shift)?.name} (
+                    {SHIFTS.find((s) => s.code === selectedCell.shift)?.time})
+                  </div>
+                  <div>
+                    <strong>Role:</strong> {selectedCell.role}
+                  </div>
                 </div>
               )}
             </DialogDescription>
@@ -895,17 +1020,33 @@ const saveSchedule = async () => {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            {selectedCell && getAssignment(selectedCell.livestream, selectedCell.day, selectedCell.shift, selectedCell.role) && (
-              <Button variant="destructive" onClick={handleRemove} className="gap-2">
-                <Trash2 className="size-4" />
-                Remove
-              </Button>
-            )}
+            {selectedCell &&
+              getAssignment(
+                selectedCell.livestream,
+                selectedCell.day,
+                selectedCell.shift,
+                selectedCell.role,
+              ) && (
+                <Button
+                  variant="destructive"
+                  onClick={handleRemove}
+                  className="gap-2"
+                >
+                  <Trash2 className="size-4" />
+                  Remove
+                </Button>
+              )}
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleAssign}>
-              {selectedCell && getAssignment(selectedCell.livestream, selectedCell.day, selectedCell.shift, selectedCell.role)
+              {selectedCell &&
+              getAssignment(
+                selectedCell.livestream,
+                selectedCell.day,
+                selectedCell.shift,
+                selectedCell.role,
+              )
                 ? "Update"
                 : "Assign"}
             </Button>

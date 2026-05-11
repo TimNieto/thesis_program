@@ -278,6 +278,32 @@ def generate_weekly_schedule():
 
         grouped = group_schedule(result["assignments"])
 
+        for account_name in account_settings.keys():
+
+            if account_name not in grouped:
+                grouped[account_name] = {}
+
+            for day in [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday"
+            ]:
+
+                if day not in grouped[account_name]:
+                    grouped[account_name][day] = {}
+
+                for shift in ["GY", "AM", "NN", "PM"]:
+
+                    if shift not in grouped[account_name][day]:
+                        grouped[account_name][day][shift] = {
+                            "host": [],
+                            "operator": []
+                        }
+
         return {
             "status": "success",
             "assignments": result["assignments"],      # keep raw (important for debugging)
@@ -328,6 +354,41 @@ def get_generated_schedule():
         ]
 
         grouped = group_schedule(assignments)
+
+        cursor.execute("""
+            SELECT account_name
+            FROM account_settings
+        """)
+
+        account_rows = cursor.fetchall()
+
+        for row in account_rows:
+
+            account_name = row[0]
+
+            if account_name not in grouped:
+                grouped[account_name] = {}
+
+            for day in [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday"
+            ]:
+
+                if day not in grouped[account_name]:
+                    grouped[account_name][day] = {}
+
+                for shift in ["GY", "AM", "NN", "PM"]:
+
+                    if shift not in grouped[account_name][day]:
+                        grouped[account_name][day][shift] = {
+                            "host": [],
+                            "operator": []
+                        }
 
         return {
             "status": "success",

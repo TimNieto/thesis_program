@@ -4,7 +4,14 @@ import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Calendar } from "lucide-react";
 
 interface LoginPageProps {
@@ -33,32 +40,34 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
     // Mock authentication - in real app, this would validate against a backend
     try {
-      const response = await fetch("https://thesisprogram-production.up.railway.app/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetch(
+        "https://thesisprogram-production.up.railway.app/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: username,
+            password: password,
+          }),
         },
-        body: JSON.stringify({
-          email: username,
-          password: password
-        })
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         setError(data.detail || "Login failed");
-      return;
-    }
+        return;
+      }
 
-    onLogin({
-      id: data.user.id,
-      name: data.user.name,
-      email: username.trim().toLowerCase(),
-      role: data.role,
-      displayRole: data.displayRole
-    });
-
+      onLogin({
+        id: data.user.id,
+        name: data.user.name,
+        email: username.trim().toLowerCase(),
+        role: data.role,
+        displayRole: data.displayRole,
+      });
     } catch (err) {
       setError("Server not reachable");
     }
@@ -71,7 +80,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <div className="flex items-center justify-center mb-4">
             <Calendar className="size-12 text-blue-600" />
           </div>
-          <CardTitle className="text-2xl text-center">Schedule Manager</CardTitle>
+          <CardTitle className="text-2xl text-center">
+            Schedule Manager
+          </CardTitle>
           <CardDescription className="text-center">
             Sign in to manage schedules and cover requests
           </CardDescription>
@@ -98,11 +109,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            {error && (
-              <div className="text-sm text-red-600">
-                {error}
-              </div>
-            )}
+            {error && <div className="text-sm text-red-600">{error}</div>}
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full">

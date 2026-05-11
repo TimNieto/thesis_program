@@ -137,12 +137,8 @@ const LEAVE_TYPES = [
   "Other",
 ];
 
-export function CoverApplication({
-  currentUser,
-  role,
-}: CoverApplicationProps) {
-  const [applications, setApplications] =
-  useState<ShiftApplication[]>([]);
+export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
+  const [applications, setApplications] = useState<ShiftApplication[]>([]);
 
   const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
@@ -150,74 +146,73 @@ export function CoverApplication({
   const [myShifts, setMyShifts] = useState<any[]>([]);
 
   const employeesMap = Object.fromEntries(
-  employees.map(emp => [emp.id, emp.name])
-);
+    employees.map((emp) => [emp.id, emp.name]),
+  );
 
   const fetchMyLeaves = async () => {
-  try {
-    const res = await fetch(
-      `https://thesisprogram-production.up.railway.app/leaves/${currentUser.employee_id}`
-    );
+    try {
+      const res = await fetch(
+        `https://thesisprogram-production.up.railway.app/leaves/${currentUser.employee_id}`,
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    console.log("LEAVES:", data);
+      console.log("LEAVES:", data);
 
-    setLeaveRequests(
-      data.map((r: any) => ({
-        id: r.request_id,
-        requester: currentUser.name,
-        livestream: "All Streams",
-        day:
-          r.from === r.to
-            ? new Date(r.from).toLocaleDateString()
-            : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
-        shift: "All",
-        role: "Host", // can improve later
-        leaveType: r.leave_type,
-        reason: r.reason || "—", // optional (not returned yet)
-        status: r.status,
-        submittedAt: new Date().toISOString()
-      }))
-    );
+      setLeaveRequests(
+        data.map((r: any) => ({
+          id: r.request_id,
+          requester: currentUser.name,
+          livestream: "All Streams",
+          day:
+            r.from === r.to
+              ? new Date(r.from).toLocaleDateString()
+              : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
+          shift: "All",
+          role: "Host", // can improve later
+          leaveType: r.leave_type,
+          reason: r.reason || "—", // optional (not returned yet)
+          status: r.status,
+          submittedAt: new Date().toISOString(),
+        })),
+      );
+    } catch (err) {
+      console.error("Failed to fetch leaves", err);
+    }
+  };
 
-  } catch (err) {
-    console.error("Failed to fetch leaves", err);
-  }
-};
+  const fetchAllLeaves = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/leaves",
+      );
 
-const fetchAllLeaves = async () => {
-  try {
-    const res = await fetch(
-      "https://thesisprogram-production.up.railway.app/leaves"
-    );
+      const data = await res.json();
 
-    const data = await res.json();
+      console.log("ALL LEAVES:", data);
 
-    console.log("ALL LEAVES:", data);
-
-    setLeaveRequests(
-      data.map((r: any) => ({
-        id: r.request_id,
-        requester: employeesMap[Number(r.employee_id)] || `Employee ${r.employee_id}`,
-        livestream: "All Streams",
-        day:
-          r.from === r.to
-            ? new Date(r.from).toLocaleDateString()
-            : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
-        shift: "All",
-        role: "Host",
-        leaveType: r.leave_type,
-        reason: r.reason || "—",
-        status: r.status,
-        submittedAt: new Date().toISOString()
-      }))
-    );
-
-  } catch (err) {
-    console.error("Failed to fetch all leaves", err);
-  }
-};
+      setLeaveRequests(
+        data.map((r: any) => ({
+          id: r.request_id,
+          requester:
+            employeesMap[Number(r.employee_id)] || `Employee ${r.employee_id}`,
+          livestream: "All Streams",
+          day:
+            r.from === r.to
+              ? new Date(r.from).toLocaleDateString()
+              : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
+          shift: "All",
+          role: "Host",
+          leaveType: r.leave_type,
+          reason: r.reason || "—",
+          status: r.status,
+          submittedAt: new Date().toISOString(),
+        })),
+      );
+    } catch (err) {
+      console.error("Failed to fetch all leaves", err);
+    }
+  };
 
   const fetchCoverRequests = async () => {
     try {
@@ -233,107 +228,86 @@ const fetchAllLeaves = async () => {
 
       setCoverRequests(
         data.map((r: any) => ({
-        id: String(r.id),
+          id: String(r.id),
 
-        requester: r.requester,
+          requester: r.requester,
 
-        livestream: r.livestream,
+          livestream: r.livestream,
 
-        day: new Date(r.day).toLocaleDateString(
-          "en-US",
-          {
+          day: new Date(r.day).toLocaleDateString("en-US", {
             weekday: "long",
             month: "short",
             day: "numeric",
-          }
-        ),
+          }),
 
-        shift: r.shift,
+          shift: r.shift,
 
-        role: r.role === "host"
-          ? "Host"
-          : "Operator",
+          role: r.role === "host" ? "Host" : "Operator",
 
-        reason: r.reason,
+          reason: r.reason,
 
-        status: r.status,
+          status: r.status,
 
-        request_type: r.request_type,
+          request_type: r.request_type,
 
-        is_targeted: r.is_targeted,
+          is_targeted: r.is_targeted,
 
-        submittedAt: new Date().toISOString()
-      }))
+          submittedAt: new Date().toISOString(),
+        })),
       );
-
     } catch (err) {
       console.error("Failed to load cover requests", err);
     }
   };
 
   const fetchApplications = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/shift-applications",
+      );
 
-  try {
+      const data = await res.json();
 
-    const res = await fetch(
-      "https://thesisprogram-production.up.railway.app/shift-applications"
-    );
+      setApplications(
+        data.map((a: any) => ({
+          id: String(a.id),
 
-    const data = await res.json();
+          coverage_request_id: String(a.coverage_request_id),
 
-    setApplications(
-      data.map((a: any) => ({
-        id: String(a.id),
+          applicant: a.applicant,
 
-        coverage_request_id: String(a.coverage_request_id),
+          employee_id: a.employee_id,
 
-        applicant: a.applicant,
+          livestream: a.livestream,
 
-        employee_id: a.employee_id,
-
-        livestream: a.livestream,
-
-        day: new Date(a.day).toLocaleDateString(
-          "en-US",
-          {
+          day: new Date(a.day).toLocaleDateString("en-US", {
             weekday: "long",
             month: "short",
             day: "numeric",
-          }
-        ),
+          }),
 
-        shift: a.shift,
+          shift: a.shift,
 
-        role:
-          a.role === "host"
-            ? "Host"
-            : "Operator",
+          role: a.role === "host" ? "Host" : "Operator",
 
-        reason: a.reason,
+          reason: a.reason,
 
-        status: a.status,
+          status: a.status,
 
-        appliedAt: new Date().toISOString()
-      }))
-    );
-
-  } catch (err) {
-
-    console.error(
-      "Failed to fetch applications",
-      err
-    );
-
-  }
-};
-
-  const fetchEmployees = () => {
-  fetch("https://thesisprogram-production.up.railway.app/employees")
-    .then(res => res.json())
-    .then(data => setEmployees(data))
-    .catch(() => console.log("Failed to load employees"));
+          appliedAt: new Date().toISOString(),
+        })),
+      );
+    } catch (err) {
+      console.error("Failed to fetch applications", err);
+    }
   };
 
+  const fetchEmployees = () => {
+    fetch("https://thesisprogram-production.up.railway.app/employees")
+      .then((res) => res.json())
+      .then((data) => setEmployees(data))
+      .catch(() => console.log("Failed to load employees"));
+  };
 
   useEffect(() => {
     fetchMyShifts();
@@ -342,47 +316,40 @@ const fetchAllLeaves = async () => {
     fetchCoverRequests();
 
     if (role !== "admin") {
-  fetchMyLeaves();
-}
+      fetchMyLeaves();
+    }
   }, []);
 
   useEffect(() => {
-  if (role === "admin" && employees.length > 0) {
-    fetchAllLeaves();
-  }
-}, [employees]);
+    if (role === "admin" && employees.length > 0) {
+      fetchAllLeaves();
+    }
+  }, [employees]);
 
   // Available shifts
-const availableShifts = coverRequests.filter(
-  (r) =>
-    r.status === "pending"
-    && r.requester !== currentUser.name
-    && !applications.some(
-      (a) =>
-        a.applicant === currentUser.name
-        && a.coverage_request_id === r.id
-        && a.status === "pending"
-    )
-);
+  const availableShifts = coverRequests.filter(
+    (r) =>
+      r.status === "pending" &&
+      r.requester !== currentUser.name &&
+      !applications.some(
+        (a) =>
+          a.applicant === currentUser.name &&
+          a.coverage_request_id === r.id &&
+          a.status === "pending",
+      ),
+  );
 
-
-
-
-  const [isCoverDialogOpen, setIsCoverDialogOpen] =
-    useState(false);
-
+  const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
 
   const [selectedShift, setSelectedShift] = useState<{
-  schedule_id: number;
-  livestream: string;
-  day: string;
-  shift: string;
-  role: "Host" | "Operator";
-} | null>(null);
-
+    schedule_id: number;
+    livestream: string;
+    day: string;
+    shift: string;
+    role: "Host" | "Operator";
+  } | null>(null);
 
   const [coverReason, setCoverReason] = useState("");
-
 
   // Standalone leave request states
   const [selectedLeaveDateRange, setSelectedLeaveDateRange] = useState<{
@@ -391,10 +358,9 @@ const availableShifts = coverRequests.filter(
   }>({ from: undefined, to: undefined });
   const [standaloneLeaveReason, setStandaloneLeaveReason] = useState("");
 
-  const [standaloneLeaveType, setStandaloneLeaveType] = useState(LEAVE_TYPES[0]);
-
-
-  
+  const [standaloneLeaveType, setStandaloneLeaveType] = useState(
+    LEAVE_TYPES[0],
+  );
 
   const openCoverDialog = (shiftObj: {
     schedule_id: number;
@@ -413,8 +379,6 @@ const availableShifts = coverRequests.filter(
     setIsCoverDialogOpen(true);
   };
 
-
-
   const submitCoverRequest = async () => {
     if (!selectedShift || !coverReason.trim()) {
       toast.error("Please provide a reason for your cover request");
@@ -427,19 +391,21 @@ const availableShifts = coverRequests.filter(
     }
 
     try {
-
       const scheduleId = selectedShift.schedule_id;
 
-      const res = await fetch(`https://thesisprogram-production.up.railway.app/request-cover/${scheduleId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        `https://thesisprogram-production.up.railway.app/request-cover/${scheduleId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: currentUser.employee_id,
+            reason: coverReason,
+          }),
         },
-        body: JSON.stringify({
-          user_id: currentUser.employee_id,
-          reason: coverReason,
-        }),
-      });
+      );
 
       const data = await res.json();
 
@@ -450,7 +416,6 @@ const availableShifts = coverRequests.filter(
       setIsCoverDialogOpen(false);
       setCoverReason("");
       setSelectedShift(null);
-
     } catch (err) {
       console.error(err);
       toast.error("Failed to submit request");
@@ -465,66 +430,69 @@ const availableShifts = coverRequests.filter(
   //     return;
   //   }
 
-    const submitStandaloneLeaveRequest = async () => {
-      if (!selectedLeaveDateRange.from) {
-        toast.error("Please select a start date");
-        return;
-      }
+  const submitStandaloneLeaveRequest = async () => {
+    if (!selectedLeaveDateRange.from) {
+      toast.error("Please select a start date");
+      return;
+    }
 
-      if (!standaloneLeaveReason.trim()) {
-        toast.error("Please provide a reason");
-        return;
-      }
+    if (!standaloneLeaveReason.trim()) {
+      toast.error("Please provide a reason");
+      return;
+    }
 
-      try {
-        const res = await fetch("https://thesisprogram-production.up.railway.app/leaves", {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/leaves",
+        {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             employee_id: currentUser.employee_id,
             from: selectedLeaveDateRange.from.toISOString().split("T")[0],
             to: (selectedLeaveDateRange.to || selectedLeaveDateRange.from)
-                  .toISOString().split("T")[0],
+              .toISOString()
+              .split("T")[0],
             leave_type: standaloneLeaveType,
-            reason: standaloneLeaveReason
-          })
-        });
+            reason: standaloneLeaveReason,
+          }),
+        },
+      );
 
-        console.log("STATUS:", res.status);
+      console.log("STATUS:", res.status);
 
-        const raw = await res.text();
-        console.log("RAW RESPONSE:", raw);
+      const raw = await res.text();
+      console.log("RAW RESPONSE:", raw);
 
-        if (!res.ok) {
-          toast.error("Backend error: " + raw);
-          return;
-        }
-
-        const data = JSON.parse(raw);
-
-          if (data.error) {
-            console.error("BACKEND ERROR:", data.error);
-            toast.error(data.error);
-            return;
-          }
-
-          toast.success("Leave request submitted!");
-
-        // 🔥 refresh list
-        fetchMyLeaves();
-
-        // 🔥 reset UI
-        setSelectedLeaveDateRange({ from: undefined, to: undefined });
-        setStandaloneLeaveReason("");
-        setStandaloneLeaveType(LEAVE_TYPES[0]);
-
-      } catch (err) {
-        console.error("FETCH FAILED:", err);
-        toast.error("Network or parsing error");
+      if (!res.ok) {
+        toast.error("Backend error: " + raw);
+        return;
       }
-    };
+
+      const data = JSON.parse(raw);
+
+      if (data.error) {
+        console.error("BACKEND ERROR:", data.error);
+        toast.error(data.error);
+        return;
+      }
+
+      toast.success("Leave request submitted!");
+
+      // 🔥 refresh list
+      fetchMyLeaves();
+
+      // 🔥 reset UI
+      setSelectedLeaveDateRange({ from: undefined, to: undefined });
+      setStandaloneLeaveReason("");
+      setStandaloneLeaveType(LEAVE_TYPES[0]);
+    } catch (err) {
+      console.error("FETCH FAILED:", err);
+      toast.error("Network or parsing error");
+    }
+  };
 
   // Helper function to check if a date is disabled (less than 1 week from today)
   const isDateDisabled = (date: Date) => {
@@ -537,86 +505,71 @@ const availableShifts = coverRequests.filter(
     return date < oneWeekFromNow;
   };
 
-const updateApplicationStatus = async (
-  id: string,
-  status: "approved" | "denied",
-) => {
+  const updateApplicationStatus = async (
+    id: string,
+    status: "approved" | "denied",
+  ) => {
+    try {
+      const endpoint =
+        status === "approved"
+          ? `/shift-applications/${id}/approve`
+          : `/shift-applications/${id}/deny`;
 
-  try {
+      await fetch(
+        `https://thesisprogram-production.up.railway.app${endpoint}`,
+        {
+          method: "POST",
+        },
+      );
 
-    const endpoint =
-      status === "approved"
-        ? `/shift-applications/${id}/approve`
-        : `/shift-applications/${id}/deny`;
+      toast.success(`Application ${status}`);
 
-    await fetch(
-      `https://thesisprogram-production.up.railway.app${endpoint}`,
-      {
-        method: "POST",
-      }
-    );
+      fetchApplications();
 
-    toast.success(
-      `Application ${status}`
-    );
+      fetchCoverRequests();
 
-    fetchApplications();
+      fetchMyShifts();
+    } catch (err) {
+      console.error(err);
 
-    fetchCoverRequests();
-
-    fetchMyShifts();
-
-  } catch (err) {
-
-    console.error(err);
-
-    toast.error(
-      "Failed to update application"
-    );
-
-  }
-};
-
+      toast.error("Failed to update application");
+    }
+  };
 
   const applyForCover = async (id: string) => {
+    try {
+      const res = await fetch(
+        `https://thesisprogram-production.up.railway.app/coverage-requests/${id}/apply`,
+        {
+          method: "POST",
 
-  try {
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-    const res = await fetch(
-      `https://thesisprogram-production.up.railway.app/coverage-requests/${id}/apply`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
+          body: JSON.stringify({
+            employee_id: currentUser.employee_id,
+            reason: "Can cover this shift",
+          }),
         },
+      );
 
-        body: JSON.stringify({
-          employee_id: currentUser.employee_id,
-          reason: "Can cover this shift"
-        }),
-      }
-    );
+      const data = await res.json();
 
-    const data = await res.json();
+      toast.success(data.message);
 
-    toast.success(data.message);
+      fetchCoverRequests();
+      fetchApplications();
+    } catch (err) {
+      console.error(err);
 
-    fetchCoverRequests();
-    fetchApplications();
-
-  } catch (err) {
-
-    console.error(err);
-
-    toast.error("Failed to apply");
-
-  }
-};
+      toast.error("Failed to apply");
+    }
+  };
 
   const updateLeaveStatus = async (
     requestId: string,
-    status: "approved" | "rejected"
+    status: "approved" | "rejected",
   ) => {
     try {
       const res = await fetch(
@@ -627,7 +580,7 @@ const updateApplicationStatus = async (
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ status }),
-        }
+        },
       );
 
       const data = await res.json();
@@ -641,19 +594,16 @@ const updateApplicationStatus = async (
 
       // 🔥 REFRESH FROM BACKEND (IMPORTANT)
       fetchAllLeaves();
-
     } catch (err) {
       console.error(err);
       toast.error("Failed to update leave");
     }
-};
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "approved":
-        return (
-          <CheckCircle className="size-4 text-green-600" />
-        );
+        return <CheckCircle className="size-4 text-green-600" />;
       case "denied":
         return <XCircle className="size-4 text-red-600" />;
       default:
@@ -668,11 +618,7 @@ const updateApplicationStatus = async (
       pending: "secondary",
     };
     return (
-      <Badge
-        variant={
-          variants[status as keyof typeof variants] as any
-        }
-      >
+      <Badge variant={variants[status as keyof typeof variants] as any}>
         {status}
       </Badge>
     );
@@ -700,7 +646,9 @@ const updateApplicationStatus = async (
 
   const fetchMyShifts = async () => {
     try {
-      const res = await fetch("https://thesisprogram-production.up.railway.app/generated-schedule")
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/generated-schedule",
+      );
       const data = await res.json();
 
       console.log("SCHEDULE DATA:", data.assignments);
@@ -709,14 +657,15 @@ const updateApplicationStatus = async (
         (data.assignments || [])
           .filter((s: any) => s.employee_id === currentUser.employee_id)
           .map((s: any) => ({
-            schedule_id: s.schedule_id,  // 🔥 THIS FIXES EVERYTHING
+            schedule_id: s.schedule_id, // 🔥 THIS FIXES EVERYTHING
             livestream: s.account,
-            day: new Date(s.shift_date).toLocaleDateString("en-US", { weekday: "long" }),
+            day: new Date(s.shift_date).toLocaleDateString("en-US", {
+              weekday: "long",
+            }),
             shift: s.shift_type,
-            role: s.role === "host" ? "Host" : "Operator"
-          }))
+            role: s.role === "host" ? "Host" : "Operator",
+          })),
       );
-
     } catch (err) {
       console.error(err);
     }
@@ -726,9 +675,7 @@ const updateApplicationStatus = async (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl">
-            Shift Applications & Requests
-          </h2>
+          <h2 className="text-3xl">Shift Applications & Requests</h2>
           <p className="text-gray-600">
             Apply for shifts, request coverage, or submit leave
           </p>
@@ -736,8 +683,17 @@ const updateApplicationStatus = async (
         <Badge variant="secondary">{role}</Badge>
       </div>
 
-      <Tabs defaultValue={role === "admin" ? "requests" : "available"} className="space-y-6">
-        <TabsList className={role === "admin" ? "grid w-full max-w-xs grid-cols-1" : "grid w-full max-w-2xl grid-cols-3"}>
+      <Tabs
+        defaultValue={role === "admin" ? "requests" : "available"}
+        className="space-y-6"
+      >
+        <TabsList
+          className={
+            role === "admin"
+              ? "grid w-full max-w-xs grid-cols-1"
+              : "grid w-full max-w-2xl grid-cols-3"
+          }
+        >
           {role !== "admin" && (
             <>
               <TabsTrigger value="available" className="gap-2">
@@ -784,11 +740,7 @@ const updateApplicationStatus = async (
                               <Badge className="text-base px-3 py-1">
                                 {slot.shift}
                               </Badge>
-                              <Badge
-                                className={getRoleBadgeColor(
-                                  slot.role,
-                                )}
-                              >
+                              <Badge className={getRoleBadgeColor(slot.role)}>
                                 {slot.role}
                               </Badge>
                             </div>
@@ -796,9 +748,7 @@ const updateApplicationStatus = async (
                               <div className="font-bold text-blue-700">
                                 {slot.livestream}
                               </div>
-                              <div className="font-medium">
-                                {slot.day}
-                              </div>
+                              <div className="font-medium">{slot.day}</div>
                               <div className="text-gray-600">
                                 {shiftInfo?.name}
                               </div>
@@ -852,11 +802,7 @@ const updateApplicationStatus = async (
                               <Badge className="text-base px-3 py-1">
                                 {slot.shift}
                               </Badge>
-                              <Badge
-                                className={getRoleBadgeColor(
-                                  slot.role,
-                                )}
-                              >
+                              <Badge className={getRoleBadgeColor(slot.role)}>
                                 {slot.role}
                               </Badge>
                             </div>
@@ -864,9 +810,7 @@ const updateApplicationStatus = async (
                               <div className="font-bold text-blue-700">
                                 {slot.livestream}
                               </div>
-                              <div className="font-medium">
-                                {slot.day}
-                              </div>
+                              <div className="font-medium">{slot.day}</div>
                               <div className="text-gray-600">
                                 {shiftInfo?.name}
                               </div>
@@ -899,7 +843,8 @@ const updateApplicationStatus = async (
                   Request Leave
                 </CardTitle>
                 <CardDescription>
-                  Select start and end dates for your leave request (must be at least 1 week in advance)
+                  Select start and end dates for your leave request (must be at
+                  least 1 week in advance)
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -911,7 +856,7 @@ const updateApplicationStatus = async (
                       selected={selectedLeaveDateRange}
                       onSelect={(range) =>
                         setSelectedLeaveDateRange(
-                          range || { from: undefined, to: undefined }
+                          range || { from: undefined, to: undefined },
                         )
                       }
                       disabled={isDateDisabled}
@@ -922,43 +867,58 @@ const updateApplicationStatus = async (
                   {selectedLeaveDateRange.from && (
                     <div className="text-sm p-3 bg-blue-50 text-blue-700 rounded-md">
                       {selectedLeaveDateRange.to ? (
-                        selectedLeaveDateRange.from.getTime() === selectedLeaveDateRange.to.getTime() ? (
+                        selectedLeaveDateRange.from.getTime() ===
+                        selectedLeaveDateRange.to.getTime() ? (
                           <p>
                             <strong>Selected Date:</strong>{" "}
-                            {selectedLeaveDateRange.from.toLocaleDateString("en-US", {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}
+                            {selectedLeaveDateRange.from.toLocaleDateString(
+                              "en-US",
+                              {
+                                weekday: "long",
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              },
+                            )}
                           </p>
                         ) : (
                           <p>
                             <strong>Leave Period:</strong>{" "}
-                            {selectedLeaveDateRange.from.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}{" "}
+                            {selectedLeaveDateRange.from.toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}{" "}
                             -{" "}
-                            {selectedLeaveDateRange.to.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
+                            {selectedLeaveDateRange.to.toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
                           </p>
                         )
                       ) : (
                         <p>
                           <strong>Start Date:</strong>{" "}
-                          {selectedLeaveDateRange.from.toLocaleDateString("en-US", {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
+                          {selectedLeaveDateRange.from.toLocaleDateString(
+                            "en-US",
+                            {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            },
+                          )}
                           <br />
-                          <span className="text-xs">Click another date to select end date</span>
+                          <span className="text-xs">
+                            Click another date to select end date
+                          </span>
                         </p>
                       )}
                     </div>
@@ -993,9 +953,7 @@ const updateApplicationStatus = async (
                     id="standalone-leave-reason"
                     placeholder="Provide a reason for your leave request..."
                     value={standaloneLeaveReason}
-                    onChange={(e) =>
-                      setStandaloneLeaveReason(e.target.value)
-                    }
+                    onChange={(e) => setStandaloneLeaveReason(e.target.value)}
                     rows={4}
                   />
                 </div>
@@ -1037,9 +995,7 @@ const updateApplicationStatus = async (
                         <TableHead>Role</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Status</TableHead>
-                        {role === "admin" && (
-                          <TableHead>Actions</TableHead>
-                        )}
+                        {role === "admin" && <TableHead>Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1047,30 +1003,23 @@ const updateApplicationStatus = async (
                         .filter(
                           (app) =>
                             role === "admin" ||
-                            app.employee_id === currentUser.employee_id
+                            app.employee_id === currentUser.employee_id,
                         )
                         .map((application) => {
-                          const shiftInfo = getShiftInfo(
-                            application.shift,
-                          );
+                          const shiftInfo = getShiftInfo(application.shift);
                           return (
                             <TableRow key={application.id}>
-                              <TableCell>
-                                {application.applicant}
-                              </TableCell>
+                              <TableCell>{application.applicant}</TableCell>
                               <TableCell>
                                 <span className="font-semibold text-blue-700">
                                   {application.livestream}
                                 </span>
                               </TableCell>
-                              <TableCell>
-                                {application.day}
-                              </TableCell>
+                              <TableCell>{application.day}</TableCell>
                               <TableCell>
                                 <div className="flex flex-col">
                                   <span className="font-medium">
-                                    {application.shift} -{" "}
-                                    {shiftInfo?.name}
+                                    {application.shift} - {shiftInfo?.name}
                                   </span>
                                   <span className="text-xs text-gray-600">
                                     {shiftInfo?.time}
@@ -1091,18 +1040,13 @@ const updateApplicationStatus = async (
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  {getStatusIcon(
-                                    application.status,
-                                  )}
-                                  {getStatusBadge(
-                                    application.status,
-                                  )}
+                                  {getStatusIcon(application.status)}
+                                  {getStatusBadge(application.status)}
                                 </div>
                               </TableCell>
                               {role === "admin" && (
                                 <TableCell>
-                                  {application.status ===
-                                    "pending" && (
+                                  {application.status === "pending" && (
                                     <div className="flex gap-2">
                                       <Button
                                         size="sm"
@@ -1179,31 +1123,24 @@ const updateApplicationStatus = async (
                       {coverRequests
                         .filter(
                           (request) =>
-                            role === "admin"
-                            || request.requester === currentUser.name
+                            role === "admin" ||
+                            request.requester === currentUser.name,
                         )
                         .map((request) => {
-                          const shiftInfo = getShiftInfo(
-                            request.shift,
-                          );
+                          const shiftInfo = getShiftInfo(request.shift);
                           return (
                             <TableRow key={request.id}>
-                              <TableCell>
-                                {request.requester}
-                              </TableCell>
+                              <TableCell>{request.requester}</TableCell>
                               <TableCell>
                                 <span className="font-semibold text-blue-700">
                                   {request.livestream}
                                 </span>
                               </TableCell>
-                              <TableCell>
-                                {request.day}
-                              </TableCell>
+                              <TableCell>{request.day}</TableCell>
                               <TableCell>
                                 <div className="flex flex-col">
                                   <span className="font-medium">
-                                    {request.shift} -{" "}
-                                    {shiftInfo?.name}
+                                    {request.shift} - {shiftInfo?.name}
                                   </span>
                                   <span className="text-xs text-gray-600">
                                     {shiftInfo?.time}
@@ -1212,9 +1149,7 @@ const updateApplicationStatus = async (
                               </TableCell>
                               <TableCell>
                                 <Badge
-                                  className={getRoleBadgeColor(
-                                    request.role,
-                                  )}
+                                  className={getRoleBadgeColor(request.role)}
                                 >
                                   {request.role}
                                 </Badge>
@@ -1223,36 +1158,29 @@ const updateApplicationStatus = async (
                                 {request.reason}
                               </TableCell>
                               <TableCell>
-                              <Badge
-                                variant={
-                                  request.request_type === "emergency"
-                                    ? "destructive"
-                                    : "secondary"
-                                }
-                              >
-                                {request.request_type}
-                              </Badge>
-                            </TableCell>
+                                <Badge
+                                  variant={
+                                    request.request_type === "emergency"
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {request.request_type}
+                                </Badge>
+                              </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  {getStatusIcon(
-                                    request.status,
-                                  )}
-                                  {getStatusBadge(
-                                    request.status,
-                                  )}
+                                  {getStatusIcon(request.status)}
+                                  {getStatusBadge(request.status)}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                {role !== "admin"
-                                  && request.status === "pending"
-                                  && request.requester !== currentUser.name
-                                  && (
+                                {role !== "admin" &&
+                                  request.status === "pending" &&
+                                  request.requester !== currentUser.name && (
                                     <Button
                                       size="sm"
-                                      onClick={() =>
-                                        applyForCover(request.id)
-                                      }
+                                      onClick={() => applyForCover(request.id)}
                                     >
                                       Accept Cover
                                     </Button>
@@ -1271,8 +1199,6 @@ const updateApplicationStatus = async (
               )}
             </CardContent>
           </Card>
-
-
 
           {/* Leave Requests Table */}
           <Card>
@@ -1298,9 +1224,7 @@ const updateApplicationStatus = async (
                         <TableHead>Leave Type</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Status</TableHead>
-                        {role === "admin" && (
-                          <TableHead>Actions</TableHead>
-                        )}
+                        {role === "admin" && <TableHead>Actions</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1308,17 +1232,13 @@ const updateApplicationStatus = async (
                         .filter(
                           (req) =>
                             role === "admin" ||
-                            req.requester === currentUser.name
+                            req.requester === currentUser.name,
                         )
                         .map((request) => {
                           return (
                             <TableRow key={request.id}>
-                              <TableCell>
-                                {request.requester}
-                              </TableCell>
-                              <TableCell>
-                                {request.day}
-                              </TableCell>
+                              <TableCell>{request.requester}</TableCell>
+                              <TableCell>{request.day}</TableCell>
                               <TableCell>
                                 <Badge variant="outline">
                                   {request.leaveType}
@@ -1329,18 +1249,13 @@ const updateApplicationStatus = async (
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  {getStatusIcon(
-                                    request.status,
-                                  )}
-                                  {getStatusBadge(
-                                    request.status,
-                                  )}
+                                  {getStatusIcon(request.status)}
+                                  {getStatusBadge(request.status)}
                                 </div>
                               </TableCell>
                               {role === "admin" && (
                                 <TableCell>
-                                  {request.status ===
-                                    "pending" && (
+                                  {request.status === "pending" && (
                                     <div className="flex gap-2">
                                       <Button
                                         size="sm"
@@ -1357,7 +1272,10 @@ const updateApplicationStatus = async (
                                         size="sm"
                                         variant="destructive"
                                         onClick={() =>
-                                          updateLeaveStatus(request.id, "rejected")
+                                          updateLeaveStatus(
+                                            request.id,
+                                            "rejected",
+                                          )
                                         }
                                       >
                                         Deny
@@ -1385,10 +1303,7 @@ const updateApplicationStatus = async (
       {/* Shift Application Dialog */}
 
       {/* Cover Request Dialog */}
-      <Dialog
-        open={isCoverDialogOpen}
-        onOpenChange={setIsCoverDialogOpen}
-      >
+      <Dialog open={isCoverDialogOpen} onOpenChange={setIsCoverDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Request Shift Coverage</DialogTitle>
@@ -1396,8 +1311,7 @@ const updateApplicationStatus = async (
               {selectedShift && (
                 <div className="space-y-1 mt-2">
                   <div>
-                    <strong>Livestream:</strong>{" "}
-                    {selectedShift.livestream}
+                    <strong>Livestream:</strong> {selectedShift.livestream}
                   </div>
                   <div>
                     <strong>Day:</strong> {selectedShift.day}
@@ -1416,9 +1330,7 @@ const updateApplicationStatus = async (
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="coverReason">
-                Reason for Coverage Request
-              </Label>
+              <Label htmlFor="coverReason">Reason for Coverage Request</Label>
               <Textarea
                 id="coverReason"
                 placeholder="Please explain why you need coverage for this shift..."
@@ -1435,9 +1347,7 @@ const updateApplicationStatus = async (
             >
               Cancel
             </Button>
-            <Button onClick={submitCoverRequest}>
-              Submit Request
-            </Button>
+            <Button onClick={submitCoverRequest}>Submit Request</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

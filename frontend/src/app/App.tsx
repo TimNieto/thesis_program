@@ -31,14 +31,14 @@ export default function App() {
     name: "",
     email: "",
     role: "",
-    displayRole: ""
+    displayRole: "",
   });
 
   const handleLogin = (userData: any) => {
-  console.log("LOGIN USER:", userData);
-  setUser(userData);
-  setIsAuthenticated(true);
-};
+    console.log("LOGIN USER:", userData);
+    setUser(userData);
+    setIsAuthenticated(true);
+  };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -47,7 +47,7 @@ export default function App() {
       name: "",
       email: "",
       role: "",
-      displayRole: ""
+      displayRole: "",
     });
   };
 
@@ -72,11 +72,7 @@ export default function App() {
                 </p>
               </div>
             </div>
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              className="gap-2"
-            >
+            <Button onClick={handleLogout} variant="outline" className="gap-2">
               <LogOut className="size-4" />
               Logout
             </Button>
@@ -139,17 +135,14 @@ export default function App() {
           )}
 
           <TabsContent value="schedule">
-            <ScheduleGenerator
-              currentUser={user.email}
-              role={user.role}
-            />
+            <ScheduleGenerator currentUser={user.email} role={user.role} />
           </TabsContent>
 
           <TabsContent value="cover">
             <CoverApplication
               currentUser={{
                 employee_id: user.id,
-                name: user.name
+                name: user.name,
               }}
               role={user.role}
             />
