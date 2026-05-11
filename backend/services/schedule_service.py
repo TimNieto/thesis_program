@@ -168,6 +168,8 @@ def group_schedule(assignments):
         account = a["account"]
 
         schedule[account][day][shift][role].append({
+            "schedule_id": a.get("schedule_id"),
+            "shift_id": a.get("shift_id"),
             "employee_id": a["employee_id"],
             "employee_name": a["employee_name"]
         })
