@@ -5,6 +5,7 @@ from services.schedule_service import generate_weekly_schedule, get_generated_sc
 from db.database import get_connection
 from datetime import datetime
 from fastapi import Body
+from typing import List
 
 router = APIRouter()
 SHIFT_STARTS = {
@@ -705,7 +706,7 @@ def deny_application(id: int):
         conn.close()
 
 @router.post("/save-schedule")
-def save_schedule(assignments: list = Body(...)):
+def save_schedule(assignments: List[dict] = Body(...)):
     conn = get_connection()
     cursor = conn.cursor()
 
