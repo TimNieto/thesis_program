@@ -114,6 +114,7 @@ def request_cover(schedule_id: int, payload: dict):
             WHERE schedule_id = %s
             AND requested_by = %s
             AND status = 'pending'
+            AND is_archived = FALSE
         """, (
             schedule_id,
             user_id
@@ -238,25 +239,31 @@ def get_requests(employee_id: int):
 
             WHERE
 
-            -- employee always sees own requests
-            cr.requested_by = %s
+            cr.is_archived = FALSE
 
-            OR
+            AND (
 
-            -- all normal requests visible
-            (
-                cr.request_type = 'normal'
+                -- employee always sees own requests
+                cr.requested_by = %s
+
+                OR
+
+                -- all normal requests visible
+                (
+                    cr.request_type = 'normal'
+                )
+
+                OR
+
+                -- emergency requests only visible to targets
+                (
+                    cr.request_type = 'emergency'
+                    AND ect.employee_id IS NOT NULL
+                )
+
             )
-
-            OR
-
-            -- emergency requests only visible to targets
-            (
-                cr.request_type = 'emergency'
-                AND ect.employee_id IS NOT NULL
-            )
-
-            ORDER BY cr.created_at DESC
+                       
+                ORDER BY cr.created_at DESC
 
         """, (
             employee_id,  # for LEFT JOIN
@@ -328,6 +335,8 @@ def get_all_requests():
 
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
+
+            WHERE cr.is_archived = FALSE
 
             ORDER BY cr.created_at DESC
 
@@ -418,6 +427,7 @@ def apply_for_cover(id: int, payload: dict):
             FROM coverage_requests
             WHERE id = %s
             AND status = 'pending'
+            AND is_archived = FALSE
         """, (id,))
 
         request = cursor.fetchone()
@@ -441,6 +451,7 @@ def apply_for_cover(id: int, payload: dict):
             FROM shift_applications
             WHERE coverage_request_id = %s
             AND applicant_id = %s
+            AND is_archived = FALSE
         """, (
             id,
             employee_id
@@ -524,6 +535,8 @@ def get_shift_applications():
 
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
+
+            WHERE sa.is_archived = FALSE
 
             ORDER BY sa.applied_at DESC
 
@@ -690,7 +703,27 @@ def save_schedule(assignments: list):
     cursor = conn.cursor()
 
     try:
-        cursor.execute("DELETE FROM generated_schedule")
+        # ARCHIVE OLD WORKFLOW DATA
+        cursor.execute("""
+            UPDATE emergency_cover_targets
+            SET is_archived = TRUE
+        """)
+
+        cursor.execute("""
+            UPDATE shift_applications
+            SET is_archived = TRUE
+        """)
+
+        cursor.execute("""
+            UPDATE coverage_requests
+            SET is_archived = TRUE
+        """)
+
+        # REMOVE OLD GENERATED SCHEDULE
+
+        cursor.execute("""
+            DELETE FROM generated_schedule
+        """)
 
         for a in assignments:
             cursor.execute("""
