@@ -341,6 +341,7 @@ def get_generated_schedule():
             FROM generated_schedule g
             JOIN shifts s ON g.shift_id = s.shift_id
             JOIN employees e ON g.employee_id = e.employee_id
+            WHERE g.is_archived = FALSE
         """)
 
         rows = cursor.fetchall()

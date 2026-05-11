@@ -240,6 +240,8 @@ def get_requests(employee_id: int):
             WHERE
 
             cr.is_archived = FALSE
+                       
+            AND gs.is_archived = FALSE
 
             AND (
 
@@ -337,6 +339,8 @@ def get_all_requests():
                 ON cr.schedule_id = gs.schedule_id
 
             WHERE cr.is_archived = FALSE
+                       
+            AND gs.is_archived = FALSE
 
             ORDER BY cr.created_at DESC
 
@@ -537,6 +541,8 @@ def get_shift_applications():
                 ON cr.schedule_id = gs.schedule_id
 
             WHERE sa.is_archived = FALSE
+            
+            AND gs.is_archived = FALSE
 
             ORDER BY sa.applied_at DESC
 
@@ -722,7 +728,8 @@ def save_schedule(assignments: list):
         # REMOVE OLD GENERATED SCHEDULE
 
         cursor.execute("""
-            DELETE FROM generated_schedule
+            UPDATE generated_schedule
+            SET is_archived = TRUE
         """)
 
         for a in assignments:
