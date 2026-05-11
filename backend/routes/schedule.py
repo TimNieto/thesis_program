@@ -471,14 +471,119 @@ def apply_for_cover(id: int, payload: dict):
                 detail="Already applied"
             )
 
-        # CREATE APPLICATION
+        # GET REQUEST TYPE + SCHEDULE
+        cursor.execute("""
+            SELECT
+                cr.request_type,
+                cr.schedule_id
+            FROM coverage_requests cr
+            WHERE cr.id = %s
+        """, (id,))
+
+        request_data = cursor.fetchone()
+
+        if not request_data:
+            raise HTTPException(
+                status_code=404,
+                detail="Cover request not found"
+            )
+
+        request_type = request_data[0]
+        schedule_id = request_data[1]
+
+        # GET ABSENT REPLACEMENT MODE
+        cursor.execute("""
+            SELECT absent_replacement_mode
+            FROM company_settings
+            LIMIT 1
+        """)
+
+        mode_row = cursor.fetchone()
+
+        replacement_mode = (
+            mode_row[0].lower()
+            if mode_row and mode_row[0]
+            else "manual"
+        )
+
+        # DETERMINE IF ADMIN APPROVAL IS NEEDED
+        requires_admin = False
+
+        # MANUAL MODE
+        if replacement_mode == "manual":
+            requires_admin = True
+
+        # HYBRID MODE
+        elif replacement_mode == "hybrid":
+
+            if request_type == "emergency":
+                requires_admin = True
+
+        # AUTOMATIC MODE
+        elif replacement_mode == "automatic":
+            requires_admin = False
+
+        # -----------------------------
+        # MANUAL APPROVAL FLOW
+        # -----------------------------
+        if requires_admin:
+
+            cursor.execute("""
+                INSERT INTO shift_applications (
+                    coverage_request_id,
+                    applicant_id,
+                    reason,
+                    status
+                )
+                VALUES (%s, %s, %s, 'pending')
+            """, (
+                id,
+                employee_id,
+                reason
+            ))
+
+            conn.commit()
+
+            return {
+                "message": "Application submitted for admin approval"
+            }
+
+        # -----------------------------
+        # AUTO APPROVAL FLOW
+        # -----------------------------
+
+        # TRANSFER SHIFT
+        cursor.execute("""
+            UPDATE generated_schedule
+            SET employee_id = %s
+            WHERE schedule_id = %s
+        """, (
+            employee_id,
+            schedule_id
+        ))
+
+        # APPROVE COVER REQUEST
+        cursor.execute("""
+            UPDATE coverage_requests
+            SET
+                status = 'approved',
+                accepted_by = %s,
+                approved_at = NOW()
+            WHERE id = %s
+        """, (
+            employee_id,
+            id
+        ))
+
+        # SAVE APPROVED APPLICATION
         cursor.execute("""
             INSERT INTO shift_applications (
                 coverage_request_id,
                 applicant_id,
-                reason
+                reason,
+                status
             )
-            VALUES (%s, %s, %s)
+            VALUES (%s, %s, %s, 'approved')
         """, (
             id,
             employee_id,
@@ -488,7 +593,7 @@ def apply_for_cover(id: int, payload: dict):
         conn.commit()
 
         return {
-            "message": "Applied successfully"
+            "message": "Shift automatically transferred"
         }
 
     finally:
