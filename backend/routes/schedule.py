@@ -516,7 +516,7 @@ def apply_for_cover(id: int, payload: dict):
         # HYBRID MODE
         elif replacement_mode == "hybrid":
 
-            if request_type == "emergency":
+            if request_type != "emergency":
                 requires_admin = True
 
         # AUTOMATIC MODE
