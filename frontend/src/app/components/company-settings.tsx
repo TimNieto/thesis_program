@@ -291,7 +291,7 @@ export function CompanySettings() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            shift_name: `NEW_SHIFT_${Date.now()}`,
+            shift_name: "NEW_SHIFT",
             start_time: "09:00:00",
             end_time: "17:00:00",
           }),
