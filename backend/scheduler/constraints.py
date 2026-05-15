@@ -38,10 +38,10 @@ def is_available(employee_id, shift, availability_map, context=None):
 
     emp_availability = availability_map.get(employee_id, {})
 
-    if not emp_availability:
-        return False
-
-    account_data = emp_availability.get(account)
+    account_data = (
+        emp_availability.get(account)
+        or emp_availability.get("default")
+    )
 
     # STRICT MODE
     if account_data:
