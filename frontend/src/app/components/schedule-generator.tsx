@@ -558,12 +558,42 @@ export function ScheduleGenerator({
     }
   };
 
-  const getShiftColor = () => {
-    return "bg-gray-100";
+  const getShiftColor = (shift: string) => {
+    switch (shift) {
+      case "AM":
+        return "bg-blue-100 border-blue-300";
+
+      case "NN":
+        return "bg-yellow-100 border-yellow-300";
+
+      case "PM":
+        return "bg-orange-100 border-orange-300";
+
+      case "GY":
+        return "bg-purple-100 border-purple-300";
+
+      default:
+        return "bg-gray-100 border-gray-300";
+    }
   };
 
-  const getShiftTextColor = () => {
-    return "text-gray-700";
+  const getShiftTextColor = (shift: string) => {
+    switch (shift) {
+      case "AM":
+        return "text-blue-700";
+
+      case "NN":
+        return "text-yellow-700";
+
+      case "PM":
+        return "text-orange-700";
+
+      case "GY":
+        return "text-purple-700";
+
+      default:
+        return "text-gray-700";
+    }
   };
 
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
