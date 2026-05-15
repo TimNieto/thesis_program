@@ -273,6 +273,13 @@ export function CompanySettings() {
     }
   };
 
+  const getShiftId = (shift: any) =>
+    Number(
+      shift.shift_template_id !== undefined
+        ? shift.shift_template_id
+        : shift.shift_id
+    );
+  
   const handleAddShift = () => {
     const newShift = {
       shift_id: Date.now(),
@@ -283,18 +290,29 @@ export function CompanySettings() {
     setShiftTimings([...shiftTimings, newShift]);
   };
 
-  const handleRemoveShift = (id: string) => {
-    setShiftTimings(shiftTimings.filter((shift) => String(shift.shift_id) !== id));
+  const handleRemoveShift = (id: number) => {
+    setShiftTimings((prev) =>
+      prev.filter((shift) => {
+        const shiftId =
+          shift.shift_template_id !== undefined
+            ? shift.shift_template_id
+            : shift.shift_id;
+
+        return Number(shiftId) !== Number(id);
+      }),
+    );
   };
 
   const handleUpdateShift = (
-    id: string,
+    id: number,
     field: string,
     value: string,
   ) => {
-    setShiftTimings(
-      shiftTimings.map((shift) =>
-        String(shift.shift_id) === id ? { ...shift, [field]: value } : shift,
+    setShiftTimings((prev) =>
+      prev.map((shift) =>
+        getShiftId(shift) === id
+          ? { ...shift, [field]: value }
+          : shift,
       ),
     );
   };
@@ -358,6 +376,23 @@ export function CompanySettings() {
         throw new Error("Failed to save settings");
       }
 
+      for (const shift of shiftTimings) {
+        await fetch(
+          `https://thesisprogram-production.up.railway.app/shift-templates/${getShiftId(shift)}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              shift_name: shift.shift_name,
+              start_time: shift.start_time,
+              end_time: shift.end_time,
+            }),
+          },
+        );
+      }
+      
       toast.success("Company settings saved successfully");
     } catch (err) {
       console.error(err);
@@ -785,39 +820,56 @@ export function CompanySettings() {
         <CardContent>
           <div className="space-y-4">
             {shiftTimings.map((shift, index) => (
-              <div key={String(shift.shift_id)}>
+              <div key={String(getShiftId(shift))}>
                 {index > 0 && <Separator className="my-4" />}
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-end">
                   <div className="space-y-2">
-                    <Label htmlFor={`shiftName-${String(shift.shift_id)}`}>Shift Name</Label>
+                    <Label htmlFor={`shiftName-${String(getShiftId(shift))}`}>
+                      Shift Name
+                    </Label>
                     <Input
-                      id={`shiftName-${String(shift.shift_id)}`}
+                      id={`shiftName-${String(getShiftId(shift))}`}
                       value={shift.shift_name}
                       onChange={(e) =>
-                        handleUpdateShift(String(shift.shift_id), "name", e.target.value)
+                        handleUpdateShift(
+                          getShiftId(shift),
+                          "shift_name",
+                          e.target.value
+                        )
                       }
                       placeholder="e.g., AM, PM, GY"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`startTime-${String(shift.shift_id)}`}>Start Time</Label>
+                    <Label htmlFor={`startTime-${String(getShiftId(shift))}`}>
+                      Start Time
+                    </Label>
+
                     <Input
-                      id={`startTime-${String(shift.shift_id)}`}
+                      id={`startTime-${String(getShiftId(shift))}`}
                       type="time"
                       value={shift.start_time}
                       onChange={(e) =>
-                        handleUpdateShift(String(shift.shift_id), "startTime", e.target.value)
+                        handleUpdateShift(
+                          getShiftId(shift),
+                          "start_time",
+                          e.target.value
+                        )
                       }
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`endTime-${String(shift.shift_id)}`}>End Time</Label>
+                    <Label htmlFor={`endTime-${String(getShiftId(shift))}`}>End Time</Label>
                     <Input
-                      id={`endTime-${String(shift.shift_id)}`}
+                      id={`endTime-${String(getShiftId(shift))}`}
                       type="time"
                       value={shift.end_time}
                       onChange={(e) =>
-                        handleUpdateShift(String(shift.shift_id), "endTime", e.target.value)
+                        handleUpdateShift(
+                          getShiftId(shift),
+                          "end_time",
+                          e.target.value
+                        )
                       }
                     />
                   </div>
@@ -825,7 +877,9 @@ export function CompanySettings() {
                     <Button
                       variant="destructive"
                       size="icon"
-                      onClick={() => handleRemoveShift(String(shift.shift_id))}
+                      onClick={() =>
+                        handleRemoveShift(getShiftId(shift))
+                      }
                     >
                       <X className="size-4" />
                     </Button>
