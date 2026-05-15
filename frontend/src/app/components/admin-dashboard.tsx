@@ -444,8 +444,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const activeEmployees = employees.filter((e) => e.status === "Active").length;
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
   const totalAssignments = assignments.length;
-  const totalSlots = DAYS.length * shiftTemplates.length * LIVESTREAMS.length * 2;
-
+  const totalSlots = DAYS.length * shiftTemplates.length * 2;
+  
   const getRequestTypeColor = (type: string) => {
     const colors = {
       application: "bg-blue-100 text-blue-700",
