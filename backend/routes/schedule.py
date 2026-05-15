@@ -8,13 +8,6 @@ from fastapi import Body
 from typing import List
 
 router = APIRouter()
-SHIFT_STARTS = {
-    "GY": 1,
-    "AM": 7,
-    "NN": 13,
-    "PM": 19,
-}
-
 
 @router.get("/generate-schedule")
 def generate_schedule():
@@ -68,10 +61,18 @@ def request_cover(schedule_id: int, payload: dict):
         # GET SHIFT INFO
         cursor.execute("""
             SELECT
-                shift_date,
-                shift_type
-            FROM generated_schedule
-            WHERE schedule_id = %s
+                s.shift_date,
+                st.start_time
+
+            FROM generated_schedule gs
+
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+
+            WHERE gs.schedule_id = %s
         """, (schedule_id,))
 
         schedule = cursor.fetchone()
@@ -83,15 +84,14 @@ def request_cover(schedule_id: int, payload: dict):
             )
 
         shift_date = schedule[0]
-        shift_type = schedule[1]
 
         # DETERMINE SHIFT START
-        shift_hour = SHIFT_STARTS.get(shift_type, 7)
+        shift_start = schedule[1]
 
         shift_datetime = datetime.combine(
             shift_date,
-            datetime.min.time()
-        ).replace(hour=shift_hour)
+            shift_start
+        )
 
         now = datetime.now()
 
@@ -153,10 +153,16 @@ def request_cover(schedule_id: int, payload: dict):
 
             # FIND EMPLOYEES WORKING SAME DAY
             cursor.execute("""
-                SELECT DISTINCT employee_id
-                FROM generated_schedule
-                WHERE shift_date = %s
-                AND employee_id != %s
+                SELECT DISTINCT gs.employee_id
+
+                FROM generated_schedule gs
+
+                JOIN shifts s
+                    ON gs.shift_id = s.shift_id
+
+                WHERE s.shift_date = %s
+                AND gs.employee_id != %s
+                AND gs.is_archived = FALSE
             """, (
                 shift_date,
                 user_id
@@ -205,11 +211,11 @@ def get_requests(employee_id: int):
 
                 e.full_name,
 
-                gs.account,
-
-                gs.shift_date,
-
-                gs.shift_type,
+                s.account,
+                       
+                s.shift_date,
+                       
+                st.shift_name,
 
                 gs.role,
 
@@ -234,6 +240,12 @@ def get_requests(employee_id: int):
 
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
+
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
 
             LEFT JOIN emergency_cover_targets ect
                 ON ect.coverage_request_id = cr.id
@@ -316,11 +328,11 @@ def get_all_requests():
 
                 e.full_name,
 
-                gs.account,
-
-                gs.shift_date,
-
-                gs.shift_type,
+                s.account,
+                       
+                s.shift_date,
+                       
+                st.shift_name,
 
                 gs.role,
 
@@ -339,6 +351,12 @@ def get_all_requests():
 
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
+
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
 
             WHERE cr.is_archived = FALSE
                        
@@ -618,11 +636,11 @@ def get_shift_applications():
                        
                 cr.requested_by,
 
-                gs.account,
-
-                gs.shift_date,
-
-                gs.shift_type,
+                s.account,
+                       
+                s.shift_date,
+                       
+                st.shift_name,
 
                 gs.role,
 
@@ -646,6 +664,12 @@ def get_shift_applications():
 
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
+
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
 
             WHERE sa.is_archived = FALSE
             
@@ -844,19 +868,13 @@ def save_schedule(assignments: List[dict] = Body(...)):
                 INSERT INTO generated_schedule (
                     shift_id,
                     employee_id,
-                    role,
-                    shift_date,
-                    shift_type,
-                    account
+                    role
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s)
             """, (
                 a["shift_id"],
                 a["employee_id"],
-                a["role"],
-                a["shift_date"],
-                a["shift_type"],
-                a["account"]
+                a["role"]
             ))
 
         conn.commit()

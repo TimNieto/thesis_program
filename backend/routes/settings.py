@@ -1,3 +1,5 @@
+# backend/routes/settings.py
+
 from fastapi import APIRouter
 from db.database import get_connection
 
@@ -21,7 +23,6 @@ def get_settings():
                 max_shifts_per_week,
                 allow_double_shifts,
                 fairness_weight,
-                gy_shift_penalty,
                 absence_replacement_mode
             FROM company_settings
             LIMIT 1
@@ -40,8 +41,7 @@ def get_settings():
             "max_shifts_per_week": row[4],
             "allow_double_shifts": row[5],
             "fairness_weight": row[6],
-            "gy_shift_penalty": row[7],
-            "absence_replacement_mode": row[8]
+            "absence_replacement_mode": row[7]
         }
 
     finally:
@@ -68,7 +68,6 @@ def update_settings(payload: dict):
                 max_shifts_per_week = %s,
                 allow_double_shifts = %s,
                 fairness_weight = %s,
-                gy_shift_penalty = %s,
                 absence_replacement_mode = %s,
                 updated_at = NOW()
             WHERE settings_id = 1
@@ -80,7 +79,6 @@ def update_settings(payload: dict):
             payload["max_shifts_per_week"],
             payload["allow_double_shifts"],
             payload["fairness_weight"],
-            payload["gy_shift_penalty"],
             payload["absence_replacement_mode"]
         ))
 

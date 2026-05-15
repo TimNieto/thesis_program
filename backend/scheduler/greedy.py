@@ -143,13 +143,6 @@ def sort_shifts_by_difficulty(shifts, employees, context):
             priority_level * 100
         )
 
-        # GY harder
-        if shift["shift_type"].upper() == "GY":
-            gy_penalty = (
-        context["settings"]["gy_shift_penalty"]
-            )
-            difficulty_score -= gy_penalty
-
         # Weekend harder
         if shift["shift_date"].weekday() >= 5:
             difficulty_score -= 1
@@ -318,7 +311,7 @@ def score_employee(employee, shift, role, context):
     # 4. GY FATIGUE PENALTY
     # --------------------------------
 
-    if shift["shift_type"].upper() == "GY":
+    if shift.get("is_overnight"):
 
         previous_assignments = context[
             "context_assignments_by_employee"
@@ -336,7 +329,7 @@ def score_employee(employee, shift, role, context):
                 delta == 1 and
                 a["shift_type"].upper() == "GY"
             ):
-                score -= 5
+                score -= shift.get("fatigue_penalty", 0)
 
     return score
 

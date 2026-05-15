@@ -135,22 +135,25 @@ def create_account(payload: dict):
         # CREATE TEMPLATE SHIFTS
         template_date = "2026-01-01"
 
-        shift_templates = [
-            ("AM", "08:00", "12:00"),
-            ("NN", "12:00", "16:00"),
-            ("PM", "16:00", "20:00"),
-            ("GY", "20:00", "00:00"),
-        ]
+        # CREATE DEFAULT SHIFTS FOR ACCOUNT
+        cursor.execute("""
+            SELECT shift_template_id
+            FROM shift_templates
+        """)
 
-        for shift_type, start_time, end_time in shift_templates:
+        templates = cursor.fetchall()
+
+        template_date = "2026-01-01"
+
+        for template in templates:
+
+            template_id = template[0]
 
             cursor.execute("""
                 INSERT INTO shifts (
                     shift_date,
                     account,
-                    shift_type,
-                    start_time,
-                    end_time,
+                    shift_template_id,
                     required_host_count,
                     required_operator_count
                 )
@@ -159,16 +162,18 @@ def create_account(payload: dict):
                     %s,
                     %s,
                     %s,
-                    %s,
-                    %s,
                     %s
                 )
+                ON CONFLICT (
+                    shift_date,
+                    account,
+                    shift_template_id
+                )
+                DO NOTHING
             """, (
                 template_date,
                 account_name,
-                shift_type,
-                start_time,
-                end_time,
+                template_id,
                 1 if require_host else 0,
                 1 if require_operator else 0
             ))
@@ -194,9 +199,16 @@ def delete_account(account_name: str):
 
         # PREVENT DELETING ACCOUNTS USED IN SAVED SCHEDULES
         cursor.execute("""
-            SELECT schedule_id
-            FROM generated_schedule
-            WHERE account = %s
+            SELECT gs.schedule_id
+
+            FROM generated_schedule gs
+
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+
+            WHERE s.account = %s
+            AND gs.is_archived = FALSE
+
             LIMIT 1
         """, (account_name,))
 

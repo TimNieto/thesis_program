@@ -10,6 +10,30 @@ from datetime import datetime, timedelta
 # FETCH HELPERS
 # -------------------------------
 
+def fetch_shift_templates(cursor):
+
+    cursor.execute("""
+        SELECT
+            shift_template_id,
+            shift_name,
+            start_time,
+            end_time
+        FROM shift_templates
+        ORDER BY start_time
+    """)
+
+    rows = cursor.fetchall()
+
+    return [
+        {
+            "shift_template_id": r[0],
+            "shift_name": r[1],
+            "start_time": r[2],
+            "end_time": r[3]
+        }
+        for r in rows
+    ]
+
 def fetch_employees(cursor):
     cursor.execute("""
         SELECT employee_id, full_name, main_role, can_be_host, can_be_operator
@@ -43,24 +67,47 @@ def fetch_shifts(cursor):
     start_date, end_date = get_next_week_range()
 
     cursor.execute("""
-        SELECT shift_id, shift_date, account, shift_type,
-               required_host_count, required_operator_count
-        FROM shifts
-        WHERE shift_date BETWEEN %s AND %s
-        ORDER BY shift_date
+        SELECT
+            s.shift_id,
+            s.shift_date,
+            s.account,
+            st.shift_name,
+            st.start_time,
+            st.end_time,
+            st.fatigue_penalty,
+            st.difficulty_weight,
+            st.is_overnight,
+            s.required_host_count,
+            s.required_operator_count
+
+        FROM shifts s
+
+        JOIN shift_templates st
+            ON s.shift_template_id = st.shift_template_id
+
+        WHERE s.shift_date BETWEEN %s AND %s
+
+        ORDER BY
+            s.shift_date,
+            st.start_time
     """, (start_date, end_date))
 
     rows = cursor.fetchall()
 
     return [
-        {
-            "shift_id": r[0],
-            "shift_date": r[1],
-            "account": r[2],
-            "shift_type": r[3],
-            "required_host_count": r[4] or 0,
-            "required_operator_count": r[5] or 0
-        }
+    {
+        "shift_id": r[0],
+        "shift_date": r[1],
+        "account": r[2],
+        "shift_type": r[3],
+        "start_time": r[4],
+        "end_time": r[5],
+        "fatigue_penalty": r[6],
+        "difficulty_weight": r[7],
+        "is_overnight": r[8],
+        "required_host_count": r[9] or 0,
+        "required_operator_count": r[10] or 0
+    }
         for r in rows
     ]
 
@@ -205,8 +252,7 @@ def generate_weekly_schedule():
                 max_shifts_per_day,
                 max_shifts_per_week,
                 allow_double_shifts,
-                fairness_weight,
-                gy_shift_penalty
+                fairness_weight
             FROM company_settings
             LIMIT 1
         """)
@@ -218,8 +264,7 @@ def generate_weekly_schedule():
             "max_shifts_per_day": settings_row[1],
             "max_shifts_per_week": settings_row[2],
             "allow_double_shifts": settings_row[3],
-            "fairness_weight": settings_row[4],
-            "gy_shift_penalty": settings_row[5]
+            "fairness_weight": settings_row[4]
         }
 
         # -------------------------
@@ -295,11 +340,16 @@ def generate_weekly_schedule():
 
                 if day not in grouped[account_name]:
                     grouped[account_name][day] = {}
+                
+                shift_templates = fetch_shift_templates(cursor)
+                
+                for template in shift_templates:
 
-                for shift in ["GY", "AM", "NN", "PM"]:
+                    shift_name = template["shift_name"]
 
-                    if shift not in grouped[account_name][day]:
-                        grouped[account_name][day][shift] = {
+                    if shift_name not in grouped[account_name][day]:
+
+                        grouped[account_name][day][shift_name] = {
                             "host": [],
                             "operator": []
                         }
@@ -322,19 +372,36 @@ def get_generated_schedule():
 
     try:
         cursor.execute("""
-            SELECT 
+            SELECT
                 g.schedule_id,
                 g.shift_id,
+
                 s.shift_date,
-                s.shift_type,
                 s.account,
+
+                st.shift_name,
+
                 e.employee_id,
                 e.full_name,
+
                 g.role
+
             FROM generated_schedule g
-            JOIN shifts s ON g.shift_id = s.shift_id
-            JOIN employees e ON g.employee_id = e.employee_id
+
+            JOIN shifts s
+                ON g.shift_id = s.shift_id
+
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+
+            JOIN employees e
+                ON g.employee_id = e.employee_id
+
             WHERE g.is_archived = FALSE
+
+            ORDER BY
+                s.shift_date,
+                st.start_time
         """)
 
         rows = cursor.fetchall()
@@ -344,8 +411,8 @@ def get_generated_schedule():
                 "schedule_id": r[0],
                 "shift_id": r[1],
                 "shift_date": r[2],
-                "shift_type": r[3],
-                "account": r[4],
+                "account": r[3],
+                "shift_type": r[4],
                 "employee_id": r[5],
                 "employee_name": r[6],
                 "role": r[7]
@@ -381,11 +448,16 @@ def get_generated_schedule():
 
                 if day not in grouped[account_name]:
                     grouped[account_name][day] = {}
+                
+                shift_templates = fetch_shift_templates(cursor)
+                
+                for template in shift_templates:
 
-                for shift in ["GY", "AM", "NN", "PM"]:
+                    shift_name = template["shift_name"]
 
-                    if shift not in grouped[account_name][day]:
-                        grouped[account_name][day][shift] = {
+                    if shift_name not in grouped[account_name][day]:
+
+                        grouped[account_name][day][shift_name] = {
                             "host": [],
                             "operator": []
                         }
@@ -401,46 +473,80 @@ def get_generated_schedule():
         conn.close()
 
 def ensure_next_week_shifts(cursor):
-    from datetime import datetime, timedelta
 
     today = datetime.today()
+
     days_ahead = 7 - today.weekday()
+
     next_monday = today + timedelta(days=days_ahead)
 
-    # 🔥 Get ONE DAY TEMPLATE ONLY (Jan 1)
+    # GET ACCOUNTS
     cursor.execute("""
-        SELECT account, shift_type,
-               start_time, end_time,
-               required_host_count, required_operator_count
-        FROM shifts
-        WHERE shift_date = '2026-01-01'
-        ORDER BY account, shift_type
+        SELECT
+            account_name,
+            require_host,
+            require_operator
+        FROM account_settings
     """)
 
-    template = cursor.fetchall()
+    accounts = cursor.fetchall()
 
-    # 🔁 Loop 7 days (Mon → Sun)
+    # GET SHIFT TEMPLATES
+    cursor.execute("""
+        SELECT
+            shift_template_id,
+            shift_name,
+            start_time,
+            end_time
+        FROM shift_templates
+        ORDER BY start_time
+    """)
+
+    templates = cursor.fetchall()
+
+    # GENERATE 7 DAYS
     for day_offset in range(7):
-        new_date = (next_monday + timedelta(days=day_offset)).date()
 
-        for row in template:
-            account, shift_type, start_time, end_time, host_count, op_count = row
+        new_date = (
+            next_monday + timedelta(days=day_offset)
+        ).date()
 
-            cursor.execute("""
-                INSERT INTO shifts (
-                    shift_date, account, shift_type,
-                    start_time, end_time,
-                    required_host_count, required_operator_count
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (shift_date, account, shift_type) DO NOTHING
-            """, (
-                new_date,
-                account,
-                shift_type,
-                start_time,
-                end_time,
-                host_count,
-                op_count
-            ))
+        for account in accounts:
+
+            account_name = account[0]
+            require_host = account[1]
+            require_operator = account[2]
+
+            for template in templates:
+
+                template_id = template[0]
+
+                cursor.execute("""
+                    INSERT INTO shifts (
+                        shift_date,
+                        account,
+                        shift_template_id,
+                        required_host_count,
+                        required_operator_count
+                    )
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s
+                    )
+                    ON CONFLICT (
+                        shift_date,
+                        account,
+                        shift_template_id
+                    )
+                    DO NOTHING
+                """, (
+                    new_date,
+                    account_name,
+                    template_id,
+                    1 if require_host else 0,
+                    1 if require_operator else 0
+                ))
 

@@ -111,13 +111,6 @@ interface CoverApplicationProps {
   role: string;
 }
 
-const SHIFTS = [
-  { code: "GY", name: "Graveyard", time: "01:00 - 07:00" },
-  { code: "AM", name: "Morning", time: "07:00 - 13:00" },
-  { code: "NN", name: "Noon", time: "13:00 - 19:00" },
-  { code: "PM", name: "Evening", time: "19:00 - 01:00" },
-];
-
 const DAYS = [
   "Monday",
   "Tuesday",
@@ -127,8 +120,9 @@ const DAYS = [
   "Saturday",
   "Sunday",
 ];
-const LIVESTREAMS = ["Mommypoko", "Sofy", "Shopee"];
+
 const ROLES = ["Host", "Operator"] as const;
+
 const LEAVE_TYPES = [
   "Sick Leave",
   "Vacation",
@@ -138,8 +132,9 @@ const LEAVE_TYPES = [
 ];
 
 export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
-  const [applications, setApplications] = useState<ShiftApplication[]>([]);
 
+  const [applications, setApplications] = useState<ShiftApplication[]>([]);
+  const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
   const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -260,6 +255,20 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
   };
 
+  const fetchShiftTemplates = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/shift-templates"
+      );
+
+      const data = await res.json();
+
+      setShiftTemplates(data);
+    } catch (err) {
+      console.error("Failed to load shift templates", err);
+    }
+  };
+
   const fetchApplications = async () => {
     try {
       const res = await fetch(
@@ -314,6 +323,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     fetchEmployees();
     fetchApplications();
     fetchCoverRequests();
+    fetchShiftTemplates();
 
     if (role !== "admin") {
       fetchMyLeaves();
@@ -624,14 +634,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     );
   };
 
-  const getShiftColor = (shift: string) => {
-    const colors = {
-      GY: "bg-indigo-50 text-indigo-700 border-indigo-200",
-      AM: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      NN: "bg-orange-50 text-orange-700 border-orange-200",
-      PM: "bg-blue-50 text-blue-700 border-blue-200",
-    };
-    return colors[shift as keyof typeof colors] || "bg-gray-50";
+  const getShiftColor = () => {
+    return "bg-gray-50 text-gray-700 border-gray-200";
   };
 
   const getRoleBadgeColor = (role: "Host" | "Operator") => {
@@ -641,7 +645,9 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const getShiftInfo = (code: string) => {
-    return SHIFTS.find((s) => s.code === code);
+    return shiftTemplates.find(
+      (s) => s.shift_name === code
+    );
   };
 
   const fetchMyShifts = async () => {

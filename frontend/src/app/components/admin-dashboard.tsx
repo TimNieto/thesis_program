@@ -113,13 +113,6 @@ interface AdminDashboardProps {
   };
 }
 
-const SHIFTS = [
-  { code: "GY", name: "Graveyard", time: "01:00 - 07:00" },
-  { code: "AM", name: "Morning", time: "07:00 - 13:00" },
-  { code: "NN", name: "Noon", time: "13:00 - 19:00" },
-  { code: "PM", name: "Evening", time: "19:00 - 01:00" },
-];
-
 const DAYS = [
   "Monday",
   "Tuesday",
@@ -129,105 +122,18 @@ const DAYS = [
   "Saturday",
   "Sunday",
 ];
-const LIVESTREAMS = ["Mommypoko", "Sofy", "Shopee"];
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
+
   const [employees, setEmployees] = useState<Employee[]>([]);
+
+  const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
 
-  const [requests, setRequests] = useState<Request[]>([
-    {
-      id: "1",
-      type: "application",
-      requester: "Mike Davis",
-      livestream: "Mommypoko",
-      day: "Thursday",
-      shift: "GY",
-      role: "Host",
-      reason: "Looking for extra hours",
-      status: "pending",
-      submittedAt: "2026-01-25T10:30:00",
-    },
-    {
-      id: "2",
-      type: "cover",
-      requester: "Sarah Johnson",
-      livestream: "Mommypoko",
-      day: "Wednesday",
-      shift: "NN",
-      role: "Host",
-      reason: "Medical appointment",
-      status: "pending",
-      submittedAt: "2026-01-25T10:30:00",
-    },
-    {
-      id: "3",
-      type: "leave",
-      requester: "John Smith",
-      livestream: "Mommypoko",
-      day: "Friday",
-      shift: "AM",
-      role: "Host",
-      leaveType: "Sick Leave",
-      reason: "Medical appointment",
-      status: "pending",
-      submittedAt: "2026-01-25T09:00:00",
-    },
-    {
-      id: "4",
-      type: "application",
-      requester: "Emma Wilson",
-      livestream: "Sofy",
-      day: "Friday",
-      shift: "NN",
-      role: "Operator",
-      reason: "Can cover this shift",
-      status: "approved",
-      submittedAt: "2026-01-24T14:20:00",
-    },
-  ]);
+  const [requests, setRequests] = useState<Request[]>([]);
 
-  const [assignments, setAssignments] = useState<Assignment[]>([
-    {
-      id: "1",
-      livestream: "Mommypoko",
-      day: "Monday",
-      shift: "AM",
-      role: "Host",
-      employee: "John Smith",
-      approvedBy: "Admin",
-      approvedAt: "2026-01-20",
-    },
-    {
-      id: "2",
-      livestream: "Mommypoko",
-      day: "Monday",
-      shift: "AM",
-      role: "Operator",
-      employee: "Sarah Johnson",
-      approvedBy: "Admin",
-      approvedAt: "2026-01-20",
-    },
-    {
-      id: "3",
-      livestream: "Sofy",
-      day: "Tuesday",
-      shift: "NN",
-      role: "Host",
-      employee: "Mike Davis",
-    },
-    {
-      id: "4",
-      livestream: "Sofy",
-      day: "Wednesday",
-      shift: "PM",
-      role: "Operator",
-      employee: "Emma Wilson",
-      approvedBy: "Admin",
-      approvedAt: "2026-01-22",
-    },
-  ]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   // Employee Management States
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
@@ -268,9 +174,24 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       .finally(() => setIsLoading(false));
   };
 
+  const fetchShiftTemplates = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/shift-templates"
+      );
+
+      const data = await res.json();
+
+      setShiftTemplates(data);
+    } catch (err) {
+      console.error("Failed to load shift templates", err);
+    }
+  };
+
   useEffect(() => {
     if (currentUser.role.toLowerCase() === "admin") {
       fetchEmployees();
+      fetchShiftTemplates();
     }
   }, [currentUser.role]);
 
@@ -523,7 +444,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const activeEmployees = employees.filter((e) => e.status === "Active").length;
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
   const totalAssignments = assignments.length;
-  const totalSlots = DAYS.length * SHIFTS.length * LIVESTREAMS.length * 2; // 2 roles per shift
+  const totalSlots = DAYS.length * shiftTemplates.length * LIVESTREAMS.length * 2;
 
   const getRequestTypeColor = (type: string) => {
     const colors = {
@@ -559,7 +480,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   const getShiftInfo = (code: string) => {
-    return SHIFTS.find((s) => s.code === code);
+    return shiftTemplates.find(
+      (s) => s.shift_name === code
+    );
   };
 
   if (currentUser.role.toLowerCase() !== "admin") {
@@ -875,14 +798,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         ))}
                       </div>
 
-                      {SHIFTS.map((shift) => (
+                      {shiftTemplates.map((shift) => (
                         <div
-                          key={shift.code}
+                          key={shift.shift_name}
                           className="grid grid-cols-8 gap-2 mt-2"
                         >
                           <div className="p-3 font-medium bg-gray-100 rounded flex flex-col justify-center">
                             <div>
-                              {shift.code} - {shift.name}
+                              {shift.shift_name} - {shift.name}
                             </div>
                             <div className="text-xs text-gray-600">
                               {shift.time}
@@ -892,16 +815,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             const isUnavailable = isSlotUnavailable(
                               selectedEmployeeForDayOff,
                               day,
-                              shift.code,
+                              shift.shift_name,
                             );
                             return (
                               <div
-                                key={`${day}-${shift.code}`}
+                                key={`${day}-${shift.shift_name}`}
                                 onClick={() =>
                                   toggleSlotAvailability(
                                     selectedEmployeeForDayOff,
                                     day,
-                                    shift.code,
+                                    shift.shift_name,
                                   )
                                 }
                                 className={`
@@ -1261,14 +1184,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </div>
 
                   {/* SHIFTS GRID */}
-                  {SHIFTS.map((shift) => (
+                  {shiftTemplates.map((shift) => (
                     <div
-                      key={shift.code}
+                      key={shift.shift_name}
                       className="grid grid-cols-8 gap-3 mt-3"
                     >
                       {/* SHIFT LABEL */}
                       <div className="p-4 bg-gray-100 rounded">
-                        {shift.code} - {shift.name}
+                        {shift.shift_name} - {shift.name}
                       </div>
 
                       {/* CELLS */}
@@ -1276,17 +1199,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         const isUnavailable = isSlotUnavailable(
                           selectedEmployeeForAvailability.id,
                           day,
-                          shift.code,
+                          shift.shift_name,
                         );
 
                         return (
                           <div
-                            key={`${day}-${shift.code}`}
+                            key={`${day}-${shift.shift_name}`}
                             onClick={() =>
                               toggleSlotAvailability(
                                 selectedEmployeeForAvailability.id,
                                 day,
-                                shift.code,
+                                shift.shift_name,
                               )
                             }
                             className={`p-4 rounded border cursor-pointer
