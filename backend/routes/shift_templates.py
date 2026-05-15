@@ -21,6 +21,7 @@ def get_shift_templates():
                 start_time,
                 end_time
             FROM shift_templates
+            WHERE is_active = TRUE
             ORDER BY start_time
         """)
 
@@ -61,6 +62,31 @@ def is_overlap(start1, end1, start2, end2):
 
     return max(s1, s2) < min(e1, e2)
 
+def parse_time_string(value: str):
+
+    value = value.strip()
+
+    formats = [
+        "%H:%M",
+        "%H:%M:%S"
+    ]
+
+    for fmt in formats:
+
+        try:
+            return datetime.strptime(
+                value,
+                fmt
+            ).time()
+
+        except ValueError:
+            pass
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Invalid time format: {value}"
+    )
+
 @router.post("/shift-templates")
 def create_shift_template(payload: dict):
 
@@ -97,15 +123,8 @@ def create_shift_template(payload: dict):
             )
 
         # PARSE TIMES
-        start_time_obj = datetime.strptime(
-            start_time,
-            "%H:%M"
-        ).time()
-
-        end_time_obj = datetime.strptime(
-            end_time,
-            "%H:%M"
-        ).time()
+        start_time_obj = parse_time_string(start_time)
+        end_time_obj = parse_time_string(end_time)
 
         if start_time_obj == end_time_obj:
             raise HTTPException(
@@ -118,6 +137,7 @@ def create_shift_template(payload: dict):
             SELECT shift_template_id
             FROM shift_templates
             WHERE LOWER(shift_name) = LOWER(%s)
+            AND is_active = TRUE
         """, (shift_name,))
 
         if cursor.fetchone():
@@ -134,6 +154,7 @@ def create_shift_template(payload: dict):
                 start_time,
                 end_time
             FROM shift_templates
+            WHERE is_active = TRUE
         """)
 
         existing = cursor.fetchall()
@@ -164,16 +185,26 @@ def create_shift_template(payload: dict):
                 end_time
             )
             VALUES (%s, %s, %s)
+            RETURNING
+                shift_template_id,
+                shift_name,
+                start_time,
+                end_time
         """, (
             shift_name,
             start_time_obj,
             end_time_obj
         ))
 
+        created = cursor.fetchone()
+
         conn.commit()
 
         return {
-            "message": "Shift template created"
+            "shift_template_id": created[0],
+            "shift_name": created[1],
+            "start_time": str(created[2]),
+            "end_time": str(created[3])
         }
 
     finally:
@@ -211,15 +242,8 @@ def update_shift_template(
                 detail="Shift name too long"
             )
 
-        start_time_obj = datetime.strptime(
-            start_time,
-            "%H:%M"
-        ).time()
-
-        end_time_obj = datetime.strptime(
-            end_time,
-            "%H:%M"
-        ).time()
+        start_time_obj = parse_time_string(start_time)
+        end_time_obj = parse_time_string(end_time)
 
         if start_time_obj == end_time_obj:
             raise HTTPException(
@@ -233,6 +257,7 @@ def update_shift_template(
             FROM shift_templates
             WHERE LOWER(shift_name) = LOWER(%s)
             AND shift_template_id != %s
+            AND is_active = TRUE
         """, (
             shift_name,
             shift_template_id
@@ -254,6 +279,7 @@ def update_shift_template(
                 end_time
             FROM shift_templates
             WHERE shift_template_id != %s
+            AND is_active = TRUE
         """, (shift_template_id,))
 
         rows = cursor.fetchall()
@@ -351,20 +377,10 @@ def delete_shift_template(shift_template_id: int):
                 detail="Cannot delete shift template used in active schedules"
             )
 
-        # --------------------------------
-        # DELETE FUTURE SHIFTS
-        # --------------------------------
+        # SOFT DELETE TEMPLATE
         cursor.execute("""
-            DELETE FROM shifts
-            WHERE shift_template_id = %s
-            AND shift_date >= CURRENT_DATE
-        """, (shift_template_id,))
-
-        # --------------------------------
-        # DELETE TEMPLATE
-        # --------------------------------
-        cursor.execute("""
-            DELETE FROM shift_templates
+            UPDATE shift_templates
+            SET is_active = FALSE
             WHERE shift_template_id = %s
         """, (shift_template_id,))
 

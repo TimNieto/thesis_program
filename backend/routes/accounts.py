@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 from db.database import get_connection
+from services.schedule_service import ensure_next_week_shifts
 
 router = APIRouter()
 
@@ -132,51 +133,7 @@ def create_account(payload: dict):
             operator_policy
         ))
 
-        # CREATE TEMPLATE SHIFTS
-        template_date = "2026-01-01"
-
-        # CREATE DEFAULT SHIFTS FOR ACCOUNT
-        cursor.execute("""
-            SELECT shift_template_id
-            FROM shift_templates
-        """)
-
-        templates = cursor.fetchall()
-
-        template_date = "2026-01-01"
-
-        for template in templates:
-
-            template_id = template[0]
-
-            cursor.execute("""
-                INSERT INTO shifts (
-                    shift_date,
-                    account,
-                    shift_template_id,
-                    required_host_count,
-                    required_operator_count
-                )
-                VALUES (
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s
-                )
-                ON CONFLICT (
-                    shift_date,
-                    account,
-                    shift_template_id
-                )
-                DO NOTHING
-            """, (
-                template_date,
-                account_name,
-                template_id,
-                1 if require_host else 0,
-                1 if require_operator else 0
-            ))
+        ensure_next_week_shifts(cursor)
 
         conn.commit()
 

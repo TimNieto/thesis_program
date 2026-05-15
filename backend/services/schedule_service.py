@@ -19,6 +19,7 @@ def fetch_shift_templates(cursor):
             start_time,
             end_time
         FROM shift_templates
+        WHERE is_active = TRUE
         ORDER BY start_time
     """)
 
@@ -84,6 +85,7 @@ def fetch_shifts(cursor):
 
         JOIN shift_templates st
             ON s.shift_template_id = st.shift_template_id
+            AND st.is_active = TRUE
 
         WHERE s.shift_date BETWEEN %s AND %s
 
@@ -499,6 +501,7 @@ def ensure_next_week_shifts(cursor):
             start_time,
             end_time
         FROM shift_templates
+        WHERE is_active = TRUE
         ORDER BY start_time
     """)
 
