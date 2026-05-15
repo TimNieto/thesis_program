@@ -613,8 +613,8 @@ export function ScheduleGenerator({
                   </span>
                 </div>
                 <div>
-                  <div className="text-sm font-medium">{shift.name}</div>
-                  <div className="text-xs text-gray-600">{shift.time}</div>
+                  <div className="text-sm font-medium">{shift.shift_name}</div>
+                  <div className="text-xs text-gray-600">{shift.start_time.slice(0,5)} - {shift.end_time.slice(0,5)}</div>
                 </div>
               </div>
             ))}
@@ -722,10 +722,10 @@ export function ScheduleGenerator({
                                   </div>
                                   <div>
                                     <div className="font-semibold text-sm">
-                                      {shift.name}
+                                      {shift.shift_name}
                                     </div>
                                     <div className="text-xs text-gray-600">
-                                      {shift.time}
+                                      {shift.start_time.slice(0,5)} - {shift.end_time.slice(0,5)}
                                     </div>
                                   </div>
                                 </div>
@@ -998,8 +998,24 @@ export function ScheduleGenerator({
                   </div>
                   <div>
                     <strong>Shift:</strong>{" "}
-                    {shiftTemplates.find((s) => s.code === selectedCell.shift)?.name} (
-                    {shiftTemplates.find((s) => s.code === selectedCell.shift)?.time})
+                    {
+                      shiftTemplates.find(
+                        (s) => s.shift_name === selectedCell.shift
+                      )?.shift_name
+                    }
+                    {" ("}
+                    {
+                      shiftTemplates.find(
+                        (s) => s.shift_name === selectedCell.shift
+                      )?.start_time?.slice(0, 5)
+                    }
+                    {" - "}
+                    {
+                      shiftTemplates.find(
+                        (s) => s.shift_name === selectedCell.shift
+                      )?.end_time?.slice(0, 5)
+                    }
+                    {")"}
                   </div>
                   <div>
                     <strong>Role:</strong> {selectedCell.role}
