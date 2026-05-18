@@ -182,7 +182,7 @@ def fetch_absences(cursor):
 def fetch_history_scores(cursor):
     cursor.execute("""
         SELECT
-            gs.employee_id,
+            COALESCE(cr.requested_by, gs.employee_id) AS employee_id,
             s.account,
             st.shift_name,
             TRIM(TO_CHAR(s.shift_date, 'Day')) AS day_name,
@@ -222,7 +222,7 @@ def fetch_history_scores(cursor):
         WHERE gs.is_archived = TRUE
 
         GROUP BY
-            gs.employee_id,
+            COALESCE(cr.requested_by, gs.employee_id),
             s.account,
             st.shift_name,
             day_name,
