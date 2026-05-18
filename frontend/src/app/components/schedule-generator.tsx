@@ -731,6 +731,11 @@ export function ScheduleGenerator({
                       <tbody>
                         {shiftTemplates.map((shift) => {
                           const roleRowsForShift = getRoleRowsForShift(shift.shift_name);
+                          console.log(
+                            "SHIFT DEBUG:",
+                            shift.shift_name,
+                            roleRowsForShift.map((r) => r.role_key),
+                          );
                           if (roleRowsForShift.length === 0) {
                             return (
                               <tr key={`${livestream}-${shift.shift_name}-empty`}>
