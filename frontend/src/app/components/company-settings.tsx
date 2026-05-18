@@ -293,6 +293,34 @@ export function CompanySettings() {
         : shift.shift_id,
     );
 
+  const timeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const doesOverlap = (
+    start1: string,
+    end1: string,
+    start2: string,
+    end2: string,
+  ) => {
+    let s1 = timeToMinutes(start1);
+    let e1 = timeToMinutes(end1);
+
+    let s2 = timeToMinutes(start2);
+    let e2 = timeToMinutes(end2);
+
+    if (e1 <= s1) {
+      e1 += 1440;
+    }
+
+    if (e2 <= s2) {
+      e2 += 1440;
+    }
+
+    return Math.max(s1, s2) < Math.min(e1, e2);
+  };
+
   const handleAddShift = () => {
     if (!newShiftName.trim()) {
       toast.error("Shift name required");
@@ -303,7 +331,35 @@ export function CompanySettings() {
       toast.error("Start and end time required");
       return;
     }
+    
+    if (newShiftStartTime === newShiftEndTime) {
+      toast.error("Start and end time cannot be identical");
+      return;
+    }
 
+    const duplicateName = shiftTimings.some(
+      (shift) =>
+        shift.shift_name.toLowerCase() === newShiftName.trim().toLowerCase(),
+    );
+
+    if (duplicateName) {
+      toast.error("Shift already exists");
+      return;
+    }
+
+    const overlappingShift = shiftTimings.find((shift) =>
+      doesOverlap(
+        newShiftStartTime,
+        newShiftEndTime,
+        shift.start_time,
+        shift.end_time,
+      ),
+    );
+
+    if (overlappingShift) {
+      toast.error(`Overlaps with ${overlappingShift.shift_name}`);
+      return;
+    }
     const tempId = -Date.now();
 
     const newShift = {
@@ -370,6 +426,12 @@ export function CompanySettings() {
 
   const handleUpdateShift = (id: number, field: string, value: string) => {
     setShiftTimings((prev) =>
+      prev.map((shift) =>
+        getShiftId(shift) === id ? { ...shift, [field]: value } : shift,
+      ),
+    );
+
+    setPendingNewShifts((prev) =>
       prev.map((shift) =>
         getShiftId(shift) === id ? { ...shift, [field]: value } : shift,
       ),
