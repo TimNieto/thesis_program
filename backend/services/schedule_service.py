@@ -1,7 +1,7 @@
 # backend/services/schedule_service.py
 
 from db.database import get_connection
-from scheduler.greedy import generate_schedule
+from scheduler.hybrid import generate_schedule
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -179,6 +179,78 @@ def fetch_absences(cursor):
         for r in rows
     ]
 
+def fetch_history_scores(cursor):
+    cursor.execute("""
+        SELECT
+            gs.employee_id,
+            s.account,
+            st.shift_name,
+            TRIM(TO_CHAR(s.shift_date, 'Day')) AS day_name,
+            gs.role,
+
+            COUNT(cr.id) FILTER (
+                WHERE cr.id IS NOT NULL
+            ) AS cover_requests,
+
+            COUNT(cr.id) FILTER (
+                WHERE cr.request_type = 'emergency'
+            ) AS emergency_requests,
+
+            COUNT(sa.id) FILTER (
+                WHERE sa.status = 'approved'
+            ) AS applications,
+
+            COUNT(gs.schedule_id) FILTER (
+                WHERE cr.id IS NULL
+            ) AS successful_assignments
+
+        FROM generated_schedule gs
+
+        JOIN shifts s
+            ON gs.shift_id = s.shift_id
+
+        JOIN shift_templates st
+            ON s.shift_template_id = st.shift_template_id
+
+        LEFT JOIN coverage_requests cr
+            ON cr.schedule_id = gs.schedule_id
+
+        LEFT JOIN shift_applications sa
+            ON sa.coverage_request_id = cr.id
+            AND sa.applicant_id = gs.employee_id
+
+        WHERE gs.is_archived = TRUE
+
+        GROUP BY
+            gs.employee_id,
+            s.account,
+            st.shift_name,
+            day_name,
+            gs.role
+    """)
+
+    rows = cursor.fetchall()
+
+    history = {}
+
+    for r in rows:
+        key = (
+            r[0],
+            r[1].lower(),
+            r[2].lower(),
+            r[3].strip().lower(),
+            r[4].lower()
+        )
+
+        history[key] = {
+            "cover_requests": r[5] or 0,
+            "emergency_requests": r[6] or 0,
+            "applications": r[7] or 0,
+            "successful_assignments": r[8] or 0
+        }
+
+    return history
+
 def to_dict(d):
     if isinstance(d, defaultdict):
         return {k: to_dict(v) for k, v in d.items()}
@@ -299,7 +371,9 @@ def generate_weekly_schedule():
                 "allow_partial_staffing": row[5]
             }
 
-        # Run scheduler
+
+        history_scores = fetch_history_scores(cursor)
+
         result = generate_schedule(
             employees,
             shifts,
@@ -307,8 +381,8 @@ def generate_weekly_schedule():
             leaves_map,
             absences_map,
             settings,
-            account_settings   
-           # absences
+            account_settings,
+            history_scores
         )
  
         # ✅ BUILD LOOKUP
