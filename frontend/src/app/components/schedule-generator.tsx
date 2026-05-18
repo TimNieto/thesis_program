@@ -185,6 +185,7 @@ export function ScheduleGenerator({
     day: string;
     shift: string;
     role: string;
+    assignmentId?: string;
   } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
@@ -292,13 +293,13 @@ export function ScheduleGenerator({
     return leaveMap.get(formatDate(date)) || [];
   };
 
-  const getAssignment = (
+  const getAssignments = (
     livestream: string,
     day: string,
     shift: string,
     role: string,
   ) => {
-    return assignments.find(
+    return assignments.filter(
       (a) =>
         a.livestream === livestream &&
         a.day === day &&
@@ -307,14 +308,24 @@ export function ScheduleGenerator({
     );
   };
 
+  const getAssignment = () => {
+    if (!selectedCell?.assignmentId) return null;
+
+    return assignments.find((a) => a.id === selectedCell.assignmentId) || null;
+  };
+
   const openAssignDialog = (
     livestream: string,
     day: string,
     shift: string,
     role: string,
+    assignmentId?: string,
   ) => {
-    setSelectedCell({ livestream, day, shift, role });
-    const existing = getAssignment(livestream, day, shift, role);
+    const existing = assignmentId
+      ? assignments.find((a) => a.id === assignmentId)
+      : null;
+
+    setSelectedCell({ livestream, day, shift, role, assignmentId });
     setEmployeeName(existing?.employee || "");
     setIsDialogOpen(true);
   };
@@ -325,12 +336,7 @@ export function ScheduleGenerator({
       return;
     }
 
-    const existing = getAssignment(
-      selectedCell.livestream,
-      selectedCell.day,
-      selectedCell.shift,
-      selectedCell.role,
-    );
+    const existing = getAssignment();
 
     if (existing) {
       setAssignments(
@@ -360,12 +366,8 @@ export function ScheduleGenerator({
   const handleRemove = () => {
     if (!selectedCell) return;
 
-    const existing = getAssignment(
-      selectedCell.livestream,
-      selectedCell.day,
-      selectedCell.shift,
-      selectedCell.role,
-    );
+    const existing = getAssignment();
+
     if (existing) {
       setAssignments(assignments.filter((a) => a.id !== existing.id));
       toast.success("Assignment removed");
@@ -563,18 +565,28 @@ export function ScheduleGenerator({
     }
   };
 
-  const getRolesForShift = (livestream: string, shiftName: string) => {
-    const roles = new Set<string>();
+  const getRoleRowsForShift = (livestream: string, shiftName: string) => {
+    const roleMaxCounts: Record<string, number> = {};
 
     DAYS.forEach((day) => {
       const shiftData = groupedSchedule?.[livestream]?.[day]?.[shiftName] || {};
 
-      Object.keys(shiftData).forEach((roleKey) => {
-        roles.add(roleKey);
+      Object.entries(shiftData).forEach(([roleKey, employees]: any) => {
+        const count = Array.isArray(employees) ? employees.length : 0;
+
+        roleMaxCounts[roleKey] = Math.max(
+          roleMaxCounts[roleKey] || 1,
+          count || 1,
+        );
       });
     });
 
-    return Array.from(roles);
+    return Object.entries(roleMaxCounts).flatMap(([roleKey, count]) =>
+      Array.from({ length: count }, (_, index) => ({
+        roleKey,
+        slotIndex: index,
+      })),
+    );
   };
 
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
@@ -702,11 +714,11 @@ export function ScheduleGenerator({
                       </thead>
                       <tbody>
                         {shiftTemplates.map((shift) => {
-                          const rolesForShift = getRolesForShift(
+                          const roleRowsForShift = getRoleRowsForShift(
                             livestream,
                             shift.shift_name,
                           );
-                          if (rolesForShift.length === 0) {
+                          if (roleRowsForShift.length === 0) {
                             return (
                               <tr key={`${livestream}-${shift.shift_name}-empty`}>
                                 <td className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}>
@@ -731,11 +743,11 @@ export function ScheduleGenerator({
                           }
                           return (
                             <React.Fragment key={`${livestream}-${shift.shift_name}`}>
-                              {rolesForShift.map((roleKey, roleIndex) => (
-                                <tr key={`${livestream}-${shift.shift_name}-${roleKey}`}>
+                              {roleRowsForShift.map(({ roleKey, slotIndex }, roleIndex) => (
+                                <tr key={`${livestream}-${shift.shift_name}-${roleKey}-${slotIndex}`}>
                                   {roleIndex === 0 && (
                                     <td
-                                      rowSpan={rolesForShift.length}
+                                      rowSpan={roleRowsForShift.length}
                                       className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
                                     >
                                       <div className="flex items-center gap-2">
@@ -770,20 +782,20 @@ export function ScheduleGenerator({
                                   </td>
 
                                   {DAYS.map((day) => {
-                                    const assignment = getAssignment(
+                                    const cellAssignment = getAssignments(
                                       livestream,
                                       day,
                                       shift.shift_name,
                                       roleKey,
-                                    );
+                                    )[slotIndex];
 
-                                    const isClickable = role === "admin";
+                                    const isClickable = role === "admin" && !!cellAssignment;
 
                                     return (
                                       <td
-                                        key={`${livestream}-${day}-${shift.shift_name}-${roleKey}`}
+                                        key={`${livestream}-${day}-${shift.shift_name}-${roleKey}-${slotIndex}`}
                                         className={`border border-gray-300 p-2 ${
-                                          assignment ? getShiftColor(shift.shift_name) : "bg-white"
+                                          cellAssignment ? getShiftColor(shift.shift_name) : "bg-white"
                                         } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
                                         onClick={() =>
                                           isClickable &&
@@ -792,17 +804,18 @@ export function ScheduleGenerator({
                                             day,
                                             shift.shift_name,
                                             roleKey,
+                                            cellAssignment?.id,
                                           )
                                         }
                                       >
-                                        {assignment ? (
+                                        {cellAssignment ? (
                                           <div className="text-center">
                                             <div
                                               className={`font-medium text-sm ${getShiftTextColor(
                                                 shift.shift_name,
                                               )}`}
                                             >
-                                              {assignment.employee}
+                                              {cellAssignment.employee}
                                             </div>
                                           </div>
                                         ) : (
@@ -967,12 +980,7 @@ export function ScheduleGenerator({
           <DialogHeader>
             <DialogTitle>
               {selectedCell &&
-              getAssignment(
-                selectedCell.livestream,
-                selectedCell.day,
-                selectedCell.shift,
-                selectedCell.role,
-              )
+              getAssignment()
                 ? "Modify Assignment"
                 : "Assign Shift"}
             </DialogTitle>
@@ -1031,12 +1039,7 @@ export function ScheduleGenerator({
           </div>
           <DialogFooter className="gap-2">
             {selectedCell &&
-              getAssignment(
-                selectedCell.livestream,
-                selectedCell.day,
-                selectedCell.shift,
-                selectedCell.role,
-              ) && (
+              getAssignment() && (
                 <Button
                   variant="destructive"
                   onClick={handleRemove}
@@ -1051,12 +1054,7 @@ export function ScheduleGenerator({
             </Button>
             <Button onClick={handleAssign}>
               {selectedCell &&
-              getAssignment(
-                selectedCell.livestream,
-                selectedCell.day,
-                selectedCell.shift,
-                selectedCell.role,
-              )
+              getAssignment()
                 ? "Update"
                 : "Assign"}
             </Button>

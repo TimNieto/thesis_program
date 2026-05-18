@@ -18,7 +18,8 @@ ELITE_COUNT = 5
 def assignment_key(a):
     return (
         a["shift_id"],
-        a["role"]
+        a["role"],
+        a["employee_id"]
     )
 
 def calculate_unfilled_slots(assignments, shifts, account_settings):

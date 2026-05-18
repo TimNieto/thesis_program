@@ -889,5 +889,3 @@ def save_schedule(assignments: List[dict] = Body(...)):
     finally:
         cursor.close()
         conn.close()
-
-        
