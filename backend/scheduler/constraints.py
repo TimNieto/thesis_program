@@ -104,7 +104,7 @@ def is_on_leave(employee_id, shift_date, leaves_map):
     shift_date = normalize_date(shift_date)
 
     if shift_date in leaves_map.get(employee_id, set()):
-        print(f"🚫 BLOCKED (LEAVE): {employee_id} on {shift_date}")
+        # print(f"🚫 BLOCKED (LEAVE): {employee_id} on {shift_date}")
         return True
 
     return False

@@ -82,7 +82,7 @@ def prepare_context(employees, shifts, availability, leaves, absences, settings,
         e["employee_id"]: e for e in employees
     }
 
-    print("\n🔥 LEAVES MAP:", context["leaves_map"])
+    # print("\n🔥 LEAVES MAP:", context["leaves_map"])
 
     return context
 
@@ -198,12 +198,12 @@ def score_employee(employee, shift, role, context):
         )
     )
 
-    print(
-        "ACCOUNT:",
-        shift["account"],
-        "POLICY:",
-        operator_policy
-    )
+    # print(
+    #     "ACCOUNT:",
+    #     shift["account"],
+    #     "POLICY:",
+    #     operator_policy
+    # )
 
     # --------------------------------
     # 1. FAIRNESS
@@ -261,11 +261,11 @@ def score_employee(employee, shift, role, context):
     ):
         score += 15
 
-        print(
-            f"⚠️ AVOIDING OPERATOR "
-            f"{employee['employee_id']} "
-            f"for {shift['account']}"
-        )
+        # print(
+        #     f"⚠️ AVOIDING OPERATOR "
+        #     f"{employee['employee_id']} "
+        #     f"for {shift['account']}"
+        # )
 
     # --------------------------------
     # 2. PRESERVE FLEXIBLE EMPLOYEES

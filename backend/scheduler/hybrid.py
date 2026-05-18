@@ -453,6 +453,10 @@ def generate_schedule(
         key=lambda x: x["fitness"]
     )
 
+    if best.get("unfilled_slots") and not seed.get("unfilled_slots"):
+        print("GA had unfilled slots. Falling back to greedy seed.")
+        best = seed
+
     print("HYBRID GA RESULT")
     print("BEST FITNESS:", best["fitness"])
     print("ASSIGNMENTS:", len(best["assignments"]))
