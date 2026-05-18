@@ -21,6 +21,65 @@ def assignment_key(a):
         a["role"]
     )
 
+def calculate_unfilled_slots(assignments, shifts, account_settings):
+    assigned_keys = {
+        (
+            a["shift_id"],
+            a["role"].lower()
+        )
+        for a in assignments
+    }
+
+    unfilled = []
+
+    for shift in shifts:
+        account_policy = account_settings.get(
+            shift["account"],
+            {}
+        )
+
+        operator_policy = account_policy.get(
+            "operator_policy",
+            "required"
+        )
+
+        required_host_count = shift.get(
+            "required_host_count",
+            0
+        ) or 0
+
+        required_operator_count = shift.get(
+            "required_operator_count",
+            0
+        ) or 0
+
+        if required_host_count > 0:
+            if (shift["shift_id"], "host") not in assigned_keys:
+                unfilled.append({
+                    "shift_id": shift["shift_id"],
+                    "account": shift["account"],
+                    "shift_date": str(shift["shift_date"]),
+                    "shift_type": shift["shift_type"],
+                    "role": "host",
+                    "reason": "Missing host"
+                })
+
+        if (
+            required_operator_count > 0
+            and operator_policy != "avoid"
+        ):
+            if (shift["shift_id"], "operator") not in assigned_keys:
+                unfilled.append({
+                    "shift_id": shift["shift_id"],
+                    "account": shift["account"],
+                    "shift_date": str(shift["shift_date"]),
+                    "shift_type": shift["shift_type"],
+                    "role": "operator",
+                    "reason": "Missing operator"
+                })
+
+    return unfilled
+
 
 def get_day_name(shift_date):
     return shift_date.strftime("%A").lower()
@@ -64,9 +123,18 @@ def historical_score(assignment, history_scores):
     return score
 
 
-def evaluate_schedule(individual, history_scores):
+def evaluate_schedule(individual, history_scores, shifts=None, account_settings=None):
     assignments = individual["assignments"]
-    unfilled_slots = individual["unfilled_slots"]
+
+    if shifts is not None and account_settings is not None:
+        unfilled_slots = calculate_unfilled_slots(
+            assignments,
+            shifts,
+            account_settings
+        )
+        individual["unfilled_slots"] = unfilled_slots
+    else:
+        unfilled_slots = individual.get("unfilled_slots", [])
 
     score = 0
 
@@ -232,11 +300,13 @@ def mutate_schedule(
 
     return evaluate_schedule(
         child,
-        history_scores
+        history_scores,
+        shifts,
+        account_settings
     )
 
 
-def crossover(parent_a, parent_b, history_scores):
+def crossover(parent_a, parent_b, history_scores, shifts, account_settings):
     child_map = {}
 
     parent_a_map = {
@@ -268,7 +338,9 @@ def crossover(parent_a, parent_b, history_scores):
 
     return evaluate_schedule(
         child,
-        history_scores
+        history_scores,
+        shifts,
+        account_settings
     )
 
 
@@ -313,7 +385,9 @@ def generate_schedule(
             "assignments": greedy_result["assignments"],
             "unfilled_slots": greedy_result["unfilled_slots"]
         },
-        history_scores
+        history_scores,
+        shifts,
+        account_settings
     )
 
     population = [seed]
@@ -351,10 +425,12 @@ def generate_schedule(
             parent_b = tournament_select(population)
 
             child = crossover(
-                parent_a,
-                parent_b,
-                history_scores
-            )
+            parent_a,
+            parent_b,
+            history_scores,
+            shifts,
+            account_settings
+        )
 
             child = mutate_schedule(
                 child,
@@ -380,7 +456,8 @@ def generate_schedule(
     print("HYBRID GA RESULT")
     print("BEST FITNESS:", best["fitness"])
     print("ASSIGNMENTS:", len(best["assignments"]))
-    print("UNFILLED:", len(best["unfilled_slots"]))
+    print("UNFILLED:", len(best.get("unfilled_slots", [])))
+    print("UNFILLED DETAILS:", best.get("unfilled_slots", []))
 
     return {
         "assignments": best["assignments"],
