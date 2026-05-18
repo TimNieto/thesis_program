@@ -63,7 +63,12 @@ export function CompanySettings() {
 
   // Shift Timings
   const [shiftTimings, setShiftTimings] = useState<any[]>([]);
-
+  const [pendingNewShifts, setPendingNewShifts] = useState<any[]>([]);
+  const [pendingDeletedShiftIds, setPendingDeletedShiftIds] = useState<number[]>([]);
+  const [isAddShiftDialogOpen, setIsAddShiftDialogOpen] = useState(false);
+  const [newShiftName, setNewShiftName] = useState("");
+  const [newShiftStartTime, setNewShiftStartTime] = useState("09:00");
+  const [newShiftEndTime, setNewShiftEndTime] = useState("17:00");
   // Staffing Requirements
   const [requiredHosts, setRequiredHosts] = useState("1");
   const [requiredOperators, setRequiredOperators] = useState("1");
@@ -100,11 +105,6 @@ export function CompanySettings() {
   const [newOperatorPolicy, setNewOperatorPolicy] = useState("required");
 
   const [selectedDeleteAccount, setSelectedDeleteAccount] = useState("");
-
-  const [isAddShiftDialogOpen, setIsAddShiftDialogOpen] = useState(false);
-  const [newShiftName, setNewShiftName] = useState("");
-  const [newShiftStartTime, setNewShiftStartTime] = useState("09:00");
-  const [newShiftEndTime, setNewShiftEndTime] = useState("17:00");
 
   useEffect(() => {
     fetchSettings();
@@ -293,7 +293,7 @@ export function CompanySettings() {
         : shift.shift_id,
     );
 
-  const handleAddShift = async () => {
+  const handleAddShift = () => {
     if (!newShiftName.trim()) {
       toast.error("Shift name required");
       return;
@@ -304,49 +304,34 @@ export function CompanySettings() {
       return;
     }
 
-    try {
-      const response = await fetch(
-        "https://thesisprogram-production.up.railway.app/shift-templates",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            shift_name: newShiftName.trim(),
-            start_time:
-              newShiftStartTime.length === 5
-                ? `${newShiftStartTime}:00`
-                : newShiftStartTime,
-            end_time:
-              newShiftEndTime.length === 5
-                ? `${newShiftEndTime}:00`
-                : newShiftEndTime,
-          }),
-        },
-      );
+    const tempId = -Date.now();
 
-      const data = await response.json();
+    const newShift = {
+      shift_template_id: tempId,
+      shift_name: newShiftName.trim().toUpperCase(),
+      start_time:
+        newShiftStartTime.length === 5
+          ? `${newShiftStartTime}:00`
+          : newShiftStartTime,
+      end_time:
+        newShiftEndTime.length === 5
+          ? `${newShiftEndTime}:00`
+          : newShiftEndTime,
+      isNew: true,
+    };
 
-      if (!response.ok) {
-        throw new Error(data.detail || "Failed to create shift");
-      }
+    setShiftTimings((prev) => [...prev, newShift]);
+    setPendingNewShifts((prev) => [...prev, newShift]);
 
-      await fetchShiftTemplates();
+    setIsAddShiftDialogOpen(false);
+    setNewShiftName("");
+    setNewShiftStartTime("09:00");
+    setNewShiftEndTime("17:00");
 
-      setIsAddShiftDialogOpen(false);
-      setNewShiftName("");
-      setNewShiftStartTime("09:00");
-      setNewShiftEndTime("17:00");
-
-      toast.success("Shift template saved");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to create shift");
-    }
+    toast.success("Shift added. Click Save Changes to apply.");
   };
 
-  const handleRemoveShift = async (id: number) => {
+  const handleRemoveShift = (id: number) => {
     const shiftToDelete = shiftTimings.find(
       (shift) => getShiftId(shift) === id,
     );
@@ -359,48 +344,28 @@ export function CompanySettings() {
     const shiftName = shiftToDelete.shift_name || "Unnamed Shift";
 
     const confirmed = window.confirm(
-      `Are you sure you want to delete shift "${shiftName}"?\n\nThis will deactivate the shift template but preserve historical schedules.`,
+      `Are you sure you want to remove shift "${shiftName}"?\n\nThis change will only be applied after clicking Save Changes.`,
     );
 
     if (!confirmed) {
       return;
     }
 
-    try {
-      // -----------------------------
-      // DETERMINE IF SHIFT EXISTS IN DB
-      // -----------------------------
-      const isPersisted = shiftToDelete.shift_template_id !== undefined;
+    setShiftTimings((prev) =>
+      prev.filter((shift) => getShiftId(shift) !== id),
+    );
 
-      // -----------------------------
-      // DATABASE DELETE
-      // -----------------------------
-      if (isPersisted) {
-        const response = await fetch(
-          `https://thesisprogram-production.up.railway.app/shift-templates/${id}`,
-          {
-            method: "DELETE",
-          },
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.detail || "Failed to delete shift");
-        }
-      }
-
-      // -----------------------------
-      // REMOVE FROM FRONTEND STATE
-      // -----------------------------
-      await fetchShiftTemplates();
-
-      toast.success(`Shift "${shiftName}" deleted`);
-    } catch (err: any) {
-      console.error(err);
-
-      toast.error(err.message || "Failed to remove shift");
+    if (shiftToDelete.isNew) {
+      setPendingNewShifts((prev) =>
+        prev.filter((shift) => getShiftId(shift) !== id),
+      );
+    } else {
+      setPendingDeletedShiftIds((prev) =>
+        prev.includes(id) ? prev : [...prev, id],
+      );
     }
+
+    toast.success("Shift removed. Click Save Changes to apply.");
   };
 
   const handleUpdateShift = (id: number, field: string, value: string) => {
@@ -470,15 +435,67 @@ export function CompanySettings() {
         throw new Error("Failed to save settings");
       }
 
-      for (const shift of shiftTimings) {
+      // 1. DELETE shifts marked for removal
+      for (const shiftId of pendingDeletedShiftIds) {
+        const res = await fetch(
+          `https://thesisprogram-production.up.railway.app/shift-templates/${shiftId}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || "Failed to delete shift");
+        }
+      }
+
+      // 2. CREATE or RESTORE newly added shifts
+      for (const shift of pendingNewShifts) {
+        const res = await fetch(
+          "https://thesisprogram-production.up.railway.app/shift-templates",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              shift_name: shift.shift_name,
+              start_time:
+                shift.start_time.length === 5
+                  ? `${shift.start_time}:00`
+                  : shift.start_time,
+              end_time:
+                shift.end_time.length === 5
+                  ? `${shift.end_time}:00`
+                  : shift.end_time,
+            }),
+          },
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || "Failed to create shift");
+        }
+      }
+
+      // 3. UPDATE existing shifts that remain active
+      const existingShifts = shiftTimings.filter(
+        (shift) =>
+          !shift.isNew &&
+          !pendingDeletedShiftIds.includes(getShiftId(shift)),
+      );
+
+      for (const shift of existingShifts) {
         const shiftId = getShiftId(shift);
 
-        // skip invalid shifts
         if (!shiftId) {
           continue;
         }
 
-        await fetch(
+        const res = await fetch(
           `https://thesisprogram-production.up.railway.app/shift-templates/${shiftId}`,
           {
             method: "PUT",
@@ -487,12 +504,10 @@ export function CompanySettings() {
             },
             body: JSON.stringify({
               shift_name: shift.shift_name,
-
               start_time:
                 shift.start_time.length === 5
                   ? `${shift.start_time}:00`
                   : shift.start_time,
-
               end_time:
                 shift.end_time.length === 5
                   ? `${shift.end_time}:00`
@@ -500,15 +515,24 @@ export function CompanySettings() {
             }),
           },
         );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || "Failed to update shift");
+        }
       }
 
       await fetchShiftTemplates();
 
+      setPendingNewShifts([]);
+      setPendingDeletedShiftIds([]);
+      
       toast.success("Company settings saved successfully");
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to save settings");
+      toast.error(err.message || "Failed to save settings");
     }
   };
 
@@ -547,7 +571,20 @@ export function CompanySettings() {
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    await fetchSettings();
+    await fetchAccountSettings();
+    await fetchAccounts();
+    await fetchShiftTemplates();
+
+    setPendingNewShifts([]);
+    setPendingDeletedShiftIds([]);
+
+    setIsAddShiftDialogOpen(false);
+    setNewShiftName("");
+    setNewShiftStartTime("09:00");
+    setNewShiftEndTime("17:00");
+
     toast.info("Changes discarded");
   };
 
