@@ -390,6 +390,10 @@ def generate_schedule(
         account_settings
     )
 
+    print("GREEDY SEED ASSIGNMENTS:", len(seed["assignments"]))
+    print("GREEDY SEED UNFILLED:", len(seed.get("unfilled_slots", [])))
+    print("GREEDY SEED UNFILLED DETAILS:", seed.get("unfilled_slots", []))
+
     population = [seed]
 
     # 2. generate mutated greedy-based population
