@@ -109,7 +109,7 @@ def historical_score(assignment, history_scores):
     score = 0
 
     # repeated cover requests = negative compatibility
-    score -= data["cover_requests"] * 30
+    score -= data["cover_requests"] * 5000
 
     # emergency covers are stronger negative signal
     score -= data["emergency_requests"] * 60
