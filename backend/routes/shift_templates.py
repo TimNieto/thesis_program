@@ -45,22 +45,36 @@ def time_to_minutes(t):
 
     return t.hour * 60 + t.minute
 
+def build_time_ranges(start, end):
+
+    s = time_to_minutes(start)
+    e = time_to_minutes(end)
+
+    # Normal same-day shift
+    if e > s:
+        return [
+            (s, e)
+        ]
+
+    # Overnight shift, split into two ranges
+    return [
+        (s, 1440),
+        (0, e)
+    ]
+
+
 def is_overlap(start1, end1, start2, end2):
 
-    s1 = time_to_minutes(start1)
-    e1 = time_to_minutes(end1)
+    ranges1 = build_time_ranges(start1, end1)
+    ranges2 = build_time_ranges(start2, end2)
 
-    s2 = time_to_minutes(start2)
-    e2 = time_to_minutes(end2)
+    for s1, e1 in ranges1:
+        for s2, e2 in ranges2:
 
-    # HANDLE OVERNIGHT
-    if e1 <= s1:
-        e1 += 1440
+            if max(s1, s2) < min(e1, e2):
+                return True
 
-    if e2 <= s2:
-        e2 += 1440
-
-    return max(s1, s2) < min(e1, e2)
+    return False
 
 def parse_time_string(value: str):
 

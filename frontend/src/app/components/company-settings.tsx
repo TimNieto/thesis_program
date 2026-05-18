@@ -298,27 +298,40 @@ export function CompanySettings() {
     return hours * 60 + minutes;
   };
 
+  const buildTimeRanges = (start: string, end: string) => {
+    const s = timeToMinutes(start);
+    const e = timeToMinutes(end);
+
+    // Normal same-day shift
+    if (e > s) {
+      return [[s, e]];
+    }
+
+    // Overnight shift, split into two ranges
+    return [
+      [s, 1440],
+      [0, e],
+    ];
+  };
+
   const doesOverlap = (
     start1: string,
     end1: string,
     start2: string,
     end2: string,
   ) => {
-    let s1 = timeToMinutes(start1);
-    let e1 = timeToMinutes(end1);
+    const ranges1 = buildTimeRanges(start1, end1);
+    const ranges2 = buildTimeRanges(start2, end2);
 
-    let s2 = timeToMinutes(start2);
-    let e2 = timeToMinutes(end2);
-
-    if (e1 <= s1) {
-      e1 += 1440;
+    for (const [s1, e1] of ranges1) {
+      for (const [s2, e2] of ranges2) {
+        if (Math.max(s1, s2) < Math.min(e1, e2)) {
+          return true;
+        }
+      }
     }
 
-    if (e2 <= s2) {
-      e2 += 1440;
-    }
-
-    return Math.max(s1, s2) < Math.min(e1, e2);
+    return false;
   };
 
   const handleAddShift = () => {
@@ -331,7 +344,7 @@ export function CompanySettings() {
       toast.error("Start and end time required");
       return;
     }
-    
+
     if (newShiftStartTime === newShiftEndTime) {
       toast.error("Start and end time cannot be identical");
       return;
@@ -438,6 +451,49 @@ export function CompanySettings() {
     );
   };
 
+  const validateShiftTimings = () => {
+    for (const shift of shiftTimings) {
+      if (!shift.shift_name.trim()) {
+        return "Shift name required";
+      }
+
+      if (!shift.start_time || !shift.end_time) {
+        return "Start and end time required";
+      }
+
+      if (shift.start_time === shift.end_time) {
+        return "Start and end time cannot be identical";
+      }
+    }
+
+    for (let i = 0; i < shiftTimings.length; i++) {
+      for (let j = i + 1; j < shiftTimings.length; j++) {
+        const first = shiftTimings[i];
+        const second = shiftTimings[j];
+
+        if (
+          first.shift_name.trim().toLowerCase() ===
+          second.shift_name.trim().toLowerCase()
+        ) {
+          return `Duplicate shift name: ${first.shift_name}`;
+        }
+
+        if (
+          doesOverlap(
+            first.start_time,
+            first.end_time,
+            second.start_time,
+            second.end_time,
+          )
+        ) {
+          return `${first.shift_name} overlaps with ${second.shift_name}`;
+        }
+      }
+    }
+
+    return null;
+  };
+
   const handleAddRole = () => {
     const newRole: CustomRole = {
       id: Date.now().toString(),
@@ -464,6 +520,14 @@ export function CompanySettings() {
   };
 
   const handleSaveChanges = async () => {
+
+    const validationError = validateShiftTimings();
+
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     try {
       const res = await fetch(
         "https://thesisprogram-production.up.railway.app/settings",
