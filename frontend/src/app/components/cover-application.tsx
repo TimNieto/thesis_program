@@ -66,7 +66,7 @@ interface ShiftApplication {
   livestream: string;
   day: string;
   shift: string;
-  role: "Host" | "Operator";
+  role: string;
   reason: string;
   status: "pending" | "approved" | "denied";
   appliedAt: string;
@@ -78,7 +78,7 @@ interface CoverRequest {
   livestream: string;
   day: string;
   shift: string;
-  role: "Host" | "Operator";
+  role: string;
   reason: string;
 
   status: "pending" | "approved" | "denied";
@@ -96,7 +96,7 @@ interface LeaveRequest {
   livestream: string;
   day: string;
   shift: string;
-  role: "Host" | "Operator";
+  role: string;
   leaveType: string;
   reason: string;
   status: "pending" | "approved" | "denied";
@@ -120,8 +120,6 @@ const DAYS = [
   "Saturday",
   "Sunday",
 ];
-
-const ROLES = ["Host", "Operator"] as const;
 
 const LEAVE_TYPES = [
   "Sick Leave",
@@ -237,7 +235,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
           shift: r.shift,
 
-          role: r.role === "host" ? "Host" : "Operator",
+          role: String(r.role || "").replace(/_/g, " "),
 
           reason: r.reason,
 
@@ -297,7 +295,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
           shift: a.shift,
 
-          role: a.role === "host" ? "Host" : "Operator",
+          role: String(a.role || "").replace(/_/g, " "),
 
           reason: a.reason,
 
@@ -356,7 +354,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     livestream: string;
     day: string;
     shift: string;
-    role: "Host" | "Operator";
+    role: string;
   } | null>(null);
 
   const [coverReason, setCoverReason] = useState("");
@@ -377,7 +375,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     livestream: string;
     day: string;
     shift: string;
-    role: "Host" | "Operator";
+    role: string;
   }) => {
     if (!shiftObj.schedule_id) {
       toast.error("Invalid shift");
@@ -638,7 +636,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     return "bg-gray-50 text-gray-700 border-gray-200";
   };
 
-  const getRoleBadgeColor = (role: "Host" | "Operator") => {
+  const getRoleBadgeColor = (role: string) => {
     return role === "Host"
       ? "bg-pink-100 text-pink-700"
       : "bg-purple-100 text-purple-700";
@@ -669,7 +667,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               weekday: "long",
             }),
             shift: s.shift_type,
-            role: s.role === "host" ? "Host" : "Operator",
+            role: String(s.role || "").replace(/_/g, " "),
           })),
       );
     } catch (err) {

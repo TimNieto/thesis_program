@@ -73,10 +73,19 @@ def prepare_context(employees, shifts, availability, leaves, absences, settings,
     hosts = [e for e in employees if e.get("can_be_host")]
     operators = [e for e in employees if e.get("can_be_operator")]
 
-    context["role_pools"] = {
+    role_pools = {
         "host": hosts,
         "operator": operators
     }
+
+    for shift in shifts:
+        for req in shift.get("staffing_requirements", []):
+            role_key = req["role_key"]
+
+            if role_key not in role_pools:
+                role_pools[role_key] = []
+
+    context["role_pools"] = role_pools
 
     context["employee_map"] = {
         e["employee_id"]: e for e in employees
@@ -100,7 +109,7 @@ def estimate_candidates(employees, shift, role, context):
     if context["context_flags"].get("relax_role"):
         pool = employees
     else:
-        pool = context["role_pools"][role]
+        pool = context["role_pools"].get(role, [])
 
     for e in pool:
 
@@ -115,10 +124,18 @@ def sort_shifts_by_difficulty(shifts, employees, context):
     """
 
     def difficulty(shift):
-        host_candidates = estimate_candidates(employees, shift, "host", context)
-        op_candidates = estimate_candidates(employees, shift, "operator", context)
+        
+        total_candidates = 0
 
-        total_candidates = host_candidates + op_candidates
+        for req in shift.get("staffing_requirements", []):
+            role = req["role_key"]
+
+            total_candidates += estimate_candidates(
+                employees,
+                shift,
+                role,
+                context
+            )
 
         account_name = shift["account"]
 
@@ -345,7 +362,7 @@ def get_candidates(employees, shift, role, context):
     if context["context_flags"].get("relax_role"):
         pool = employees
     else:
-        pool = context["role_pools"][role]
+        pool = context["role_pools"].get(role, [])
 
     candidates = [
         e for e in pool
@@ -464,7 +481,7 @@ def try_fill_unfilled_slot(
     if context["context_flags"].get("relax_role"):
         pool = employees
     else:
-        pool = context["role_pools"][role]
+        pool = context["role_pools"].get(role, [])
     
     for emp in pool:
 
@@ -498,7 +515,7 @@ def try_fill_unfilled_slot(
             if context["context_flags"].get("relax_role"):
                 replacement_pool = employees
             else:
-                replacement_pool = context["role_pools"][old_role]
+                replacement_pool = context["role_pools"].get(old_role, [])
 
             replacement_candidates = [
                 e for e in replacement_pool
@@ -536,12 +553,14 @@ def try_fill_unfilled_slot(
 
                 for s in shifts:
 
-                    for r in ["host", "operator"]:
+                    for req in s.get("staffing_requirements", []):
 
-                        required = s.get(
-                            f"required_{r}_count",
-                            1
-                        )
+                        r = req["role_key"]
+
+                        required = req.get("required_count", 0) or 0
+
+                        if required <= 0:
+                            continue
 
                         current_count = len([
                             a for a in context["assignments"]
@@ -617,6 +636,55 @@ def repair_schedule(unfilled, employees, shifts, context):
 
     return still_unfilled
 
+def fill_shift_staffing_requirements(
+    shift,
+    employees,
+    context,
+    unfilled
+):
+    """
+    Fill all database-defined staffing requirements for one shift.
+    """
+
+    for req in shift.get("staffing_requirements", []):
+
+        role = req["role_key"]
+        required_count = req.get("required_count", 0) or 0
+
+        if required_count <= 0:
+            continue
+
+        # Keep existing operator policy behavior
+        account_policy = (
+            context["account_settings"]
+            .get(shift["account"], {})
+        )
+
+        operator_policy = account_policy.get(
+            "operator_policy",
+            "required"
+        )
+
+        if role == "operator" and operator_policy == "avoid":
+            continue
+
+        assigned_count = fill_role(
+            shift,
+            role,
+            required_count,
+            employees,
+            context
+        )
+
+        if assigned_count < required_count:
+
+            for _ in range(required_count - assigned_count):
+
+                unfilled.append({
+                    "shift_id": shift["shift_id"],
+                    "role": role
+                })
+                
 # -------------------------------
 # MAIN GENERATOR
 # -------------------------------
@@ -759,92 +827,25 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
         shift = min(
             context["remaining_shifts"],
-            key=lambda s:
-                estimate_candidates(employees, s, "host", context)
-                +
-                estimate_candidates(employees, s, "operator", context)
+            key=lambda s: sum(
+                estimate_candidates(
+                    employees,
+                    s,
+                    req["role_key"],
+                    context
+                )
+                for req in s.get("staffing_requirements", [])
+            )
         )
 
         context["remaining_shifts"].remove(shift)
 
-        # --------------------------------
-        # HOSTS
-        # --------------------------------
-
-        assigned_hosts = fill_role(
+        fill_shift_staffing_requirements(
             shift,
-            "host",
-            shift.get("required_host_count", 1),
             employees,
-            context
+            context,
+            unfilled
         )
-
-        if assigned_hosts < shift.get("required_host_count", 1):
-
-            for _ in range(
-                shift.get("required_host_count", 1)
-                - assigned_hosts
-            ):
-
-                unfilled.append({
-                    "shift_id": shift["shift_id"],
-                    "role": "host"
-                })
-
-        # --------------------------------
-        # OPERATORS
-        # --------------------------------
-
-        account_policy = (
-            context["account_settings"]
-            .get(shift["account"], {})
-        )
-
-        operator_policy = (
-            account_policy.get(
-                "operator_policy",
-                "required"
-            )
-        )
-
-        assigned_ops = 0
-
-        # Skip operator staffing entirely
-        # for avoid-policy accounts
-        if operator_policy != "avoid":
-
-            assigned_ops = fill_role(
-                shift,
-                "operator",
-                shift.get(
-                    "required_operator_count",
-                    1
-                ),
-                employees,
-                context
-            )
-
-            if (
-                operator_policy == "required"
-                and
-                assigned_ops <
-                shift.get(
-                    "required_operator_count",
-                    1
-                )
-            ):
-
-                for _ in range(
-                    shift.get(
-                        "required_operator_count",
-                        1
-                    ) - assigned_ops
-                ):
-
-                    unfilled.append({
-                        "shift_id": shift["shift_id"],
-                        "role": "operator"
-                    })
 
     # NEW: attempt to fix unfilled slots
     # --------------------------------
@@ -886,82 +887,25 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
             shift = min(
                 context["remaining_shifts"],
-                key=lambda s:
-                    estimate_candidates(employees, s, "host", context)
-                    +
-                    estimate_candidates(employees, s, "operator", context)
+                key=lambda s: sum(
+                    estimate_candidates(
+                        employees,
+                        s,
+                        req["role_key"],
+                        context
+                    )
+                    for req in s.get("staffing_requirements", [])
+                )
             )
 
             context["remaining_shifts"].remove(shift)
 
-            assigned_hosts = fill_role(
+            fill_shift_staffing_requirements(
                 shift,
-                "host",
-                shift.get("required_host_count", 1),
                 employees,
-                context
+                context,
+                unfilled
             )
-
-            if assigned_hosts < shift.get("required_host_count", 1):
-
-                for _ in range(
-                    shift.get("required_host_count", 1)
-                    - assigned_hosts
-                ):
-
-                    unfilled.append({
-                        "shift_id": shift["shift_id"],
-                        "role": "host"
-                    })
-
-            account_policy = (
-                context["account_settings"]
-                .get(shift["account"], {})
-            )
-
-            operator_policy = (
-                account_policy.get(
-                    "operator_policy",
-                    "required"
-                )
-            )
-
-            assigned_ops = 0
-
-            if operator_policy != "avoid":
-
-                assigned_ops = fill_role(
-                    shift,
-                    "operator",
-                    shift.get(
-                        "required_operator_count",
-                        1
-                    ),
-                    employees,
-                    context
-                )
-
-                if (
-                    operator_policy == "required"
-                    and
-                    assigned_ops <
-                    shift.get(
-                        "required_operator_count",
-                        1
-                    )
-                ):
-
-                    for _ in range(
-                        shift.get(
-                            "required_operator_count",
-                            1
-                        ) - assigned_ops
-                    ):
-
-                        unfilled.append({
-                            "shift_id": shift["shift_id"],
-                            "role": "operator"
-                        })
 
         unfilled = repair_schedule(
             unfilled,
@@ -996,82 +940,25 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
             shift = min(
                 context["remaining_shifts"],
-                key=lambda s:
-                    estimate_candidates(employees, s, "host", context)
-                    +
-                    estimate_candidates(employees, s, "operator", context)
+                key=lambda s: sum(
+                    estimate_candidates(
+                        employees,
+                        s,
+                        req["role_key"],
+                        context
+                    )
+                    for req in s.get("staffing_requirements", [])
+                )
             )
 
             context["remaining_shifts"].remove(shift)
 
-            assigned_hosts = fill_role(
+            fill_shift_staffing_requirements(
                 shift,
-                "host",
-                shift.get("required_host_count", 1),
                 employees,
-                context
+                context,
+                unfilled
             )
-
-            if assigned_hosts < shift.get("required_host_count", 1):
-
-                for _ in range(
-                    shift.get("required_host_count", 1)
-                    - assigned_hosts
-                ):
-
-                    unfilled.append({
-                        "shift_id": shift["shift_id"],
-                        "role": "host"
-                    })
-
-            account_policy = (
-                context["account_settings"]
-                .get(shift["account"], {})
-            )
-
-            operator_policy = (
-                account_policy.get(
-                    "operator_policy",
-                    "required"
-                )
-            )
-
-            assigned_ops = 0
-
-            if operator_policy != "avoid":
-
-                assigned_ops = fill_role(
-                    shift,
-                    "operator",
-                    shift.get(
-                        "required_operator_count",
-                        1
-                    ),
-                    employees,
-                    context
-                )
-
-                if (
-                    operator_policy == "required"
-                    and
-                    assigned_ops <
-                    shift.get(
-                        "required_operator_count",
-                        1
-                    )
-                ):
-
-                    for _ in range(
-                        shift.get(
-                            "required_operator_count",
-                            1
-                        ) - assigned_ops
-                    ):
-
-                        unfilled.append({
-                            "shift_id": shift["shift_id"],
-                            "role": "operator"
-                        })
 
         unfilled = repair_schedule(
             unfilled,
@@ -1109,82 +996,25 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
             shift = min(
                 context["remaining_shifts"],
-                key=lambda s:
-                    estimate_candidates(employees, s, "host", context)
-                    +
-                    estimate_candidates(employees, s, "operator", context)
+                key=lambda s: sum(
+                    estimate_candidates(
+                        employees,
+                        s,
+                        req["role_key"],
+                        context
+                    )
+                    for req in s.get("staffing_requirements", [])
+                )
             )
 
             context["remaining_shifts"].remove(shift)
 
-            assigned_hosts = fill_role(
+            fill_shift_staffing_requirements(
                 shift,
-                "host",
-                shift.get("required_host_count", 1),
                 employees,
-                context
+                context,
+                unfilled
             )
-
-            if assigned_hosts < shift.get("required_host_count", 1):
-
-                for _ in range(
-                    shift.get("required_host_count", 1)
-                    - assigned_hosts
-                ):
-
-                    unfilled.append({
-                        "shift_id": shift["shift_id"],
-                        "role": "host"
-                    })
-
-            account_policy = (
-                context["account_settings"]
-                .get(shift["account"], {})
-            )
-
-            operator_policy = (
-                account_policy.get(
-                    "operator_policy",
-                    "required"
-                )
-            )
-
-            assigned_ops = 0
-
-            if operator_policy != "avoid":
-
-                assigned_ops = fill_role(
-                    shift,
-                    "operator",
-                    shift.get(
-                        "required_operator_count",
-                        1
-                    ),
-                    employees,
-                    context
-                )
-
-                if (
-                    operator_policy == "required"
-                    and
-                    assigned_ops <
-                    shift.get(
-                        "required_operator_count",
-                        1
-                    )
-                ):
-
-                    for _ in range(
-                        shift.get(
-                            "required_operator_count",
-                            1
-                        ) - assigned_ops
-                    ):
-
-                        unfilled.append({
-                            "shift_id": shift["shift_id"],
-                            "role": "operator"
-                        })
 
         unfilled = repair_schedule(
             unfilled,
@@ -1217,7 +1047,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                 "valid": 0
             }
 
-            pool = context["role_pools"][role]
+            pool = context["role_pools"].get(role, [])
 
             for e in pool:
                 emp_id = e["employee_id"]

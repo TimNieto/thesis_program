@@ -39,10 +39,22 @@ import {
 } from "@/app/components/ui/dialog";
 import { toast } from "sonner";
 
-interface CustomRole {
-  id: string;
-  roleName: string;
-  requiredCount: number;
+interface StaffingRole {
+  staffing_role_id: number;
+  role_name: string;
+  role_key: string;
+  is_active?: boolean;
+  isNew?: boolean;
+}
+
+interface StaffingRequirement {
+  requirement_id?: number;
+  shift_template_id: number;
+  shift_name: string;
+  staffing_role_id: number;
+  role_name: string;
+  role_key: string;
+  required_count: number;
 }
 
 export function CompanySettings() {
@@ -64,15 +76,23 @@ export function CompanySettings() {
   // Shift Timings
   const [shiftTimings, setShiftTimings] = useState<any[]>([]);
   const [pendingNewShifts, setPendingNewShifts] = useState<any[]>([]);
-  const [pendingDeletedShiftIds, setPendingDeletedShiftIds] = useState<number[]>([]);
+  const [pendingDeletedShiftIds, setPendingDeletedShiftIds] = useState<
+    number[]
+  >([]);
   const [isAddShiftDialogOpen, setIsAddShiftDialogOpen] = useState(false);
   const [newShiftName, setNewShiftName] = useState("");
   const [newShiftStartTime, setNewShiftStartTime] = useState("09:00");
   const [newShiftEndTime, setNewShiftEndTime] = useState("17:00");
+
   // Staffing Requirements
-  const [requiredHosts, setRequiredHosts] = useState("1");
-  const [requiredOperators, setRequiredOperators] = useState("1");
-  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
+  const [staffingRoles, setStaffingRoles] = useState<StaffingRole[]>([]);
+  const [staffingRequirements, setStaffingRequirements] = useState<
+    StaffingRequirement[]
+  >([]);
+  const [pendingDeletedRoleIds, setPendingDeletedRoleIds] = useState<number[]>(
+    [],
+  );
+  const [newRoleName, setNewRoleName] = useState("");
 
   // Scheduling Behavior
   const [absenceReplacementMode, setAbsenceReplacementMode] =
@@ -106,11 +126,14 @@ export function CompanySettings() {
 
   const [selectedDeleteAccount, setSelectedDeleteAccount] = useState("");
 
+  const [savingChanges, setSavingChanges] = useState(false);
+
   useEffect(() => {
     fetchSettings();
     fetchAccountSettings();
     fetchAccounts();
     fetchShiftTemplates();
+    fetchStaffingRequirements();
   }, []);
 
   const fetchSettings = async () => {
@@ -181,6 +204,26 @@ export function CompanySettings() {
       setShiftTimings(data);
     } catch (err) {
       console.error("Failed to load shift templates", err);
+    }
+  };
+
+  const fetchStaffingRequirements = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load staffing requirements");
+      }
+
+      setStaffingRoles(data.roles || []);
+      setStaffingRequirements(data.requirements || []);
+    } catch (err) {
+      console.error("Failed to load staffing requirements", err);
+      toast.error("Failed to load staffing requirements");
     }
   };
 
@@ -390,6 +433,17 @@ export function CompanySettings() {
     };
 
     setShiftTimings((prev) => [...prev, newShift]);
+    setStaffingRequirements((prev) => [
+      ...prev,
+      ...staffingRoles.map((role) => ({
+        shift_template_id: tempId,
+        shift_name: newShift.shift_name,
+        staffing_role_id: role.staffing_role_id,
+        role_name: role.role_name,
+        role_key: role.role_key,
+        required_count: 1,
+      })),
+    ]);
     setPendingNewShifts((prev) => [...prev, newShift]);
 
     setIsAddShiftDialogOpen(false);
@@ -420,8 +474,10 @@ export function CompanySettings() {
       return;
     }
 
-    setShiftTimings((prev) =>
-      prev.filter((shift) => getShiftId(shift) !== id),
+    setShiftTimings((prev) => prev.filter((shift) => getShiftId(shift) !== id));
+
+    setStaffingRequirements((prev) =>
+      prev.filter((req) => req.shift_template_id !== id),
     );
 
     if (shiftToDelete.isNew) {
@@ -494,33 +550,105 @@ export function CompanySettings() {
     return null;
   };
 
-  const handleAddRole = () => {
-    const newRole: CustomRole = {
-      id: Date.now().toString(),
-      roleName: "",
-      requiredCount: 1,
+  const handleAddStaffingRole = () => {
+    if (!newRoleName.trim()) {
+      toast.error("Role name required");
+      return;
+    }
+
+    const cleanedName = newRoleName.trim();
+
+    const duplicate = staffingRoles.some(
+      (role) => role.role_name.toLowerCase() === cleanedName.toLowerCase(),
+    );
+
+    if (duplicate) {
+      toast.error("Role already exists");
+      return;
+    }
+
+    const tempId = -Date.now();
+
+    const newRole: StaffingRole = {
+      staffing_role_id: tempId,
+      role_name: cleanedName,
+      role_key: cleanedName.toLowerCase().replace(/\s+/g, "_"),
+      isNew: true,
     };
-    setCustomRoles([...customRoles, newRole]);
+
+    setStaffingRoles((prev) => [...prev, newRole]);
+
+    setStaffingRequirements((prev) => [
+      ...prev,
+      ...shiftTimings.map((shift) => ({
+        shift_template_id: getShiftId(shift),
+        shift_name: shift.shift_name,
+        staffing_role_id: tempId,
+        role_name: newRole.role_name,
+        role_key: newRole.role_key,
+        required_count: 1,
+      })),
+    ]);
+
+    setNewRoleName("");
+
+    toast.success("Role added. Click Save Changes to apply.");
   };
 
-  const handleRemoveRole = (id: string) => {
-    setCustomRoles(customRoles.filter((role) => role.id !== id));
+  const handleRemoveStaffingRole = (roleId: number) => {
+    const role = staffingRoles.find((r) => r.staffing_role_id === roleId);
+
+    if (!role) {
+      toast.error("Role not found");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to remove role "${role.role_name}"?\n\nThis change will only be applied after clicking Save Changes.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setStaffingRoles((prev) =>
+      prev.filter((r) => r.staffing_role_id !== roleId),
+    );
+
+    setStaffingRequirements((prev) =>
+      prev.filter((req) => req.staffing_role_id !== roleId),
+    );
+
+    if (!role.isNew) {
+      setPendingDeletedRoleIds((prev) =>
+        prev.includes(roleId) ? prev : [...prev, roleId],
+      );
+    }
+
+    toast.success("Role removed. Click Save Changes to apply.");
   };
 
-  const handleUpdateRole = (
-    id: string,
-    field: keyof CustomRole,
-    value: string | number,
+  const updateStaffingCount = (
+    shiftTemplateId: number,
+    staffingRoleId: number,
+    value: number,
   ) => {
-    setCustomRoles(
-      customRoles.map((role) =>
-        role.id === id ? { ...role, [field]: value } : role,
+    const safeValue = Math.max(0, Number(value) || 0);
+
+    setStaffingRequirements((prev) =>
+      prev.map((req) =>
+        req.shift_template_id === shiftTemplateId &&
+        req.staffing_role_id === staffingRoleId
+          ? {
+              ...req,
+              required_count: safeValue,
+            }
+          : req,
       ),
     );
   };
 
   const handleSaveChanges = async () => {
-
     const validationError = validateShiftTimings();
 
     if (validationError) {
@@ -528,6 +656,16 @@ export function CompanySettings() {
       return;
     }
 
+    const confirmed = window.confirm(
+      "Are you sure you want to save all company setting changes?\n\nThis will apply shift timing changes, staffing role changes, and staffing requirement changes.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSavingChanges(true);
+    
     try {
       const res = await fetch(
         "https://thesisprogram-production.up.railway.app/settings",
@@ -576,6 +714,8 @@ export function CompanySettings() {
           throw new Error(data.detail || "Failed to delete shift");
         }
       }
+      
+      const shiftIdMap: Record<number, number> = {};
 
       // 2. CREATE or RESTORE newly added shifts
       for (const shift of pendingNewShifts) {
@@ -605,13 +745,18 @@ export function CompanySettings() {
         if (!res.ok) {
           throw new Error(data.detail || "Failed to create shift");
         }
+
+        const savedShiftId = Number(data.shift_template_id);
+
+        if (savedShiftId) {
+          shiftIdMap[getShiftId(shift)] = savedShiftId;
+        }
       }
 
       // 3. UPDATE existing shifts that remain active
       const existingShifts = shiftTimings.filter(
         (shift) =>
-          !shift.isNew &&
-          !pendingDeletedShiftIds.includes(getShiftId(shift)),
+          !shift.isNew && !pendingDeletedShiftIds.includes(getShiftId(shift)),
       );
 
       for (const shift of existingShifts) {
@@ -649,16 +794,127 @@ export function CompanySettings() {
         }
       }
 
+      // 4. CREATE or REACTIVATE newly added staffing roles
+      const newStaffingRoles = staffingRoles.filter((role) => role.isNew);
+
+      for (const role of newStaffingRoles) {
+        const res = await fetch(
+          "https://thesisprogram-production.up.railway.app/staffing-roles",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              role_name: role.role_name,
+            }),
+          },
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || "Failed to save staffing role");
+        }
+      }
+
+      // 5. DELETE staffing roles marked for removal
+      for (const roleId of pendingDeletedRoleIds) {
+        const res = await fetch(
+          `https://thesisprogram-production.up.railway.app/staffing-roles/${roleId}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || "Failed to delete staffing role");
+        }
+      }
+
+      // 6. RELOAD staffing roles after creates/deletes
+      const staffingReloadRes = await fetch(
+        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+      );
+
+      const staffingReloadData = await staffingReloadRes.json();
+
+      if (!staffingReloadRes.ok) {
+        throw new Error(
+          staffingReloadData.detail || "Failed to reload staffing requirements",
+        );
+      }
+
+      const savedRoles = staffingReloadData.roles || [];
+
+      const roleIdMap: Record<number, number> = {};
+
+      staffingRoles.forEach((localRole) => {
+        const savedRole = savedRoles.find(
+          (role: any) =>
+            role.role_key === localRole.role_key ||
+            role.role_name.toLowerCase() === localRole.role_name.toLowerCase(),
+        );
+
+        if (savedRole) {
+          roleIdMap[localRole.staffing_role_id] = savedRole.staffing_role_id;
+        }
+      });
+
+      // 7. SAVE staffing requirement counts for all active roles
+      const requirementsToSave = staffingRequirements
+        .filter((req) => !pendingDeletedRoleIds.includes(req.staffing_role_id))
+        .map((req) => ({
+          shift_template_id:
+            shiftIdMap[req.shift_template_id] || req.shift_template_id,
+          staffing_role_id:
+            roleIdMap[req.staffing_role_id] || req.staffing_role_id,
+          required_count: req.required_count,
+        }))
+        .filter(
+          (req) =>
+            req.shift_template_id > 0 &&
+            req.staffing_role_id > 0,
+        );
+
+      const staffingRes = await fetch(
+        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            requirements: requirementsToSave,
+          }),
+        },
+      );
+
+      const staffingData = await staffingRes.json();
+
+      if (!staffingRes.ok) {
+        throw new Error(
+          staffingData.detail || "Failed to save staffing requirements",
+        );
+      }
+
       await fetchShiftTemplates();
+      await fetchStaffingRequirements();
 
       setPendingNewShifts([]);
       setPendingDeletedShiftIds([]);
-      
+      setPendingDeletedRoleIds([]);
+      setNewRoleName("");
+
       toast.success("Company settings saved successfully");
 
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to save settings");
+    } finally {
+      setSavingChanges(false);
     }
   };
 
@@ -702,9 +958,12 @@ export function CompanySettings() {
     await fetchAccountSettings();
     await fetchAccounts();
     await fetchShiftTemplates();
+    await fetchStaffingRequirements();
 
     setPendingNewShifts([]);
     setPendingDeletedShiftIds([]);
+    setPendingDeletedRoleIds([]);
+    setNewRoleName("");
 
     setIsAddShiftDialogOpen(false);
     setNewShiftName("");
@@ -863,12 +1122,16 @@ export function CompanySettings() {
           </CardContent>
         </Card>
       )}
-      <Dialog open={isAddShiftDialogOpen} onOpenChange={setIsAddShiftDialogOpen}>
+      <Dialog
+        open={isAddShiftDialogOpen}
+        onOpenChange={setIsAddShiftDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Shift Template</DialogTitle>
             <DialogDescription>
-              Add a new shift or restore a previously deleted shift using the same name.
+              Add a new shift or restore a previously deleted shift using the
+              same name.
             </DialogDescription>
           </DialogHeader>
 
@@ -912,9 +1175,7 @@ export function CompanySettings() {
               Cancel
             </Button>
 
-            <Button onClick={handleAddShift}>
-              Save Shift
-            </Button>
+            <Button onClick={handleAddShift}>Save Shift</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1178,7 +1439,7 @@ export function CompanySettings() {
                     <Input
                       id={`startTime-${String(getShiftId(shift))}`}
                       type="time"
-                      value={shift.start_time}
+                      value={shift.start_time?.slice(0, 5) || ""}
                       onChange={(e) =>
                         handleUpdateShift(
                           getShiftId(shift),
@@ -1195,7 +1456,7 @@ export function CompanySettings() {
                     <Input
                       id={`endTime-${String(getShiftId(shift))}`}
                       type="time"
-                      value={shift.end_time}
+                      value={shift.end_time?.slice(0, 5) || ""}
                       onChange={(e) =>
                         handleUpdateShift(
                           getShiftId(shift),
@@ -1224,102 +1485,106 @@ export function CompanySettings() {
       {/* Staffing Requirements */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Users className="size-5 text-blue-600" />
-            <CardTitle>Staffing Requirements</CardTitle>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="size-5" />
+            Staffing Requirements
+          </CardTitle>
           <CardDescription>
-            Define required roles and headcount per shift
+            Configure required roles per shift. Changes apply only after Save
+            Changes.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="requiredHosts">Required Hosts per Shift</Label>
-              <Input
-                id="requiredHosts"
-                type="number"
-                value={requiredHosts}
-                onChange={(e) => setRequiredHosts(e.target.value)}
-                placeholder="Enter count"
-              />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="requiredOperators">
-                Required Operators per Shift
-              </Label>
-              <Input
-                id="requiredOperators"
-                type="number"
-                value={requiredOperators}
-                onChange={(e) => setRequiredOperators(e.target.value)}
-                placeholder="Enter count"
-              />
-            </div>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="New role name"
+              value={newRoleName}
+              onChange={(e) => setNewRoleName(e.target.value)}
+            />
+
+            <Button onClick={handleAddStaffingRole} className="gap-2">
+              <Plus className="size-4" />
+              Add Role
+            </Button>
           </div>
 
-          {customRoles.length > 0 && (
-            <>
-              <Separator />
-              <div className="space-y-4">
-                <Label>Custom Roles</Label>
-                {customRoles.map((role) => (
-                  <div
-                    key={role.id}
-                    className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end"
-                  >
-                    <div className="space-y-2">
-                      <Label htmlFor={`roleName-${role.id}`}>Role Name</Label>
-                      <Input
-                        id={`roleName-${role.id}`}
-                        value={role.roleName}
-                        onChange={(e) =>
-                          handleUpdateRole(role.id, "roleName", e.target.value)
-                        }
-                        placeholder="e.g., Moderator, Tech Support"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`roleCount-${role.id}`}>
-                        Required Count
-                      </Label>
-                      <Input
-                        id={`roleCount-${role.id}`}
-                        type="number"
-                        value={role.requiredCount}
-                        onChange={(e) =>
-                          handleUpdateRole(
-                            role.id,
-                            "requiredCount",
-                            parseInt(e.target.value) || 1,
-                          )
-                        }
-                        placeholder="Count"
-                      />
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => handleRemoveRole(role.id)}
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          <div className="overflow-x-auto">
+            <table className="w-full border text-sm">
+              <thead>
+                <tr>
+                  <th className="border p-2 text-left">Shift</th>
 
-          <Button
-            onClick={handleAddRole}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-          >
-            <Plus className="size-4" />
-            Add Role
-          </Button>
+                  {staffingRoles.map((role) => (
+                    <th key={role.staffing_role_id} className="border p-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <span>{role.role_name}</span>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            handleRemoveStaffingRole(role.staffing_role_id)
+                          }
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {shiftTimings.map((shift) => {
+                  const shiftId = getShiftId(shift);
+
+                  return (
+                    <tr key={shiftId}>
+                      <td className="border p-2 font-medium">
+                        {shift.shift_name}
+                      </td>
+
+                      {staffingRoles.map((role) => {
+                        const requirement = staffingRequirements.find(
+                          (req) =>
+                            req.shift_template_id === shiftId &&
+                            req.staffing_role_id === role.staffing_role_id,
+                        );
+
+                        return (
+                          <td
+                            key={role.staffing_role_id}
+                            className="border p-2"
+                          >
+                            <Input
+                              type="number"
+                              min="0"
+                              value={requirement?.required_count ?? 0}
+                              onChange={(e) =>
+                                updateStaffingCount(
+                                  shiftId,
+                                  role.staffing_role_id,
+                                  Number(e.target.value),
+                                )
+                              }
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {staffingRoles.length === 0 && (
+            <p className="text-sm text-gray-500">
+              No active staffing roles. Schedule generation will produce no role
+              assignments until roles are added.
+            </p>
+          )}
         </CardContent>
       </Card>
       {/* Scheduler Scoring */}
@@ -1605,7 +1870,9 @@ export function CompanySettings() {
           <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button onClick={handleSaveChanges}>Save Changes</Button>
+          <Button onClick={handleSaveChanges} disabled={savingChanges}>
+            {savingChanges ? "Saving..." : "Save Changes"}
+          </Button>
         </div>
       </div>
     </div>

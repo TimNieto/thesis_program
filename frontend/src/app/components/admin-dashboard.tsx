@@ -75,7 +75,7 @@ interface Request {
   livestream: string;
   day: string;
   shift: string;
-  role: "Host" | "Operator";
+  role: string;
   reason: string;
   status: "pending" | "approved" | "denied";
   submittedAt: string;
@@ -87,7 +87,7 @@ interface Assignment {
   livestream: string;
   day: string;
   shift: string;
-  role: "Host" | "Operator";
+  role: string;
   employee: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -128,6 +128,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
+
+  const [staffingRoles, setStaffingRoles] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -188,10 +190,25 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const fetchStaffingRequirements = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+      );
+
+      const data = await res.json();
+
+      setStaffingRoles(data.roles || []);
+    } catch (err) {
+      console.error("Failed to load staffing roles", err);
+    }
+  };
+
   useEffect(() => {
     if (currentUser.role.toLowerCase() === "admin") {
       fetchEmployees();
       fetchShiftTemplates();
+      fetchStaffingRequirements();
     }
   }, [currentUser.role]);
 
@@ -444,7 +461,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const activeEmployees = employees.filter((e) => e.status === "Active").length;
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
   const totalAssignments = assignments.length;
-  const totalSlots = DAYS.length * shiftTemplates.length * 2;
+  const totalSlots = DAYS.length * shiftTemplates.length * staffingRoles.length;
   
   const getRequestTypeColor = (type: string) => {
     const colors = {

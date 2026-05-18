@@ -9,7 +9,8 @@ from routes import (
     leaves,
     settings,
     accounts,
-    shift_templates
+    shift_templates,
+    staffing_requirements
 )
 
 app = FastAPI()
@@ -32,6 +33,7 @@ app.include_router(leaves.router)
 app.include_router(settings.router)
 app.include_router(accounts.router)
 app.include_router(shift_templates.router)
+app.include_router(staffing_requirements.router)
 
 @app.get("/")
 def root():

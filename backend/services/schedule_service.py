@@ -35,6 +35,76 @@ def fetch_shift_templates(cursor):
         for r in rows
     ]
 
+def fetch_active_staffing_roles(cursor):
+    cursor.execute("""
+        SELECT
+            staffing_role_id,
+            role_name,
+            role_key
+        FROM staffing_roles
+        WHERE is_active = TRUE
+        ORDER BY staffing_role_id
+    """)
+
+    rows = cursor.fetchall()
+
+    return [
+        {
+            "staffing_role_id": r[0],
+            "role_name": r[1],
+            "role_key": r[2]
+        }
+        for r in rows
+    ]
+
+
+def fetch_staffing_requirements_map(cursor):
+    cursor.execute("""
+        SELECT
+            ssr.shift_template_id,
+            sr.staffing_role_id,
+            sr.role_name,
+            sr.role_key,
+            ssr.required_count
+        FROM shift_staffing_requirements ssr
+
+        JOIN staffing_roles sr
+            ON ssr.staffing_role_id = sr.staffing_role_id
+
+        WHERE ssr.is_active = TRUE
+        AND sr.is_active = TRUE
+
+        ORDER BY sr.staffing_role_id
+    """)
+
+    rows = cursor.fetchall()
+
+    requirements_map = {}
+
+    for r in rows:
+        shift_template_id = r[0]
+
+        if shift_template_id not in requirements_map:
+            requirements_map[shift_template_id] = []
+
+        requirements_map[shift_template_id].append({
+            "staffing_role_id": r[1],
+            "role_name": r[2],
+            "role_key": r[3],
+            "required_count": r[4]
+        })
+
+    return requirements_map
+
+
+def build_empty_roles(active_roles):
+    empty = {}
+
+    for role in active_roles:
+        empty[role["role_key"]] = []
+
+    return empty
+
 def fetch_employees(cursor):
     cursor.execute("""
         SELECT employee_id, full_name, main_role, can_be_host, can_be_operator
@@ -67,19 +137,20 @@ def get_next_week_range():
 def fetch_shifts(cursor):
     start_date, end_date = get_next_week_range()
 
+    staffing_requirements_map = fetch_staffing_requirements_map(cursor)
+
     cursor.execute("""
         SELECT
             s.shift_id,
             s.shift_date,
             s.account,
+            st.shift_template_id,
             st.shift_name,
             st.start_time,
             st.end_time,
             st.fatigue_penalty,
             st.difficulty_weight,
-            st.is_overnight,
-            s.required_host_count,
-            s.required_operator_count
+            st.is_overnight
 
         FROM shifts s
 
@@ -97,19 +168,19 @@ def fetch_shifts(cursor):
     rows = cursor.fetchall()
 
     return [
-    {
-        "shift_id": r[0],
-        "shift_date": r[1],
-        "account": r[2],
-        "shift_type": r[3],
-        "start_time": r[4],
-        "end_time": r[5],
-        "fatigue_penalty": r[6],
-        "difficulty_weight": r[7],
-        "is_overnight": r[8],
-        "required_host_count": r[9] or 0,
-        "required_operator_count": r[10] or 0
-    }
+        {
+            "shift_id": r[0],
+            "shift_date": r[1],
+            "account": r[2],
+            "shift_template_id": r[3],
+            "shift_type": r[4],
+            "start_time": r[5],
+            "end_time": r[6],
+            "fatigue_penalty": r[7],
+            "difficulty_weight": r[8],
+            "is_overnight": r[9],
+            "staffing_requirements": staffing_requirements_map.get(r[3], [])
+        }
         for r in rows
     ]
 
@@ -256,26 +327,22 @@ def to_dict(d):
         return {k: to_dict(v) for k, v in d.items()}
     return d
 
-def group_schedule(assignments):
+def group_schedule(assignments, active_roles):
     """
     Convert flat assignments → nested structure:
-    Day → Shift → Role → [employees]
+    Account → Day → Shift → Role → [employees]
     """
+
     schedule = defaultdict(
         lambda: defaultdict(
-            lambda: defaultdict(
-                lambda: {
-                    "host": [],
-                    "operator": []
-                }
-            )
+            lambda: defaultdict(dict)
         )
     )
 
     day_cache = {}
 
     for a in assignments:
-        
+
         shift_date = a["shift_date"]
 
         day = day_cache.get(shift_date)
@@ -288,6 +355,9 @@ def group_schedule(assignments):
         role = a["role"]
         account = a["account"]
 
+        if role not in schedule[account][day][shift]:
+            schedule[account][day][shift][role] = []
+
         schedule[account][day][shift][role].append({
             "schedule_id": a.get("schedule_id"),
             "shift_id": a.get("shift_id"),
@@ -295,7 +365,18 @@ def group_schedule(assignments):
             "employee_name": a["employee_name"]
         })
 
-    return to_dict(schedule)
+    result = to_dict(schedule)
+
+    for account in result:
+        for day in result[account]:
+            for shift in result[account][day]:
+                for role in active_roles:
+                    role_key = role["role_key"]
+
+                    if role_key not in result[account][day][shift]:
+                        result[account][day][shift][role_key] = []
+
+    return result
 
 # -------------------------------
 # MAIN SERVICE
@@ -397,7 +478,12 @@ def generate_weekly_schedule():
             a["employee_name"] = employee_lookup.get(emp_id, f"Employee {emp_id}")
 
 
-        grouped = group_schedule(result["assignments"])
+        active_roles = fetch_active_staffing_roles(cursor)
+
+        grouped = group_schedule(
+            result["assignments"],
+            active_roles
+        )
 
         for account_name in account_settings.keys():
 
@@ -425,11 +511,7 @@ def generate_weekly_schedule():
 
                     if shift_name not in grouped[account_name][day]:
 
-                        grouped[account_name][day][shift_name] = {
-                            "host": [],
-                            "operator": []
-                        }
-
+                        grouped[account_name][day][shift_name] = build_empty_roles(active_roles)
         return {
             "status": "success",
             "assignments": result["assignments"],      # keep raw (important for debugging)
@@ -496,7 +578,12 @@ def get_generated_schedule():
             for r in rows
         ]
 
-        grouped = group_schedule(assignments)
+        active_roles = fetch_active_staffing_roles(cursor)
+
+        grouped = group_schedule(
+            assignments,
+            active_roles
+        )
 
         cursor.execute("""
             SELECT account_name
@@ -533,10 +620,7 @@ def get_generated_schedule():
 
                     if shift_name not in grouped[account_name][day]:
 
-                        grouped[account_name][day][shift_name] = {
-                            "host": [],
-                            "operator": []
-                        }
+                        grouped[account_name][day][shift_name] = build_empty_roles(active_roles)
 
         return {
             "status": "success",
@@ -558,10 +642,7 @@ def ensure_next_week_shifts(cursor):
 
     # GET ACCOUNTS
     cursor.execute("""
-        SELECT
-            account_name,
-            require_host,
-            require_operator
+        SELECT account_name
         FROM account_settings
     """)
 
@@ -569,11 +650,7 @@ def ensure_next_week_shifts(cursor):
 
     # GET SHIFT TEMPLATES
     cursor.execute("""
-        SELECT
-            shift_template_id,
-            shift_name,
-            start_time,
-            end_time
+        SELECT shift_template_id
         FROM shift_templates
         WHERE is_active = TRUE
         ORDER BY start_time
@@ -591,8 +668,6 @@ def ensure_next_week_shifts(cursor):
         for account in accounts:
 
             account_name = account[0]
-            require_host = account[1]
-            require_operator = account[2]
 
             for template in templates:
 
@@ -602,13 +677,9 @@ def ensure_next_week_shifts(cursor):
                     INSERT INTO shifts (
                         shift_date,
                         account,
-                        shift_template_id,
-                        required_host_count,
-                        required_operator_count
+                        shift_template_id
                     )
                     VALUES (
-                        %s,
-                        %s,
                         %s,
                         %s,
                         %s
@@ -622,8 +693,6 @@ def ensure_next_week_shifts(cursor):
                 """, (
                     new_date,
                     account_name,
-                    template_id,
-                    1 if require_host else 0,
-                    1 if require_operator else 0
+                    template_id
                 ))
 

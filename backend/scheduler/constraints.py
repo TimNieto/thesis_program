@@ -139,6 +139,8 @@ def is_unavailable(employee_id, shift, context):
 
 def has_role(employee, role, context=None):
 
+    role = role.lower()
+
     # RELAX ROLE MODE
     if (
         context and
@@ -150,13 +152,16 @@ def has_role(employee, role, context=None):
             employee.get("can_be_operator", False)
         )
 
-    # STRICT MODE
+    # CURRENT EMPLOYEE TABLE SUPPORTS ONLY THESE CAPABILITIES
     if role == "host":
         return employee.get("can_be_host", False)
 
     if role == "operator":
         return employee.get("can_be_operator", False)
 
+    # CUSTOM ROLES ARE DATABASE-BASED,
+    # BUT EMPLOYEE CAPABILITY FOR CUSTOM ROLES
+    # DOES NOT EXIST YET.
     return False
 
 

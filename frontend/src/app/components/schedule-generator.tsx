@@ -44,7 +44,7 @@ interface ShiftAssignment {
   livestream: string;
   day: string;
   shift: string;
-  role: "Host" | "Operator";
+  role: string;
   employee: string;
 }
 
@@ -75,8 +75,6 @@ const DAYS = [
   "Sunday",
 ];
 
-const ROLES = ["Host", "Operator"] as const;
-
 export function ScheduleGenerator({
   currentUser,
   role,
@@ -86,6 +84,8 @@ export function ScheduleGenerator({
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
+  
+  const [groupedSchedule, setGroupedSchedule] = useState<any>({});
 
   const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([]);
 
@@ -184,7 +184,7 @@ export function ScheduleGenerator({
     livestream: string;
     day: string;
     shift: string;
-    role: "Host" | "Operator";
+    role: string;
   } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
@@ -211,6 +211,7 @@ export function ScheduleGenerator({
 
         if (!data.grouped_schedule) return;
 
+        setGroupedSchedule(data.grouped_schedule);
         setLivestreams(Object.keys(data.grouped_schedule));
 
         const transformed: ShiftAssignment[] = [];
@@ -219,31 +220,19 @@ export function ScheduleGenerator({
           ([livestream, days]: any) => {
             Object.entries(days).forEach(([day, shifts]: any) => {
               Object.entries(shifts).forEach(([shift, roles]: any) => {
-                (roles.host || []).forEach((emp: any) => {
-                  transformed.push({
-                    id: `${livestream}-${day}-${shift}-host-${emp.employee_id}`,
-                    schedule_id: emp.schedule_id,
-                    shift_id: emp.shift_id,
-                    employee_id: emp.employee_id,
-                    livestream,
-                    day,
-                    shift,
-                    role: "Host",
-                    employee: emp.employee_name,
-                  });
-                });
-
-                (roles.operator || []).forEach((emp: any) => {
-                  transformed.push({
-                    id: `${livestream}-${day}-${shift}-operator-${emp.employee_id}`,
-                    schedule_id: emp.schedule_id,
-                    shift_id: emp.shift_id,
-                    employee_id: emp.employee_id,
-                    livestream,
-                    day,
-                    shift,
-                    role: "Operator",
-                    employee: emp.employee_name,
+                Object.entries(roles).forEach(([roleKey, employees]: any) => {
+                  (employees || []).forEach((emp: any) => {
+                    transformed.push({
+                      id: `${livestream}-${day}-${shift}-${roleKey}-${emp.employee_id}`,
+                      schedule_id: emp.schedule_id,
+                      shift_id: emp.shift_id,
+                      employee_id: emp.employee_id,
+                      livestream,
+                      day,
+                      shift,
+                      role: roleKey,
+                      employee: emp.employee_name,
+                    });
                   });
                 });
               });
@@ -303,20 +292,11 @@ export function ScheduleGenerator({
     return leaveMap.get(formatDate(date)) || [];
   };
 
-  /*const getAssignment = (
-    livestream: string,
-    day: string,
-    shift: string,
-    role: "Host" | "Operator"
-  ) => {
-    return assignmentMap.get(`${livestream}-${day}-${shift}-${role}`);
-  };*/
-
   const getAssignment = (
     livestream: string,
     day: string,
     shift: string,
-    role: "Host" | "Operator",
+    role: string,
   ) => {
     return assignments.find(
       (a) =>
@@ -331,7 +311,7 @@ export function ScheduleGenerator({
     livestream: string,
     day: string,
     shift: string,
-    role: "Host" | "Operator",
+    role: string,
   ) => {
     setSelectedCell({ livestream, day, shift, role });
     const existing = getAssignment(livestream, day, shift, role);
@@ -440,6 +420,7 @@ export function ScheduleGenerator({
       }
 
       const grouped = data.grouped_schedule || {};
+      setGroupedSchedule(grouped);
       setLivestreams(Object.keys(grouped));
       console.log("GROUPED:", grouped);
       const unfilled = data.unfilled_slots || [];
@@ -451,40 +432,26 @@ export function ScheduleGenerator({
       let idCounter = 0;
 
       // 🔥 KEEP UI SAME → still loop livestreams
-      Object.entries(grouped).forEach(([livestream, days]) => {
+      Object.entries(grouped).forEach(([livestream, days]: any) => {
         DAYS.forEach((day) => {
           const shifts = days[day] || {};
 
           shiftTemplates.forEach((shift) => {
             const shiftData = shifts[shift.shift_name] || {};
 
-            // HOSTS
-            (shiftData.host || []).forEach((emp: any) => {
-              transformed.push({
-                id: String(idCounter++),
-                shift_id: emp.shift_id,
-                employee_id: emp.employee_id,
-                schedule_id: emp.schedule_id,
-                livestream,
-                day,
-                shift: shift.shift_name,
-                role: "Host",
-                employee: emp.employee_name,
-              });
-            });
-
-            // OPERATORS
-            (shiftData.operator || []).forEach((emp: any) => {
-              transformed.push({
-                id: String(idCounter++),
-                shift_id: emp.shift_id,
-                employee_id: emp.employee_id,
-                schedule_id: emp.schedule_id,
-                livestream,
-                day,
-                shift: shift.shift_name,
-                role: "Operator",
-                employee: emp.employee_name,
+            Object.entries(shiftData).forEach(([roleKey, employees]: any) => {
+              (employees || []).forEach((emp: any) => {
+                transformed.push({
+                  id: String(idCounter++),
+                  shift_id: emp.shift_id,
+                  employee_id: emp.employee_id,
+                  schedule_id: emp.schedule_id,
+                  livestream,
+                  day,
+                  shift: shift.shift_name,
+                  role: roleKey,
+                  employee: emp.employee_name,
+                });
               });
             });
           });
@@ -519,7 +486,7 @@ export function ScheduleGenerator({
 
             employee_id: a.employee_id,
 
-            role: a.role.toLowerCase(),
+            role: a.role.toLowerCase().replace(/\s+/g, "_"),
 
             shift_date: formatDate(weekDates[dayIndex]),
 
@@ -596,6 +563,20 @@ export function ScheduleGenerator({
     }
   };
 
+  const getRolesForShift = (livestream: string, shiftName: string) => {
+    const roles = new Set<string>();
+
+    DAYS.forEach((day) => {
+      const shiftData = groupedSchedule?.[livestream]?.[day]?.[shiftName] || {};
+
+      Object.keys(shiftData).forEach((roleKey) => {
+        roles.add(roleKey);
+      });
+    });
+
+    return Array.from(roles);
+  };
+
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
 
   return (
@@ -648,18 +629,6 @@ export function ScheduleGenerator({
                 </div>
               </div>
             ))}
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded border-2 bg-pink-100 border-pink-300 flex items-center justify-center">
-                <span className="font-semibold text-xs">H</span>
-              </div>
-              <div className="text-sm font-medium">Host</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded border-2 bg-purple-100 border-purple-300 flex items-center justify-center">
-                <span className="font-semibold text-xs">O</span>
-              </div>
-              <div className="text-sm font-medium">Operator</div>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -732,133 +701,123 @@ export function ScheduleGenerator({
                         </tr>
                       </thead>
                       <tbody>
-                        {shiftTemplates.map((shift) => (
-                          <React.Fragment key={shift.shift_name}>
-                            {/* Host Row */}
-                            <tr key={`${livestream}-${shift.shift_name}-host`}>
-                              <td
-                                rowSpan={2}
-                                className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={`w-10 h-10 rounded border-2 ${getShiftColor(shift.shift_name)} flex items-center justify-center`}
+                        {shiftTemplates.map((shift) => {
+                          const rolesForShift = getRolesForShift(
+                            livestream,
+                            shift.shift_name,
+                          );
+                          if (rolesForShift.length === 0) {
+                            return (
+                              <tr key={`${livestream}-${shift.shift_name}-empty`}>
+                                <td className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}>
+                                  <div className="font-semibold text-sm">{shift.shift_name}</div>
+                                  <div className="text-xs text-gray-600">
+                                    {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
+                                  </div>
+                                </td>
+                                <td className="border border-gray-300 bg-gray-50 p-2 text-center text-sm text-gray-400">
+                                  No roles
+                                </td>
+                                {DAYS.map((day) => (
+                                  <td
+                                    key={`${livestream}-${day}-${shift.shift_name}-empty`}
+                                    className="border border-gray-300 p-2 bg-white text-center text-gray-300 text-xs"
                                   >
-                                    <span
-                                      className={`font-semibold text-sm ${getShiftTextColor(shift.shift_name)}`}
+                                    -
+                                  </td>
+                                ))}
+                              </tr>
+                            );
+                          }
+                          return (
+                            <React.Fragment key={`${livestream}-${shift.shift_name}`}>
+                              {rolesForShift.map((roleKey, roleIndex) => (
+                                <tr key={`${livestream}-${shift.shift_name}-${roleKey}`}>
+                                  {roleIndex === 0 && (
+                                    <td
+                                      rowSpan={rolesForShift.length}
+                                      className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
                                     >
-                                      {shift.shift_name}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <div className="font-semibold text-sm">
-                                      {shift.shift_name}
-                                    </div>
-                                    <div className="text-xs text-gray-600">
-                                      {shift.start_time.slice(0,5)} - {shift.end_time.slice(0,5)}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="border border-gray-300 bg-pink-50 p-2 text-center font-semibold text-sm">
-                                Host
-                              </td>
-                              {DAYS.map((day) => {
-                                const assignment = getAssignment(
-                                  livestream,
-                                  day,
-                                  shift.shift_name,
-                                  "Host",
-                                );
-                                const isClickable = role === "admin";
-
-                                return (
-                                  <td
-                                    key={`${livestream}-${day}-${shift.shift_name}-host`}
-                                    className={`border border-gray-300 p-2 ${
-                                      assignment
-                                        ? getShiftColor(shift.shift_name)
-                                        : "bg-white"
-                                    } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
-                                    onClick={() =>
-                                      isClickable &&
-                                      openAssignDialog(
-                                        livestream,
-                                        day,
-                                        shift.shift_name,
-                                        "Host",
-                                      )
-                                    }
-                                  >
-                                    {assignment ? (
-                                      <div className="text-center">
+                                      <div className="flex items-center gap-2">
                                         <div
-                                          className={`font-medium text-sm ${getShiftTextColor(shift.shift_name)}`}
+                                          className={`w-10 h-10 rounded border-2 ${getShiftColor(
+                                            shift.shift_name,
+                                          )} flex items-center justify-center`}
                                         >
-                                          {assignment.employee}
+                                          <span
+                                            className={`font-semibold text-sm ${getShiftTextColor(
+                                              shift.shift_name,
+                                            )}`}
+                                          >
+                                            {shift.shift_name}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <div className="font-semibold text-sm">
+                                            {shift.shift_name}
+                                          </div>
+                                          <div className="text-xs text-gray-600">
+                                            {shift.start_time.slice(0, 5)} -{" "}
+                                            {shift.end_time.slice(0, 5)}
+                                          </div>
                                         </div>
                                       </div>
-                                    ) : (
-                                      <div className="text-center text-gray-300 text-xs py-1">
-                                        {isClickable ? "+" : "-"}
-                                      </div>
-                                    )}
-                                  </td>
-                                );
-                              })}
-                            </tr>
+                                    </td>
+                                  )}
 
-                            {/* Operator Row */}
-                            <tr key={`${livestream}-${shift.shift_name}-operator`}>
-                              <td className="border border-gray-300 bg-purple-50 p-2 text-center font-semibold text-sm">
-                                Operator
-                              </td>
-                              {DAYS.map((day) => {
-                                const assignment = getAssignment(
-                                  livestream,
-                                  day,
-                                  shift.shift_name,
-                                  "Operator",
-                                );
-                                const isClickable = role === "admin";
-
-                                return (
-                                  <td
-                                    key={`${livestream}-${day}-${shift.shift_name}-operator`}
-                                    className={`border border-gray-300 p-2 ${
-                                      assignment
-                                        ? getShiftColor(shift.shift_name)
-                                        : "bg-white"
-                                    } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
-                                    onClick={() =>
-                                      isClickable &&
-                                      openAssignDialog(
-                                        livestream,
-                                        day,
-                                        shift.shift_name,
-                                        "Operator",
-                                      )
-                                    }
-                                  >
-                                    {assignment ? (
-                                      <div className="text-center">
-                                        <div
-                                          className={`font-medium text-sm ${getShiftTextColor(shift.shift_name)}`}
-                                        >
-                                          {assignment.employee}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="text-center text-gray-300 text-xs py-1">
-                                        {isClickable ? "+" : "-"}
-                                      </div>
-                                    )}
+                                  <td className="border border-gray-300 bg-gray-50 p-2 text-center font-semibold text-sm capitalize">
+                                    {roleKey.replace(/_/g, " ")}
                                   </td>
-                                );
-                              })}
-                            </tr>
-                          </React.Fragment>
-                        ))}
+
+                                  {DAYS.map((day) => {
+                                    const assignment = getAssignment(
+                                      livestream,
+                                      day,
+                                      shift.shift_name,
+                                      roleKey,
+                                    );
+
+                                    const isClickable = role === "admin";
+
+                                    return (
+                                      <td
+                                        key={`${livestream}-${day}-${shift.shift_name}-${roleKey}`}
+                                        className={`border border-gray-300 p-2 ${
+                                          assignment ? getShiftColor(shift.shift_name) : "bg-white"
+                                        } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                                        onClick={() =>
+                                          isClickable &&
+                                          openAssignDialog(
+                                            livestream,
+                                            day,
+                                            shift.shift_name,
+                                            roleKey,
+                                          )
+                                        }
+                                      >
+                                        {assignment ? (
+                                          <div className="text-center">
+                                            <div
+                                              className={`font-medium text-sm ${getShiftTextColor(
+                                                shift.shift_name,
+                                              )}`}
+                                            >
+                                              {assignment.employee}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="text-center text-gray-300 text-xs py-1">
+                                            {isClickable ? "+" : "-"}
+                                          </div>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

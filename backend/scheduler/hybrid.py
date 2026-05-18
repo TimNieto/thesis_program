@@ -22,13 +22,15 @@ def assignment_key(a):
     )
 
 def calculate_unfilled_slots(assignments, shifts, account_settings):
-    assigned_keys = {
-        (
-            a["shift_id"],
-            a["role"].lower()
-        )
-        for a in assignments
-    }
+    assigned_counts = defaultdict(int)
+
+    for a in assignments:
+        assigned_counts[
+            (
+                a["shift_id"],
+                a["role"].lower()
+            )
+        ] += 1
 
     unfilled = []
 
@@ -43,40 +45,37 @@ def calculate_unfilled_slots(assignments, shifts, account_settings):
             "required"
         )
 
-        required_host_count = shift.get(
-            "required_host_count",
-            0
-        ) or 0
+        for req in shift.get("staffing_requirements", []):
 
-        required_operator_count = shift.get(
-            "required_operator_count",
-            0
-        ) or 0
+            role = req["role_key"]
+            required_count = req.get("required_count", 0) or 0
 
-        if required_host_count > 0:
-            if (shift["shift_id"], "host") not in assigned_keys:
-                unfilled.append({
-                    "shift_id": shift["shift_id"],
-                    "account": shift["account"],
-                    "shift_date": str(shift["shift_date"]),
-                    "shift_type": shift["shift_type"],
-                    "role": "host",
-                    "reason": "Missing host"
-                })
+            if required_count <= 0:
+                continue
 
-        if (
-            required_operator_count > 0
-            and operator_policy != "avoid"
-        ):
-            if (shift["shift_id"], "operator") not in assigned_keys:
-                unfilled.append({
-                    "shift_id": shift["shift_id"],
-                    "account": shift["account"],
-                    "shift_date": str(shift["shift_date"]),
-                    "shift_type": shift["shift_type"],
-                    "role": "operator",
-                    "reason": "Missing operator"
-                })
+            if role == "operator" and operator_policy == "avoid":
+                continue
+
+            current_count = assigned_counts.get(
+                (
+                    shift["shift_id"],
+                    role.lower()
+                ),
+                0
+            )
+
+            if current_count < required_count:
+
+                for _ in range(required_count - current_count):
+
+                    unfilled.append({
+                        "shift_id": shift["shift_id"],
+                        "account": shift["account"],
+                        "shift_date": str(shift["shift_date"]),
+                        "shift_type": shift["shift_type"],
+                        "role": role,
+                        "reason": f"Missing {role}"
+                    })
 
     return unfilled
 
@@ -245,7 +244,7 @@ def mutate_schedule(
     if context["context_flags"].get("relax_role"):
         pool = employees
     else:
-        pool = context["role_pools"][role]
+        pool = context["role_pools"].get(role, [])
 
     candidates = [
         e for e in pool
