@@ -84,6 +84,8 @@ export function ScheduleGenerator({
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
+
+  const [staffingRequirements, setStaffingRequirements] = useState<any[]>([]);
   
   const [groupedSchedule, setGroupedSchedule] = useState<any>({});
 
@@ -100,6 +102,20 @@ export function ScheduleGenerator({
       setShiftTemplates(data);
     } catch (err) {
       console.error("Failed to load shift templates", err);
+    }
+  };
+
+  const fetchStaffingRequirements = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/staffing-requirements"
+      );
+
+      const data = await res.json();
+
+      setStaffingRequirements(data.requirements || []);
+    } catch (err) {
+      console.error("Failed to load staffing requirements", err);
     }
   };
 
@@ -198,6 +214,7 @@ export function ScheduleGenerator({
 
   useEffect(() => {
     fetchShiftTemplates();
+    fetchStaffingRequirements();
   }, []);
 
   useEffect(() => {
@@ -565,28 +582,27 @@ export function ScheduleGenerator({
     }
   };
 
-  const getRoleRowsForShift = (livestream: string, shiftName: string) => {
-    const roleMaxCounts: Record<string, number> = {};
-
-    DAYS.forEach((day) => {
-      const shiftData = groupedSchedule?.[livestream]?.[day]?.[shiftName] || {};
-
-      Object.entries(shiftData).forEach(([roleKey, employees]: any) => {
-        const count = Array.isArray(employees) ? employees.length : 0;
-
-        roleMaxCounts[roleKey] = Math.max(
-          roleMaxCounts[roleKey] || 1,
-          count || 1,
-        );
-      });
-    });
-
-    return Object.entries(roleMaxCounts).flatMap(([roleKey, count]) =>
-      Array.from({ length: count }, (_, index) => ({
-        roleKey,
-        slotIndex: index,
-      })),
+  const getRoleRowsForShift = (shiftName: string) => {
+    const shiftTemplate = shiftTemplates.find(
+      (s) => s.shift_name === shiftName
     );
+
+    if (!shiftTemplate) return [];
+
+    const shiftTemplateId = Number(shiftTemplate.shift_template_id);
+
+    return staffingRequirements
+      .filter(
+        (req) =>
+          Number(req.shift_template_id) === shiftTemplateId &&
+          Number(req.required_count) > 0
+      )
+      .flatMap((req) =>
+        Array.from({ length: Number(req.required_count) }, (_, index) => ({
+          roleKey: req.role_key,
+          slotIndex: index,
+        }))
+      );
   };
 
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
@@ -714,10 +730,7 @@ export function ScheduleGenerator({
                       </thead>
                       <tbody>
                         {shiftTemplates.map((shift) => {
-                          const roleRowsForShift = getRoleRowsForShift(
-                            livestream,
-                            shift.shift_name,
-                          );
+                          const roleRowsForShift = getRoleRowsForShift(shift.shift_name);
                           if (roleRowsForShift.length === 0) {
                             return (
                               <tr key={`${livestream}-${shift.shift_name}-empty`}>
@@ -789,7 +802,7 @@ export function ScheduleGenerator({
                                       roleKey,
                                     )[slotIndex];
 
-                                    const isClickable = role === "admin" && !!cellAssignment;
+                                    const isClickable = role === "admin";
 
                                     return (
                                       <td
