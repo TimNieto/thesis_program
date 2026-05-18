@@ -377,6 +377,11 @@ def generate_schedule(
         key=lambda x: x["fitness"]
     )
 
+    print("HYBRID GA RESULT")
+    print("BEST FITNESS:", best["fitness"])
+    print("ASSIGNMENTS:", len(best["assignments"]))
+    print("UNFILLED:", len(best["unfilled_slots"]))
+
     return {
         "assignments": best["assignments"],
         "unfilled_slots": best["unfilled_slots"],
