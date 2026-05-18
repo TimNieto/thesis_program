@@ -109,7 +109,7 @@ def historical_score(assignment, history_scores):
     score = 0
 
     # repeated cover requests = negative compatibility
-    score -= data["cover_requests"] * 5000
+    score -= data["cover_requests"] * 30
 
     # emergency covers are stronger negative signal
     score -= data["emergency_requests"] * 60
@@ -265,6 +265,23 @@ def mutate_schedule(
             e,
             shift,
             role
+        )
+
+        print(
+            "CANDIDATE:",
+            e["full_name"],
+            "BASE:",
+            score_employee(
+                e,
+                shift,
+                role,
+                context
+            ),
+            "HISTORY:",
+            historical_score(
+                temp_assignment,
+                history_scores
+            )
         )
 
         return (
