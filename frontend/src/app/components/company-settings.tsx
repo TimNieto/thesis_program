@@ -29,6 +29,14 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
 import { toast } from "sonner";
 
 interface CustomRole {
@@ -92,6 +100,11 @@ export function CompanySettings() {
   const [newOperatorPolicy, setNewOperatorPolicy] = useState("required");
 
   const [selectedDeleteAccount, setSelectedDeleteAccount] = useState("");
+
+  const [isAddShiftDialogOpen, setIsAddShiftDialogOpen] = useState(false);
+  const [newShiftName, setNewShiftName] = useState("");
+  const [newShiftStartTime, setNewShiftStartTime] = useState("09:00");
+  const [newShiftEndTime, setNewShiftEndTime] = useState("17:00");
 
   useEffect(() => {
     fetchSettings();
@@ -160,7 +173,7 @@ export function CompanySettings() {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/shift-templates"
+        "https://thesisprogram-production.up.railway.app/shift-templates",
       );
 
       const data = await res.json();
@@ -277,12 +290,21 @@ export function CompanySettings() {
     Number(
       shift.shift_template_id !== undefined
         ? shift.shift_template_id
-        : shift.shift_id
+        : shift.shift_id,
     );
-  
-  const handleAddShift = async () => {
-    try {
 
+  const handleAddShift = async () => {
+    if (!newShiftName.trim()) {
+      toast.error("Shift name required");
+      return;
+    }
+
+    if (!newShiftStartTime || !newShiftEndTime) {
+      toast.error("Start and end time required");
+      return;
+    }
+
+    try {
       const response = await fetch(
         "https://thesisprogram-production.up.railway.app/shift-templates",
         {
@@ -291,41 +313,42 @@ export function CompanySettings() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            shift_name: "NEW_SHIFT",
-            start_time: "09:00:00",
-            end_time: "17:00:00",
+            shift_name: newShiftName.trim(),
+            start_time:
+              newShiftStartTime.length === 5
+                ? `${newShiftStartTime}:00`
+                : newShiftStartTime,
+            end_time:
+              newShiftEndTime.length === 5
+                ? `${newShiftEndTime}:00`
+                : newShiftEndTime,
           }),
-        }
+        },
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.detail || "Failed to create shift"
-        );
+        throw new Error(data.detail || "Failed to create shift");
       }
 
-      // IMPORTANT:
-      // reload from backend
       await fetchShiftTemplates();
 
-      toast.success("Shift template created");
+      setIsAddShiftDialogOpen(false);
+      setNewShiftName("");
+      setNewShiftStartTime("09:00");
+      setNewShiftEndTime("17:00");
 
+      toast.success("Shift template saved");
     } catch (err: any) {
-
       console.error(err);
-
-      toast.error(
-        err.message || "Failed to create shift"
-      );
+      toast.error(err.message || "Failed to create shift");
     }
   };
 
   const handleRemoveShift = async (id: number) => {
-
     const shiftToDelete = shiftTimings.find(
-      (shift) => getShiftId(shift) === id
+      (shift) => getShiftId(shift) === id,
     );
 
     if (!shiftToDelete) {
@@ -333,11 +356,10 @@ export function CompanySettings() {
       return;
     }
 
-    const shiftName =
-      shiftToDelete.shift_name || "Unnamed Shift";
+    const shiftName = shiftToDelete.shift_name || "Unnamed Shift";
 
     const confirmed = window.confirm(
-      `Are you sure you want to delete shift "${shiftName}"?\n\nThis will deactivate the shift template but preserve historical schedules.`
+      `Are you sure you want to delete shift "${shiftName}"?\n\nThis will deactivate the shift template but preserve historical schedules.`,
     );
 
     if (!confirmed) {
@@ -345,68 +367,46 @@ export function CompanySettings() {
     }
 
     try {
-
       // -----------------------------
       // DETERMINE IF SHIFT EXISTS IN DB
       // -----------------------------
-      const isPersisted =
-        shiftToDelete.shift_template_id !== undefined;
+      const isPersisted = shiftToDelete.shift_template_id !== undefined;
 
       // -----------------------------
       // DATABASE DELETE
       // -----------------------------
       if (isPersisted) {
-
         const response = await fetch(
           `https://thesisprogram-production.up.railway.app/shift-templates/${id}`,
           {
             method: "DELETE",
-          }
+          },
         );
 
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data.detail || "Failed to delete shift"
-          );
+          throw new Error(data.detail || "Failed to delete shift");
         }
       }
 
       // -----------------------------
       // REMOVE FROM FRONTEND STATE
       // -----------------------------
-      setShiftTimings((prev) =>
-        prev.filter(
-          (shift) =>
-            getShiftId(shift) !== id
-        )
-      );
+      await fetchShiftTemplates();
 
-      toast.success(
-        `Shift "${shiftName}" deleted`
-      );
-
+      toast.success(`Shift "${shiftName}" deleted`);
     } catch (err: any) {
-
       console.error(err);
 
-      toast.error(
-        err.message || "Failed to remove shift"
-      );
+      toast.error(err.message || "Failed to remove shift");
     }
   };
 
-  const handleUpdateShift = (
-    id: number,
-    field: string,
-    value: string,
-  ) => {
+  const handleUpdateShift = (id: number, field: string, value: string) => {
     setShiftTimings((prev) =>
       prev.map((shift) =>
-        getShiftId(shift) === id
-          ? { ...shift, [field]: value }
-          : shift,
+        getShiftId(shift) === id ? { ...shift, [field]: value } : shift,
       ),
     );
   };
@@ -471,7 +471,6 @@ export function CompanySettings() {
       }
 
       for (const shift of shiftTimings) {
-
         const shiftId = getShiftId(shift);
 
         // skip invalid shifts
@@ -499,11 +498,14 @@ export function CompanySettings() {
                   ? `${shift.end_time}:00`
                   : shift.end_time,
             }),
-          }
+          },
         );
       }
 
+      await fetchShiftTemplates();
+
       toast.success("Company settings saved successfully");
+
     } catch (err) {
       console.error(err);
       toast.error("Failed to save settings");
@@ -698,6 +700,61 @@ export function CompanySettings() {
           </CardContent>
         </Card>
       )}
+      <Dialog open={isAddShiftDialogOpen} onOpenChange={setIsAddShiftDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Shift Template</DialogTitle>
+            <DialogDescription>
+              Add a new shift or restore a previously deleted shift using the same name.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newShiftName">Shift Name</Label>
+              <Input
+                id="newShiftName"
+                value={newShiftName}
+                onChange={(e) => setNewShiftName(e.target.value)}
+                placeholder="e.g., AM, PM, GY"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newShiftStartTime">Start Time</Label>
+              <Input
+                id="newShiftStartTime"
+                type="time"
+                value={newShiftStartTime}
+                onChange={(e) => setNewShiftStartTime(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newShiftEndTime">End Time</Label>
+              <Input
+                id="newShiftEndTime"
+                type="time"
+                value={newShiftEndTime}
+                onChange={(e) => setNewShiftEndTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddShiftDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+
+            <Button onClick={handleAddShift}>
+              Save Shift
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -917,7 +974,7 @@ export function CompanySettings() {
               </CardDescription>
             </div>
             <Button
-              onClick={handleAddShift}
+              onClick={() => setIsAddShiftDialogOpen(true)}
               variant="outline"
               size="sm"
               className="gap-2"
@@ -944,7 +1001,7 @@ export function CompanySettings() {
                         handleUpdateShift(
                           getShiftId(shift),
                           "shift_name",
-                          e.target.value
+                          e.target.value,
                         )
                       }
                       placeholder="e.g., AM, PM, GY"
@@ -963,13 +1020,15 @@ export function CompanySettings() {
                         handleUpdateShift(
                           getShiftId(shift),
                           "start_time",
-                          e.target.value
+                          e.target.value,
                         )
                       }
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`endTime-${String(getShiftId(shift))}`}>End Time</Label>
+                    <Label htmlFor={`endTime-${String(getShiftId(shift))}`}>
+                      End Time
+                    </Label>
                     <Input
                       id={`endTime-${String(getShiftId(shift))}`}
                       type="time"
@@ -978,7 +1037,7 @@ export function CompanySettings() {
                         handleUpdateShift(
                           getShiftId(shift),
                           "end_time",
-                          e.target.value
+                          e.target.value,
                         )
                       }
                     />
@@ -987,9 +1046,7 @@ export function CompanySettings() {
                     <Button
                       variant="destructive"
                       size="icon"
-                      onClick={() =>
-                        handleRemoveShift(getShiftId(shift))
-                      }
+                      onClick={() => handleRemoveShift(getShiftId(shift))}
                     >
                       <X className="size-4" />
                     </Button>

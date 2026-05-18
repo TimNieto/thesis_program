@@ -132,20 +132,89 @@ def create_shift_template(payload: dict):
                 detail="Start and end time cannot be identical"
             )
 
-        # CHECK DUPLICATE NAME
+        # CHECK EXISTING NAME, ACTIVE OR INACTIVE
         cursor.execute("""
-            SELECT shift_template_id
+            SELECT
+                shift_template_id,
+                is_active
             FROM shift_templates
             WHERE LOWER(shift_name) = LOWER(%s)
-            AND is_active = TRUE
         """, (shift_name,))
 
-        if cursor.fetchone():
+        existing_template = cursor.fetchone()
 
-            raise HTTPException(
-                status_code=400,
-                detail="Shift already exists"
-            )
+        if existing_template:
+
+            existing_id = existing_template[0]
+            existing_is_active = existing_template[1]
+
+            if existing_is_active:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Shift already exists"
+                )
+
+            # CHECK OVERLAPS EXCLUDING THIS INACTIVE TEMPLATE
+            cursor.execute("""
+                SELECT
+                    shift_name,
+                    start_time,
+                    end_time
+                FROM shift_templates
+                WHERE is_active = TRUE
+                AND shift_template_id != %s
+            """, (existing_id,))
+
+            existing_active_templates = cursor.fetchall()
+
+            for row in existing_active_templates:
+
+                existing_name = row[0]
+                existing_start = row[1]
+                existing_end = row[2]
+
+                if is_overlap(
+                    start_time_obj,
+                    end_time_obj,
+                    existing_start,
+                    existing_end
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Overlaps with {existing_name}"
+                    )
+
+            # RESTORE SOFT-DELETED TEMPLATE
+            cursor.execute("""
+                UPDATE shift_templates
+                SET
+                    start_time = %s,
+                    end_time = %s,
+                    is_active = TRUE,
+                    updated_at = NOW()
+                WHERE shift_template_id = %s
+                RETURNING
+                    shift_template_id,
+                    shift_name,
+                    start_time,
+                    end_time
+            """, (
+                start_time_obj,
+                end_time_obj,
+                existing_id
+            ))
+
+            restored = cursor.fetchone()
+
+            conn.commit()
+
+            return {
+                "shift_template_id": restored[0],
+                "shift_name": restored[1],
+                "start_time": str(restored[2]),
+                "end_time": str(restored[3])
+            }
 
         # CHECK OVERLAPS
         cursor.execute("""
@@ -251,23 +320,35 @@ def update_shift_template(
                 detail="Start and end time cannot be identical"
             )
 
-        # DUPLICATE NAME CHECK
+        # DUPLICATE NAME CHECK - ACTIVE OR INACTIVE
         cursor.execute("""
-            SELECT shift_template_id
+            SELECT
+                shift_template_id,
+                is_active
             FROM shift_templates
             WHERE LOWER(shift_name) = LOWER(%s)
             AND shift_template_id != %s
-            AND is_active = TRUE
         """, (
             shift_name,
             shift_template_id
         ))
 
-        if cursor.fetchone():
+        existing_name = cursor.fetchone()
+
+        if existing_name:
+
+            existing_id = existing_name[0]
+            existing_is_active = existing_name[1]
+
+            if existing_is_active:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Shift already exists"
+                )
 
             raise HTTPException(
                 status_code=400,
-                detail="Shift already exists"
+                detail="A deleted shift with this name already exists. Add it again using Add Shift instead."
             )
 
         # OVERLAP CHECK
@@ -337,11 +418,8 @@ def delete_shift_template(shift_template_id: int):
 
     try:
 
-        # --------------------------------
-        # GET TEMPLATE INFO
-        # --------------------------------
         cursor.execute("""
-            SELECT shift_name
+            SELECT shift_template_id
             FROM shift_templates
             WHERE shift_template_id = %s
         """, (shift_template_id,))
@@ -354,33 +432,11 @@ def delete_shift_template(shift_template_id: int):
                 detail="Shift template not found"
             )
 
-        shift_name = row[0]
-
-        # --------------------------------
-        # BLOCK DELETE IF ACTIVE SCHEDULES EXIST
-        # --------------------------------
-        cursor.execute("""
-            SELECT gs.schedule_id
-            FROM generated_schedule gs
-            JOIN shifts s
-                ON gs.shift_id = s.shift_id
-            WHERE s.shift_template_id = %s
-            AND gs.is_archived = FALSE
-            LIMIT 1
-        """, (shift_template_id,))
-
-        active_schedule = cursor.fetchone()
-
-        if active_schedule:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot delete shift template used in active schedules"
-            )
-
-        # SOFT DELETE TEMPLATE
         cursor.execute("""
             UPDATE shift_templates
-            SET is_active = FALSE
+            SET
+                is_active = FALSE,
+                updated_at = NOW()
             WHERE shift_template_id = %s
         """, (shift_template_id,))
 
