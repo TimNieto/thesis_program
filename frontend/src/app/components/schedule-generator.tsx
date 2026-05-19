@@ -538,7 +538,6 @@ export function ScheduleGenerator({
         throw new Error(err);
       }
 
-      setScheduleMode("saved");
       toast.success("Schedule saved");
     } catch (err) {
       console.error(err);
@@ -608,57 +607,35 @@ export function ScheduleGenerator({
     );
   };
 
-  const getRoleRowsForShift = (livestream: string, shiftName: string) => {
-    if (scheduleMode === "preview") {
-      const shiftTemplate = shiftTemplates.find(
-        (s) => s.shift_name === shiftName,
-      );
+  const getRoleRowsForShift = (
+    livestream: string,
+    shiftName: string,
+  ) => {
+    const shiftTemplate = shiftTemplates.find(
+      (s) => s.shift_name === shiftName,
+    );
 
-      if (!shiftTemplate) return [];
+    if (!shiftTemplate) return [];
 
-      const shiftTemplateId = Number(shiftTemplate.shift_template_id);
+    const shiftTemplateId = Number(
+      shiftTemplate.shift_template_id,
+    );
 
-      return staffingRequirements
-        .filter(
-          (req) =>
-            Number(req.shift_template_id) === shiftTemplateId &&
-            Number(req.required_count) > 0,
-        )
-        .flatMap((req) =>
-          Array.from({ length: Number(req.required_count) }, (_, index) => ({
+    return staffingRequirements
+      .filter(
+        (req) =>
+          Number(req.shift_template_id) === shiftTemplateId &&
+          Number(req.required_count) > 0,
+      )
+      .flatMap((req) =>
+        Array.from(
+          { length: Number(req.required_count) },
+          (_, index) => ({
             roleKey: req.role_key,
             slotIndex: index,
-          })),
-        );
-    }
-
-    const roleMaxCounts: Record<string, number> = {};
-
-    DAYS.forEach((day) => {
-      const roleCounts: Record<string, number> = {};
-
-      assignments
-        .filter(
-          (a) =>
-            a.livestream === livestream &&
-            a.day === day &&
-            a.shift === shiftName,
-        )
-        .forEach((a) => {
-          roleCounts[a.role] = (roleCounts[a.role] || 0) + 1;
-        });
-
-      Object.entries(roleCounts).forEach(([roleKey, count]) => {
-        roleMaxCounts[roleKey] = Math.max(roleMaxCounts[roleKey] || 0, count);
-      });
-    });
-
-    return Object.entries(roleMaxCounts).flatMap(([roleKey, count]) =>
-      Array.from({ length: count }, (_, index) => ({
-        roleKey,
-        slotIndex: index,
-      })),
-    );
+          }),
+        ),
+      );
   };
 
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
