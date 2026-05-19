@@ -869,12 +869,16 @@ export function ScheduleGenerator({
                                   </td>
 
                                   {DAYS.map((day) => {
-                                    const cellAssignment = getAssignments(
+                                    const roleAssignments = getAssignments(
                                       livestream,
                                       day,
                                       shift.shift_name,
                                       roleKey,
-                                    )[slotIndex];
+                                    );
+
+                                    const cellAssignment = roleAssignments.find(
+                                      (a) => (a.slot_index ?? 0) === slotIndex,
+                                    );
 
                                     const isClickable = role === "admin";
 
