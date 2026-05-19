@@ -496,6 +496,11 @@ export function ScheduleGenerator({
   };
 
   const saveSchedule = async () => {
+
+    if (scheduleMode !== "preview") {
+      toast.error("Generate a new schedule first before saving changes");
+      return;
+    }
     try {
       const payload = assignments
         .filter((a) => a.shift_id && a.employee_id)
@@ -679,8 +684,11 @@ export function ScheduleGenerator({
               <Button onClick={generateSchedule} className="gap-2">
                 Generate Schedule
               </Button>
-
-              <Button onClick={saveSchedule} variant="secondary">
+              <Button
+                onClick={saveSchedule}
+                variant="secondary"
+                disabled={scheduleMode !== "preview"}
+              >
                 Save Changes
               </Button>
             </>
