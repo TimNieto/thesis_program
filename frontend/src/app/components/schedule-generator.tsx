@@ -219,55 +219,55 @@ export function ScheduleGenerator({
     fetchStaffingRequirements();
   }, []);
 
-  useEffect(() => {
-    const loadSchedule = async () => {
-      try {
-        const res = await fetch(
-          "https://thesisprogram-production.up.railway.app/generated-schedule",
-        );
-        const data = await res.json();
+  const loadSchedule = async () => {
+    try {
+      const res = await fetch(
+        "https://thesisprogram-production.up.railway.app/generated-schedule",
+      );
 
-        setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
+      const data = await res.json();
 
-        if (!data.grouped_schedule) return;
+      setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
 
-        setGroupedSchedule(data.grouped_schedule);
-        setLivestreams(Object.keys(data.grouped_schedule));
+      if (!data.grouped_schedule) return;
 
-        const transformed: ShiftAssignment[] = [];
+      setGroupedSchedule(data.grouped_schedule);
+      setLivestreams(Object.keys(data.grouped_schedule));
 
-        Object.entries(data.grouped_schedule).forEach(
-          ([livestream, days]: any) => {
-            Object.entries(days).forEach(([day, shifts]: any) => {
-              Object.entries(shifts).forEach(([shift, roles]: any) => {
-                Object.entries(roles).forEach(([roleKey, employees]: any) => {
-                  (employees || []).forEach((emp: any) => {
-                    transformed.push({
-                      id: `${livestream}-${day}-${shift}-${roleKey}-${emp.employee_id}`,
-                      schedule_id: emp.schedule_id,
-                      shift_id: emp.shift_id,
-                      employee_id: emp.employee_id,
-                      livestream,
-                      day,
-                      shift,
-                      role: roleKey,
-                      employee: emp.employee_name,
-                    });
+      const transformed: ShiftAssignment[] = [];
+
+      Object.entries(data.grouped_schedule).forEach(
+        ([livestream, days]: any) => {
+          Object.entries(days).forEach(([day, shifts]: any) => {
+            Object.entries(shifts).forEach(([shift, roles]: any) => {
+              Object.entries(roles).forEach(([roleKey, employees]: any) => {
+                (employees || []).forEach((emp: any) => {
+                  transformed.push({
+                    id: `${livestream}-${day}-${shift}-${roleKey}-${emp.schedule_id || emp.employee_id}`,
+                    schedule_id: emp.schedule_id,
+                    shift_id: emp.shift_id,
+                    employee_id: emp.employee_id,
+                    livestream,
+                    day,
+                    shift,
+                    role: roleKey,
+                    employee: emp.employee_name,
                   });
                 });
               });
             });
-          },
-        );
+          });
+        },
+      );
 
-        setAssignments(transformed);
-        setScheduleMode("saved");
+      setAssignments(transformed);
+      setScheduleMode("saved");
+    } catch (err) {
+      console.error("Failed to load schedule", err);
+    }
+  };
 
-      } catch (err) {
-        console.error("Failed to load schedule", err);
-      }
-    };
-
+  useEffect(() => {
     loadSchedule();
   }, []);
 
@@ -538,6 +538,7 @@ export function ScheduleGenerator({
         throw new Error(err);
       }
 
+      await loadSchedule();
       toast.success("Schedule saved");
     } catch (err) {
       console.error(err);
@@ -585,56 +586,26 @@ export function ScheduleGenerator({
   };
 
   const getRoleRowsForShift = (livestream: string, shiftName: string) => {
-    if (scheduleMode === "preview") {
-      const shiftTemplate = shiftTemplates.find(
-        (s) => s.shift_name === shiftName
-      );
-
-      if (!shiftTemplate) return [];
-
-      const shiftTemplateId = Number(shiftTemplate.shift_template_id);
-
-      return staffingRequirements
-        .filter(
-          (req) =>
-            Number(req.shift_template_id) === shiftTemplateId &&
-            Number(req.required_count) > 0
-        )
-        .flatMap((req) =>
-          Array.from({ length: Number(req.required_count) }, (_, index) => ({
-            roleKey: req.role_key,
-            slotIndex: index,
-          }))
-        );
-    }
-
-    const roleMaxCounts: Record<string, number> = {};
-
-    DAYS.forEach((day) => {
-      const roleCounts: Record<string, number> = {};
-
-      assignments
-        .filter(
-          (a) =>
-            a.livestream === livestream &&
-            a.day === day &&
-            a.shift === shiftName
-        )
-        .forEach((a) => {
-          roleCounts[a.role] = (roleCounts[a.role] || 0) + 1;
-        });
-
-      Object.entries(roleCounts).forEach(([roleKey, count]) => {
-        roleMaxCounts[roleKey] = Math.max(roleMaxCounts[roleKey] || 0, count);
-      });
-    });
-
-    return Object.entries(roleMaxCounts).flatMap(([roleKey, count]) =>
-      Array.from({ length: count }, (_, index) => ({
-        roleKey,
-        slotIndex: index,
-      }))
+    const shiftTemplate = shiftTemplates.find(
+      (s) => s.shift_name === shiftName,
     );
+
+    if (!shiftTemplate) return [];
+
+    const shiftTemplateId = Number(shiftTemplate.shift_template_id);
+
+    return staffingRequirements
+      .filter(
+        (req) =>
+          Number(req.shift_template_id) === shiftTemplateId &&
+          Number(req.required_count) > 0,
+      )
+      .flatMap((req) =>
+        Array.from({ length: Number(req.required_count) }, (_, index) => ({
+          roleKey: req.role_key,
+          slotIndex: index,
+        })),
+      );
   };
 
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
