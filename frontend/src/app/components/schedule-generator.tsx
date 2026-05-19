@@ -46,6 +46,7 @@ interface ShiftAssignment {
   shift: string;
   role: string;
   employee: string;
+  slot_index?: number;
 }
 
 interface LeaveRequest {
@@ -241,7 +242,7 @@ export function ScheduleGenerator({
           Object.entries(days).forEach(([day, shifts]: any) => {
             Object.entries(shifts).forEach(([shift, roles]: any) => {
               Object.entries(roles).forEach(([roleKey, employees]: any) => {
-                (employees || []).forEach((emp: any) => {
+                (employees || []).forEach((emp: any, index: number) => {
                   transformed.push({
                     id: `${livestream}-${day}-${shift}-${roleKey}-${emp.schedule_id || emp.employee_id}`,
                     schedule_id: emp.schedule_id,
@@ -252,6 +253,7 @@ export function ScheduleGenerator({
                     shift,
                     role: roleKey,
                     employee: emp.employee_name,
+                    slot_index: emp.slot_index ?? index,
                   });
                 });
               });
@@ -463,7 +465,7 @@ export function ScheduleGenerator({
             const shiftData = shifts[shift.shift_name] || {};
 
             Object.entries(shiftData).forEach(([roleKey, employees]: any) => {
-              (employees || []).forEach((emp: any) => {
+              (employees || []).forEach((emp: any, index: number) => {
                 transformed.push({
                   id: String(idCounter++),
                   shift_id: emp.shift_id,
@@ -474,6 +476,7 @@ export function ScheduleGenerator({
                   shift: shift.shift_name,
                   role: roleKey,
                   employee: emp.employee_name,
+                  slot_index: emp.slot_index ?? index,
                 });
               });
             });
@@ -519,6 +522,8 @@ export function ScheduleGenerator({
             shift_type: a.shift,
 
             account: a.livestream,
+            
+            slot_index: a.slot_index ?? 0,
           };
         });
 

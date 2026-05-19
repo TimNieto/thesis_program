@@ -868,13 +868,15 @@ def save_schedule(assignments: List[dict] = Body(...)):
                 INSERT INTO generated_schedule (
                     shift_id,
                     employee_id,
-                    role
+                    role,
+                    slot_index
                 )
-                VALUES (%s, %s, %s)
+                VALUES (%s, %s, %s, %s)
             """, (
                 a["shift_id"],
                 a["employee_id"],
-                a["role"]
+                a["role"],
+                a.get("slot_index", 0)
             ))
 
         conn.commit()

@@ -362,11 +362,19 @@ def group_schedule(assignments, active_roles):
             "schedule_id": a.get("schedule_id"),
             "shift_id": a.get("shift_id"),
             "employee_id": a["employee_id"],
-            "employee_name": a["employee_name"]
+            "employee_name": a["employee_name"],
+            "slot_index": a.get("slot_index", 0)
         })
 
     result = to_dict(schedule)
 
+    for account in result:
+        for day in result[account]:
+            for shift in result[account][day]:
+                for role in result[account][day][shift]:
+                    result[account][day][shift][role].sort(
+                        key=lambda emp: emp.get("slot_index", 0)
+                    )
     for account in result:
         for day in result[account]:
             for shift in result[account][day]:
@@ -542,7 +550,8 @@ def get_generated_schedule():
                 e.employee_id,
                 e.full_name,
 
-                g.role
+                g.role,
+                g.slot_index
 
             FROM generated_schedule g
 
@@ -559,7 +568,9 @@ def get_generated_schedule():
 
             ORDER BY
                 s.shift_date,
-                st.start_time
+                st.start_time,
+                g.role,
+                g.slot_index
         """)
 
         rows = cursor.fetchall()
@@ -573,7 +584,8 @@ def get_generated_schedule():
                 "shift_type": r[4],
                 "employee_id": r[5],
                 "employee_name": r[6],
-                "role": r[7]
+                "role": r[7],
+                "slot_index": r[8]
             }
             for r in rows
         ]
