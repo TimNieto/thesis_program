@@ -636,7 +636,7 @@ export function ScheduleGenerator({
           .forEach((a) => {
             roleCounts[a.role] = Math.max(
               roleCounts[a.role] || 0,
-              getAssignments(livestream, day, shiftName, a.role).length,
+              (a.slot_index ?? 0) + 1,
             );
           });
       });

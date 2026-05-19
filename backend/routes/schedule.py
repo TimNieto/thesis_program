@@ -840,49 +840,75 @@ def save_schedule(assignments: List[dict] = Body(...)):
     cursor = conn.cursor()
 
     try:
-        # ARCHIVE OLD WORKFLOW DATA
-        cursor.execute("""
-            UPDATE emergency_cover_targets
-            SET is_archived = TRUE
-        """)
+        cursor.execute("UPDATE emergency_cover_targets SET is_archived = TRUE")
+        cursor.execute("UPDATE shift_applications SET is_archived = TRUE")
+        cursor.execute("UPDATE coverage_requests SET is_archived = TRUE")
+        cursor.execute("UPDATE generated_schedule SET is_archived = TRUE")
 
         cursor.execute("""
-            UPDATE shift_applications
-            SET is_archived = TRUE
+            SELECT
+                s.shift_id,
+                sr.role_key,
+                ssr.required_count
+            FROM shifts s
+            JOIN shift_staffing_requirements ssr
+                ON s.shift_template_id = ssr.shift_template_id
+            JOIN staffing_roles sr
+                ON ssr.staffing_role_id = sr.staffing_role_id
+            WHERE ssr.is_active = TRUE
+            AND sr.is_active = TRUE
         """)
 
-        cursor.execute("""
-            UPDATE coverage_requests
-            SET is_archived = TRUE
-        """)
+        allowed_counts = {
+            (r[0], r[1]): r[2]
+            for r in cursor.fetchall()
+        }
 
-        # REMOVE OLD GENERATED SCHEDULE
-
-        cursor.execute("""
-            UPDATE generated_schedule
-            SET is_archived = TRUE
-        """)
+        grouped = {}
 
         for a in assignments:
-            cursor.execute("""
-                INSERT INTO generated_schedule (
+            shift_id = a["shift_id"]
+            role = a["role"].lower().replace(" ", "_")
+
+            key = (shift_id, role)
+
+            if key not in grouped:
+                grouped[key] = []
+
+            grouped[key].append(a)
+
+        for key, items in grouped.items():
+            shift_id, role = key
+            required_count = allowed_counts.get(key, 0)
+
+            if required_count <= 0:
+                continue
+
+            items = sorted(
+                items,
+                key=lambda x: x.get("slot_index", 0)
+            )
+
+            for slot_index, a in enumerate(items[:required_count]):
+                cursor.execute("""
+                    INSERT INTO generated_schedule (
+                        shift_id,
+                        employee_id,
+                        role,
+                        slot_index
+                    )
+                    VALUES (%s, %s, %s, %s)
+                """, (
                     shift_id,
-                    employee_id,
+                    a["employee_id"],
                     role,
                     slot_index
-                )
-                VALUES (%s, %s, %s, %s)
-            """, (
-                a["shift_id"],
-                a["employee_id"],
-                a["role"],
-                a.get("slot_index", 0)
-            ))
+                ))
 
         conn.commit()
 
         return {"message": "Schedule saved"}
-    
+
     except Exception as e:
         conn.rollback()
         print("SAVE SCHEDULE ERROR:", e)
