@@ -394,6 +394,12 @@ def assign_employee(employee, shift, role, context):
     else:
         relaxation_level = "strict"
         
+    slot_index = len([
+        a for a in context["assignments"]
+        if a["shift_id"] == shift["shift_id"]
+        and a["role"] == role
+    ])
+
     assignment = {
         "shift_id": shift["shift_id"],
         "shift_date": shift["shift_date"],
@@ -402,6 +408,7 @@ def assign_employee(employee, shift, role, context):
         "employee_id": employee["employee_id"],
         "employee_name": employee["full_name"],
         "role": role,
+        "slot_index": slot_index,
         "relaxation_level": relaxation_level
     }
 

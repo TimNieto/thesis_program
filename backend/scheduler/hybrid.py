@@ -178,7 +178,7 @@ def replay_assignment(context, assignment):
     context["context_assignments_by_employee"][emp_id].append(assignment)
 
 
-def make_assignment(employee, shift, role):
+def make_assignment(employee, shift, role, slot_index=0):
     return {
         "shift_id": shift["shift_id"],
         "shift_date": shift["shift_date"],
@@ -187,6 +187,7 @@ def make_assignment(employee, shift, role):
         "employee_id": employee["employee_id"],
         "employee_name": employee["full_name"],
         "role": role,
+        "slot_index": slot_index,
         "relaxation_level": "ga_optimized"
     }
 
@@ -264,7 +265,8 @@ def mutate_schedule(
         temp_assignment = make_assignment(
             e,
             shift,
-            role
+            role,
+            target.get("slot_index", 0)
         )
 
         print(
@@ -310,7 +312,8 @@ def mutate_schedule(
     new_assignment = make_assignment(
         selected,
         shift,
-        role
+        role,
+        target.get("slot_index", 0)
     )
 
     child["assignments"] = remaining_assignments + [new_assignment]

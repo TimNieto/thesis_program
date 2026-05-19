@@ -358,12 +358,17 @@ def group_schedule(assignments, active_roles):
         if role not in schedule[account][day][shift]:
             schedule[account][day][shift][role] = []
 
+        slot_index = a.get("slot_index")
+
+        if slot_index is None:
+            slot_index = len(schedule[account][day][shift][role])
+
         schedule[account][day][shift][role].append({
             "schedule_id": a.get("schedule_id"),
             "shift_id": a.get("shift_id"),
             "employee_id": a["employee_id"],
             "employee_name": a["employee_name"],
-            "slot_index": a.get("slot_index", 0)
+            "slot_index": slot_index
         })
 
     result = to_dict(schedule)
