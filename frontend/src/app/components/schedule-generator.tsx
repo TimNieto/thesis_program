@@ -613,57 +613,57 @@ export function ScheduleGenerator({
     );
   };
 
-  const getRoleRowsForShift = (livestream: string, shiftName: string) => {
-    if (scheduleMode === "preview") {
-      const shiftTemplate = shiftTemplates.find(
-        (s) => s.shift_name === shiftName,
-      );
-
-      if (!shiftTemplate) return [];
-
-      const shiftTemplateId = Number(shiftTemplate.shift_template_id);
-
-      return staffingRequirements
-        .filter(
-          (req) =>
-            Number(req.shift_template_id) === shiftTemplateId &&
-            Number(req.required_count) > 0,
-        )
-        .flatMap((req) =>
-          Array.from({ length: Number(req.required_count) }, (_, index) => ({
-            roleKey: req.role_key,
-            slotIndex: index,
-          })),
-        );
-    }
-
-    const roleMaxCounts: Record<string, number> = {};
-
-    DAYS.forEach((day) => {
+  const getRoleRowsForShift = (
+    livestream: string,
+    shiftName: string,
+  ) => {
+    if (scheduleMode === "saved") {
       const roleCounts: Record<string, number> = {};
 
-      assignments
-        .filter(
-          (a) =>
-            a.livestream === livestream &&
-            a.day === day &&
-            a.shift === shiftName,
-        )
-        .forEach((a) => {
-          roleCounts[a.role] = (roleCounts[a.role] || 0) + 1;
-        });
-
-      Object.entries(roleCounts).forEach(([roleKey, count]) => {
-        roleMaxCounts[roleKey] = Math.max(roleMaxCounts[roleKey] || 0, count);
+      DAYS.forEach((day) => {
+        assignments
+          .filter(
+            (a) =>
+              a.livestream === livestream &&
+              a.day === day &&
+              a.shift === shiftName,
+          )
+          .forEach((a) => {
+            roleCounts[a.role] = Math.max(
+              roleCounts[a.role] || 0,
+              getAssignments(livestream, day, shiftName, a.role).length,
+            );
+          });
       });
-    });
 
-    return Object.entries(roleMaxCounts).flatMap(([roleKey, count]) =>
-      Array.from({ length: count }, (_, index) => ({
-        roleKey,
-        slotIndex: index,
-      })),
+      return Object.entries(roleCounts).flatMap(([roleKey, count]) =>
+        Array.from({ length: count }, (_, index) => ({
+          roleKey,
+          slotIndex: index,
+        })),
+      );
+    }
+
+    const shiftTemplate = shiftTemplates.find(
+      (s) => s.shift_name === shiftName,
     );
+
+    if (!shiftTemplate) return [];
+
+    const shiftTemplateId = Number(shiftTemplate.shift_template_id);
+
+    return staffingRequirements
+      .filter(
+        (req) =>
+          Number(req.shift_template_id) === shiftTemplateId &&
+          Number(req.required_count) > 0,
+      )
+      .flatMap((req) =>
+        Array.from({ length: Number(req.required_count) }, (_, index) => ({
+          roleKey: req.role_key,
+          slotIndex: index,
+        })),
+      );
   };
 
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
