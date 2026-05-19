@@ -538,7 +538,7 @@ export function ScheduleGenerator({
         throw new Error(err);
       }
 
-      await loadSchedule();
+      setScheduleMode("saved");
       toast.success("Schedule saved");
     } catch (err) {
       console.error(err);
@@ -583,6 +583,29 @@ export function ScheduleGenerator({
       default:
         return "text-gray-700";
     }
+  };
+
+  const getVisibleShifts = (livestream: string) => {
+    if (scheduleMode === "preview") {
+      return shiftTemplates;
+    }
+
+    const savedShiftNames = Array.from(
+      new Set(
+        assignments
+          .filter((a) => a.livestream === livestream)
+          .map((a) => a.shift),
+      ),
+    );
+
+    return savedShiftNames.map(
+      (shiftName) =>
+        shiftTemplates.find((s) => s.shift_name === shiftName) || {
+          shift_name: shiftName,
+          start_time: "",
+          end_time: "",
+        },
+    );
   };
 
   const getRoleRowsForShift = (livestream: string, shiftName: string) => {
@@ -762,7 +785,7 @@ export function ScheduleGenerator({
                         </tr>
                       </thead>
                       <tbody>
-                        {shiftTemplates.map((shift) => {
+                        {getVisibleShifts(livestream).map((shift) => {
                           const roleRowsForShift = getRoleRowsForShift(livestream, shift.shift_name);
                           console.log(
                             "SHIFT DEBUG:",
