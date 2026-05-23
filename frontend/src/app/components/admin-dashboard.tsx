@@ -169,7 +169,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchEmployees = () => {
     setIsLoading(true);
 
-    fetch("https://thesisprogram-production.up.railway.app/employees")
+    fetch("https://backend-production-6e75.up.railway.app/employees")
       .then((res) => res.json())
       .then((data) => setEmployees(data))
       .catch(() => console.log("Failed to load employees"))
@@ -179,7 +179,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/shift-templates"
+        "https://backend-production-6e75.up.railway.app//shift-templates"
       );
 
       const data = await res.json();
@@ -193,7 +193,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchStaffingRequirements = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+        "https://backend-production-6e75.up.railway.app/staffing-requirements",
       );
 
       const data = await res.json();
@@ -221,7 +221,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/employees",
+        "https://backend-production-6e75.up.railway.app/employees",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -259,7 +259,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     if (!employeeToDelete) return;
 
     await fetch(
-      `https://thesisprogram-production.up.railway.app/employees/${employeeToDelete}`,
+      `https://backend-production-6e75.up.railway.app/employees/${employeeToDelete}`,
       {
         method: "DELETE",
       },
@@ -290,7 +290,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     role: "Host" | "Operator" | "Both" | "Team Leader",
   ) => {
     await fetch(
-      `https://thesisprogram-production.up.railway.app/employees/${id}/role`,
+      `https://backend-production-6e75.up.railway.app/employees/${id}/role`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -385,7 +385,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     // 🔥 STEP 2: send to backend FIRST
     try {
       await fetch(
-        "https://thesisprogram-production.up.railway.app/availability",
+        "https://backend-production-6e75.up.railway.app/availability",
         {
           method: "POST",
           headers: {
@@ -411,7 +411,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchAvailability = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/availability",
+        "https://backend-production-6e75.up.railway.app/availability",
       );
       const data = await res.json();
 

@@ -139,7 +139,7 @@ export function CompanySettings() {
   const fetchSettings = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/settings",
+        "https://backend-production-6e75.up.railway.app/settings",
       );
 
       const data = await res.json();
@@ -168,7 +168,7 @@ export function CompanySettings() {
   const fetchAccountSettings = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/account-settings",
+        "https://backend-production-6e75.up.railway.app/account-settings",
       );
 
       const data = await res.json();
@@ -182,7 +182,7 @@ export function CompanySettings() {
   const fetchAccounts = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/accounts",
+        "https://backend-production-6e75.up.railway.app/accounts",
       );
 
       const data = await res.json();
@@ -196,7 +196,7 @@ export function CompanySettings() {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/shift-templates",
+        "https://backend-production-6e75.up.railway.app/shift-templates",
       );
 
       const data = await res.json();
@@ -210,7 +210,7 @@ export function CompanySettings() {
   const fetchStaffingRequirements = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+        "https://backend-production-6e75.up.railway.app/staffing-requirements",
       );
 
       const data = await res.json();
@@ -241,7 +241,7 @@ export function CompanySettings() {
     }
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/accounts",
+        "https://backend-production-6e75.up.railway.app/accounts",
         {
           method: "POST",
 
@@ -304,7 +304,7 @@ export function CompanySettings() {
 
     try {
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/accounts/${encodeURIComponent(selectedDeleteAccount)}`,
+        `https://backend-production-6e75.up.railway.app/accounts/${encodeURIComponent(selectedDeleteAccount)}`,
         {
           method: "DELETE",
         },
@@ -668,7 +668,7 @@ export function CompanySettings() {
     
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/settings",
+        "https://backend-production-6e75.up.railway.app/settings",
         {
           method: "PUT",
           headers: {
@@ -702,7 +702,7 @@ export function CompanySettings() {
       // 1. DELETE shifts marked for removal
       for (const shiftId of pendingDeletedShiftIds) {
         const res = await fetch(
-          `https://thesisprogram-production.up.railway.app/shift-templates/${shiftId}`,
+          `https://backend-production-6e75.up.railway.app/shift-templates/${shiftId}`,
           {
             method: "DELETE",
           },
@@ -720,7 +720,7 @@ export function CompanySettings() {
       // 2. CREATE or RESTORE newly added shifts
       for (const shift of pendingNewShifts) {
         const res = await fetch(
-          "https://thesisprogram-production.up.railway.app/shift-templates",
+          "https://backend-production-6e75.up.railway.app/shift-templates",
           {
             method: "POST",
             headers: {
@@ -767,7 +767,7 @@ export function CompanySettings() {
         }
 
         const res = await fetch(
-          `https://thesisprogram-production.up.railway.app/shift-templates/${shiftId}`,
+          `https://backend-production-6e75.up.railway.app/shift-templates/${shiftId}`,
           {
             method: "PUT",
             headers: {
@@ -799,7 +799,7 @@ export function CompanySettings() {
 
       for (const role of newStaffingRoles) {
         const res = await fetch(
-          "https://thesisprogram-production.up.railway.app/staffing-roles",
+          "https://backend-production-6e75.up.railway.app/staffing-roles",
           {
             method: "POST",
             headers: {
@@ -821,7 +821,7 @@ export function CompanySettings() {
       // 5. DELETE staffing roles marked for removal
       for (const roleId of pendingDeletedRoleIds) {
         const res = await fetch(
-          `https://thesisprogram-production.up.railway.app/staffing-roles/${roleId}`,
+          `https://backend-production-6e75.up.railway.app/staffing-roles/${roleId}`,
           {
             method: "DELETE",
           },
@@ -836,7 +836,7 @@ export function CompanySettings() {
 
       // 6. RELOAD staffing roles after creates/deletes
       const staffingReloadRes = await fetch(
-        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+        "https://backend-production-6e75.up.railway.app/staffing-requirements",
       );
 
       const staffingReloadData = await staffingReloadRes.json();
@@ -880,7 +880,7 @@ export function CompanySettings() {
         );
 
       const staffingRes = await fetch(
-        "https://thesisprogram-production.up.railway.app/staffing-requirements",
+        "https://backend-production-6e75.up.railway.app/staffing-requirements",
         {
           method: "PUT",
           headers: {
@@ -922,7 +922,7 @@ export function CompanySettings() {
     try {
       for (const policy of accountPolicies) {
         await fetch(
-          `https://thesisprogram-production.up.railway.app/account-settings/${policy.account_setting_id}`,
+          `https://backend-production-6e75.up.railway.app/account-settings/${policy.account_setting_id}`,
           {
             method: "PUT",
 

@@ -97,7 +97,7 @@ export function ScheduleGenerator({
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/shift-templates"
+        "https://backend-production-6e75.up.railway.app/shift-templates"
       );
 
       const data = await res.json();
@@ -111,7 +111,7 @@ export function ScheduleGenerator({
   const fetchStaffingRequirements = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/staffing-requirements"
+        "https://backend-production-6e75.up.railway.app/staffing-requirements"
       );
 
       const data = await res.json();
@@ -223,7 +223,7 @@ export function ScheduleGenerator({
   const loadSchedule = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/generated-schedule",
+        "https://backend-production-6e75.up.railway.app/generated-schedule",
       );
 
       const data = await res.json();
@@ -283,7 +283,7 @@ export function ScheduleGenerator({
       const end = weekDates[6];
 
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/leaves-approved?start=${formatDate(start)}&end=${formatDate(end)}`,
+        `https://backend-production-6e75.up.railway.app/leaves-approved?start=${formatDate(start)}&end=${formatDate(end)}`,
       );
 
       const data = await res.json();
@@ -432,7 +432,7 @@ export function ScheduleGenerator({
   const generateSchedule = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/generate-schedule",
+        "https://backend-production-6e75.up.railway.app/generate-schedule",
       );
       const data = await res.json();
 
@@ -530,7 +530,7 @@ export function ScheduleGenerator({
       console.log(payload);
 
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/save-schedule",
+        "https://backend-production-6e75.up.railway.app/save-schedule",
         {
           method: "POST",
           headers: {

@@ -41,7 +41,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     // Mock authentication - in real app, this would validate against a backend
     try {
       const response = await fetch(
-        "https://thesisprogram-production.up.railway.app/login",
+        "https://backend-production-6e75.up.railway.app/login",
         {
           method: "POST",
           headers: {

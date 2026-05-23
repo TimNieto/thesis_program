@@ -145,7 +145,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchMyLeaves = async () => {
     try {
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/leaves/${currentUser.employee_id}`,
+        `https://backend-production-6e75.up.railway.app/leaves/${currentUser.employee_id}`,
       );
 
       const data = await res.json();
@@ -177,7 +177,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchAllLeaves = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/leaves",
+        "https://backend-production-6e75.up.railway.app/leaves",
       );
 
       const data = await res.json();
@@ -211,8 +211,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     try {
       const endpoint =
         role === "admin"
-          ? "https://thesisprogram-production.up.railway.app/coverage-requests-admin"
-          : `https://thesisprogram-production.up.railway.app/coverage-requests/${currentUser.employee_id}`;
+          ? "https://backend-production-6e75.up.railway.app/coverage-requests-admin"
+          : `https://backend-production-6e75.up.railway.app/coverage-requests/${currentUser.employee_id}`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -256,7 +256,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/shift-templates"
+        "https://backend-production-6e75.up.railway.app/shift-templates"
       );
 
       const data = await res.json();
@@ -270,7 +270,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchApplications = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/shift-applications",
+        "https://backend-production-6e75.up.railway.app/shift-applications",
       );
 
       const data = await res.json();
@@ -310,7 +310,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const fetchEmployees = () => {
-    fetch("https://thesisprogram-production.up.railway.app/employees")
+    fetch("https://backend-production-6e75.up.railway.app/employees")
       .then((res) => res.json())
       .then((data) => setEmployees(data))
       .catch(() => console.log("Failed to load employees"));
@@ -402,7 +402,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       const scheduleId = selectedShift.schedule_id;
 
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/request-cover/${scheduleId}`,
+        `https://backend-production-6e75.up.railway.app/request-cover/${scheduleId}`,
         {
           method: "POST",
           headers: {
@@ -451,7 +451,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/leaves",
+        "https://backend-production-6e75.up.railway.app/leaves",
         {
           method: "POST",
           headers: {
@@ -524,7 +524,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           : `/shift-applications/${id}/deny`;
 
       await fetch(
-        `https://thesisprogram-production.up.railway.app${endpoint}`,
+        `https://backend-production-6e75.up.railway.app${endpoint}`,
         {
           method: "POST",
         },
@@ -547,7 +547,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const applyForCover = async (id: string) => {
     try {
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/coverage-requests/${id}/apply`,
+        `https://backend-production-6e75.up.railway.app/coverage-requests/${id}/apply`,
         {
           method: "POST",
 
@@ -581,7 +581,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   ) => {
     try {
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/leaves/${requestId}`,
+        `https://backend-production-6e75.up.railway.app/leaves/${requestId}`,
         {
           method: "PATCH",
           headers: {
@@ -651,7 +651,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchMyShifts = async () => {
     try {
       const res = await fetch(
-        "https://thesisprogram-production.up.railway.app/generated-schedule",
+        "https://backend-production-6e75.up.railway.app/generated-schedule",
       );
       const data = await res.json();
 

@@ -40,7 +40,7 @@ export function EmployeeProfile({
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    fetch(`https://thesisprogram-production.up.railway.app/employees/${userId}`)
+    fetch(`https://backend-production-6e75.up.railway.app/employees/${userId}`)
       .then((res) => res.json())
       .then((data) => {
         setName(data.name || "");
@@ -66,7 +66,7 @@ export function EmployeeProfile({
 
     try {
       const response = await fetch(
-        `https://thesisprogram-production.up.railway.app/employees/${userId}`,
+        `https://backend-production-6e75.up.railway.app/employees/${userId}`,
         {
           method: "PUT",
           headers: {
@@ -118,7 +118,7 @@ export function EmployeeProfile({
 
     try {
       const res = await fetch(
-        `https://thesisprogram-production.up.railway.app/change-password`,
+        `https://backend-production-6e75.up.railway.app/change-password`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

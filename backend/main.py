@@ -19,7 +19,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://frontend-production-9997.up.railway.app",
+        "https://visioncore.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
