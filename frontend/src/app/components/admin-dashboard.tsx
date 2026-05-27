@@ -269,6 +269,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       return;
     }
 
+    if (!newEmployeeContactNumber.trim()) {
+      toast.error("Contact number is required");
+      return;
+    }
+
     if (newEmployeeRole === "Host" && hostAccounts.length === 0) {
       toast.error("Host account is required for Host role");
       return;
@@ -1116,7 +1121,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="employeeContactNumber">
-                Contact Number (Optional)
+                Contact Number
               </Label>
               <Input
                 id="employeeContactNumber"

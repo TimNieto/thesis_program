@@ -165,7 +165,13 @@ def add_employee(data: dict):
                 status_code=400,
                 detail="Valid email is required"
             )
-
+        
+        if not contact_number:
+            raise HTTPException(
+                status_code=400,
+                detail="Contact number is required"
+            )
+        
         if role not in [
             "Host",
             "Operator",
