@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
+import { Checkbox } from "@/app/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -124,7 +125,6 @@ const DAYS = [
 ];
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
-
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
@@ -145,6 +145,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newEmployeeRole, setNewEmployeeRole] = useState<
     "Host" | "Operator" | "Both" | "Team Leader"
   >("Host");
+
+  const [newEmployeeNickname, setNewEmployeeNickname] = useState("");
+  const [hostAccounts, setHostAccounts] = useState<string[]>([]);
+  const [operatorAccounts, setOperatorAccounts] = useState<string[]>([]);
+
+  const [accounts, setAccounts] = useState<any[]>([]);
 
   // Override Dialog States
   const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
@@ -179,7 +185,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app//shift-templates"
+        "https://backend-production-6e75.up.railway.app//shift-templates",
       );
 
       const data = await res.json();
@@ -204,18 +210,80 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/accounts",
+      );
+
+      const data = await res.json();
+
+      setAccounts(data);
+    } catch (err) {
+      console.error("Failed to load accounts", err);
+    }
+  };
+
   useEffect(() => {
     if (currentUser.role.toLowerCase() === "admin") {
       fetchEmployees();
       fetchShiftTemplates();
       fetchStaffingRequirements();
+      fetchAccounts();
     }
   }, [currentUser.role]);
 
+  const toggleAccountSelection = (
+    accountName: string,
+    selectedAccounts: string[],
+    setSelectedAccounts: React.Dispatch<React.SetStateAction<string[]>>,
+  ) => {
+    if (accountName === "none") {
+      setSelectedAccounts([]);
+      return;
+    }
+
+    setSelectedAccounts((prev) => {
+      if (prev.includes(accountName)) {
+        return prev.filter((item) => item !== accountName);
+      }
+
+      return [...prev, accountName];
+    });
+  };
+
   // Add Employee
   const handleAddEmployee = async () => {
-    if (!newEmployeeName || !newEmployeeEmail.includes("@")) {
+    if (!newEmployeeName.trim()) {
+      toast.error("Employee name is required");
+      return;
+    }
+
+    if (!newEmployeeNickname.trim()) {
+      toast.error("Nickname is required");
+      return;
+    }
+
+    if (!newEmployeeEmail.includes("@")) {
       toast.error("Valid email required");
+      return;
+    }
+
+    if (newEmployeeRole === "Host" && hostAccounts.length === 0) {
+      toast.error("Host account is required for Host role");
+      return;
+    }
+
+    if (newEmployeeRole === "Operator" && operatorAccounts.length === 0) {
+      toast.error("Operator account is required for Operator role");
+      return;
+    }
+
+    if (
+      newEmployeeRole === "Both" &&
+      (hostAccounts.length === 0 || operatorAccounts.length === 0)
+    ) {
+      toast.error("Both role requires host and operator accounts");
       return;
     }
 
@@ -227,9 +295,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: newEmployeeName,
+            nickname: newEmployeeNickname,
             email: newEmployeeEmail,
             contactNumber: newEmployeeContactNumber,
             role: newEmployeeRole,
+            host_accounts: hostAccounts.length > 0 ? hostAccounts : null,
+            operator_accounts:
+              operatorAccounts.length > 0 ? operatorAccounts : null,
           }),
         },
       );
@@ -243,9 +315,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       setIsAddEmployeeOpen(false);
 
       setNewEmployeeName("");
+      setNewEmployeeNickname("");
       setNewEmployeeEmail("");
       setNewEmployeeContactNumber("");
       setNewEmployeeRole("Host");
+      setHostAccounts([]);
+      setOperatorAccounts([]);
 
       toast.success("Employee added");
     } catch (err) {
@@ -462,7 +537,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
   const totalAssignments = assignments.length;
   const totalSlots = DAYS.length * shiftTemplates.length * staffingRoles.length;
-  
+
   const getRequestTypeColor = (type: string) => {
     const colors = {
       application: "bg-blue-100 text-blue-700",
@@ -497,9 +572,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   const getShiftInfo = (code: string) => {
-    return shiftTemplates.find(
-      (s) => s.shift_name === code
-    );
+    return shiftTemplates.find((s) => s.shift_name === code);
   };
 
   if (currentUser.role.toLowerCase() !== "admin") {
@@ -1013,6 +1086,21 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="employeeNickname">Nickname</Label>
+              <Input
+                id="employeeNickname"
+                placeholder="Enter nickname"
+                value={newEmployeeNickname}
+                onChange={(e) => setNewEmployeeNickname(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleAddEmployee();
+                  }
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="employeeEmail">Email</Label>
               <Input
                 id="employeeEmail"
@@ -1043,7 +1131,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="employeeRole">Role</Label>
+              <Label htmlFor="employeeRole">Main Role</Label>
+
               <Select
                 value={newEmployeeRole}
                 onValueChange={(value) =>
@@ -1055,13 +1144,97 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <SelectTrigger id="employeeRole">
                   <SelectValue />
                 </SelectTrigger>
+
                 <SelectContent>
                   <SelectItem value="Team Leader">Team Leader</SelectItem>
+
                   <SelectItem value="Host">Host</SelectItem>
+
                   <SelectItem value="Operator">Operator</SelectItem>
+
                   <SelectItem value="Both">Both</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* HOST ACCOUNTS */}
+
+            <div className="space-y-2">
+              <Label>Host Accounts</Label>
+
+              <div className="border rounded-md p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={hostAccounts.length === 0}
+                    onCheckedChange={() =>
+                      toggleAccountSelection(
+                        "none",
+                        hostAccounts,
+                        setHostAccounts,
+                      )
+                    }
+                  />
+
+                  <span>None</span>
+                </div>
+
+                {accounts.map((account) => (
+                  <div key={account.id} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={hostAccounts.includes(account.name)}
+                      onCheckedChange={() =>
+                        toggleAccountSelection(
+                          account.name,
+                          hostAccounts,
+                          setHostAccounts,
+                        )
+                      }
+                    />
+
+                    <span>{account.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* OPERATOR ACCOUNTS */}
+
+            <div className="space-y-2">
+              <Label>Operator Accounts</Label>
+
+              <div className="border rounded-md p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={operatorAccounts.length === 0}
+                    onCheckedChange={() =>
+                      toggleAccountSelection(
+                        "none",
+                        operatorAccounts,
+                        setOperatorAccounts,
+                      )
+                    }
+                  />
+
+                  <span>None</span>
+                </div>
+
+                {accounts.map((account) => (
+                  <div key={account.id} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={operatorAccounts.includes(account.name)}
+                      onCheckedChange={() =>
+                        toggleAccountSelection(
+                          account.name,
+                          operatorAccounts,
+                          setOperatorAccounts,
+                        )
+                      }
+                    />
+
+                    <span>{account.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

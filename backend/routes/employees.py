@@ -103,6 +103,26 @@ def get_employee(employee_id: int):
         cursor.close()
         conn.close()
 
+def normalize_accounts(value):
+    if not value:
+        return None
+
+    if not isinstance(value, list):
+        value = [value]
+
+    cleaned = []
+
+    for item in value:
+        item = str(item).strip()
+
+        if item and item.lower() != "none":
+            cleaned.append(item)
+
+    if not cleaned:
+        return None
+
+    return ", ".join(cleaned)
+
 # ADD employee
 @router.post("/employees")
 def add_employee(data: dict):
@@ -110,34 +130,210 @@ def add_employee(data: dict):
     cursor = conn.cursor()
 
     try:
-        role = data["role"]
+        name = data.get("name", "").strip()
+        nickname = data.get("nickname", "").strip()
+        email = data.get("email", "").strip().lower()
+        contact_number = data.get("contactNumber", "").strip()
+        role = data.get("role", "").strip()
 
-        can_be_host = role in ["Host", "Both"]
-        can_be_operator = role in ["Operator", "Both"]
+        host_account = normalize_accounts(
+            data.get("host_accounts")
+        )
+
+        operator_account = normalize_accounts(
+            data.get("operator_accounts")
+        )
+
+        # -------------------------
+        # VALIDATIONS
+        # -------------------------
+
+        if not name:
+            raise HTTPException(
+                status_code=400,
+                detail="Full name is required"
+            )
+
+        if not nickname:
+            raise HTTPException(
+                status_code=400,
+                detail="Nickname is required"
+            )
+
+        if not email or "@" not in email:
+            raise HTTPException(
+                status_code=400,
+                detail="Valid email is required"
+            )
+
+        if role not in [
+            "Host",
+            "Operator",
+            "Both",
+            "Team Leader"
+        ]:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid role"
+            )
+
+        # -------------------------
+        # ROLE RULES
+        # -------------------------
+
+        if role == "Host" and not host_account:
+            raise HTTPException(
+                status_code=400,
+                detail="Host account required for Host role"
+            )
+
+        if role == "Operator" and not operator_account:
+            raise HTTPException(
+                status_code=400,
+                detail="Operator account required for Operator role"
+            )
+
+        if role == "Both":
+
+            if not host_account:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Host account required for Both role"
+                )
+
+            if not operator_account:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Operator account required for Both role"
+                )
+
+        # -------------------------
+        # CAPABILITIES
+        # -------------------------
+
+        can_be_host = host_account is not None
+        can_be_operator = operator_account is not None
+
+        # -------------------------
+        # EXISTING EMAIL CHECK
+        # -------------------------
 
         cursor.execute("""
-            INSERT INTO employees 
-            (full_name, email, main_role, password, employment_status, can_be_host, can_be_operator, contact_number)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            SELECT employee_id, employment_status
+            FROM employees
+            WHERE LOWER(email) = LOWER(%s)
+        """, (email,))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            employee_id = existing[0]
+            employment_status = existing[1]
+
+            if employment_status == "Active":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Employee already exists"
+                )
+
+            cursor.execute("""
+                UPDATE employees
+                SET
+                    full_name = %s,
+                    nickname = %s,
+                    email = %s,
+                    main_role = %s,
+                    password = %s,
+                    employment_status = 'Active',
+                    can_be_host = %s,
+                    host_account = %s,
+                    can_be_operator = %s,
+                    operator_account = %s,
+                    contact_number = %s
+                WHERE employee_id = %s
+            """, (
+                name,
+                nickname,
+                email,
+                role,
+                hash_password("1234"),
+                can_be_host,
+                host_account,
+                can_be_operator,
+                operator_account,
+                contact_number,
+                employee_id
+            ))
+
+            conn.commit()
+
+            return {
+                "message": "Employee reactivated"
+            }
+
+        # -------------------------
+        # INSERT
+        # -------------------------
+
+        cursor.execute("""
+            INSERT INTO employees (
+                full_name,
+                nickname,
+                email,
+                main_role,
+                password,
+                employment_status,
+                can_be_host,
+                host_account,
+                can_be_operator,
+                operator_account,
+                contact_number
+            )
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
+            )
         """, (
-            data["name"],
-            data["email"],
+            name,
+            nickname,
+            email,
             role,
             hash_password("1234"),
             "Active",
             can_be_host,
+            host_account,
             can_be_operator,
-            data.get("contactNumber")
+            operator_account,
+            contact_number
         ))
 
         conn.commit()
 
-        return {"message": "Employee added"}
+        return {
+            "message": "Employee added"
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
 
     except Exception as e:
         conn.rollback()
-        print("ERROR:", e) 
-        raise HTTPException(status_code=500, detail=str(e))
+        print("ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
     finally:
         cursor.close()
