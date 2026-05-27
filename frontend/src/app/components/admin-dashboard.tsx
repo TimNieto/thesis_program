@@ -1170,21 +1170,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <Label>Host Accounts</Label>
 
               <div className="border rounded-md p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={hostAccounts.length === 0}
-                    onCheckedChange={() =>
-                      toggleAccountSelection(
-                        "none",
-                        hostAccounts,
-                        setHostAccounts,
-                      )
-                    }
-                  />
-
-                  <span>None</span>
-                </div>
-
                 {accounts.map((account) => (
                   <div key={account.id} className="flex items-center gap-2">
                     <Checkbox
@@ -1201,6 +1186,22 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     <span>{account.name}</span>
                   </div>
                 ))}
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={hostAccounts.length === 0}
+                    onCheckedChange={() =>
+                      toggleAccountSelection(
+                        "none",
+                        hostAccounts,
+                        setHostAccounts,
+                      )
+                    }
+                  />
+
+                  <span>None</span>
+
+                </div>
               </div>
             </div>
 
@@ -1210,21 +1211,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               <Label>Operator Accounts</Label>
 
               <div className="border rounded-md p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={operatorAccounts.length === 0}
-                    onCheckedChange={() =>
-                      toggleAccountSelection(
-                        "none",
-                        operatorAccounts,
-                        setOperatorAccounts,
-                      )
-                    }
-                  />
-
-                  <span>None</span>
-                </div>
-
                 {accounts.map((account) => (
                   <div key={account.id} className="flex items-center gap-2">
                     <Checkbox
@@ -1241,6 +1227,22 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     <span>{account.name}</span>
                   </div>
                 ))}
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={operatorAccounts.length === 0}
+                    onCheckedChange={() =>
+                      toggleAccountSelection(
+                        "none",
+                        operatorAccounts,
+                        setOperatorAccounts,
+                      )
+                    }
+                  />
+
+                  <span>None</span>
+                </div>
+                
               </div>
             </div>
           </div>
