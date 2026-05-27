@@ -64,8 +64,6 @@ interface ScheduleGeneratorProps {
   role: string;
 }
 
-
-
 const DAYS = [
   "Monday",
   "Tuesday",
@@ -87,8 +85,10 @@ export function ScheduleGenerator({
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
 
   const [staffingRequirements, setStaffingRequirements] = useState<any[]>([]);
-  
-  const [scheduleMode, setScheduleMode] = useState<"saved" | "preview">("saved");
+
+  const [scheduleMode, setScheduleMode] = useState<"saved" | "preview">(
+    "saved",
+  );
 
   const [groupedSchedule, setGroupedSchedule] = useState<any>({});
 
@@ -97,7 +97,7 @@ export function ScheduleGenerator({
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/shift-templates"
+        "https://backend-production-6e75.up.railway.app/shift-templates",
       );
 
       const data = await res.json();
@@ -111,7 +111,7 @@ export function ScheduleGenerator({
   const fetchStaffingRequirements = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/staffing-requirements"
+        "https://backend-production-6e75.up.railway.app/staffing-requirements",
       );
 
       const data = await res.json();
@@ -405,9 +405,7 @@ export function ScheduleGenerator({
     const csv = [
       ["Livestream", "Day", "Shift", "Time", "Role", "Employee"],
       ...assignments.map((a) => {
-        const shiftInfo = shiftTemplates.find(
-          (s) => s.shift_name === a.shift
-        );
+        const shiftInfo = shiftTemplates.find((s) => s.shift_name === a.shift);
         return [
           a.livestream,
           a.day,
@@ -499,7 +497,6 @@ export function ScheduleGenerator({
   };
 
   const saveSchedule = async () => {
-
     if (scheduleMode !== "preview") {
       toast.error("Generate a new schedule first before saving changes");
       return;
@@ -522,7 +519,7 @@ export function ScheduleGenerator({
             shift_type: a.shift,
 
             account: a.livestream,
-            
+
             slot_index: a.slot_index ?? 0,
           };
         });
@@ -618,10 +615,7 @@ export function ScheduleGenerator({
     );
   };
 
-  const getRoleRowsForShift = (
-    livestream: string,
-    shiftName: string,
-  ) => {
+  const getRoleRowsForShift = (livestream: string, shiftName: string) => {
     if (scheduleMode === "saved") {
       const roleCounts: Record<string, number> = {};
 
@@ -722,7 +716,10 @@ export function ScheduleGenerator({
                 </div>
                 <div>
                   <div className="text-sm font-medium">{shift.shift_name}</div>
-                  <div className="text-xs text-gray-600">{shift.start_time.slice(0,5)} - {shift.end_time.slice(0,5)}</div>
+                  <div className="text-xs text-gray-600">
+                    {shift.start_time.slice(0, 5)} -{" "}
+                    {shift.end_time.slice(0, 5)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -732,8 +729,14 @@ export function ScheduleGenerator({
 
       {/* Main Tabs */}
       <Tabs defaultValue="schedule" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="schedule" className="gap-2">
+        <TabsList
+          className={
+            role === "admin"
+              ? "grid w-full max-w-md grid-cols-2"
+              : "inline-flex w-fit"
+          }
+        >
+          <TabsTrigger value="schedule" className="gap-2 px-12">
             <Calendar className="size-4" />
             Weekly Schedule
           </TabsTrigger>
@@ -799,7 +802,10 @@ export function ScheduleGenerator({
                       </thead>
                       <tbody>
                         {getVisibleShifts(livestream).map((shift) => {
-                          const roleRowsForShift = getRoleRowsForShift(livestream, shift.shift_name);
+                          const roleRowsForShift = getRoleRowsForShift(
+                            livestream,
+                            shift.shift_name,
+                          );
                           console.log(
                             "SHIFT DEBUG:",
                             shift.shift_name,
@@ -807,11 +813,18 @@ export function ScheduleGenerator({
                           );
                           if (roleRowsForShift.length === 0) {
                             return (
-                              <tr key={`${livestream}-${shift.shift_name}-empty`}>
-                                <td className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}>
-                                  <div className="font-semibold text-sm">{shift.shift_name}</div>
+                              <tr
+                                key={`${livestream}-${shift.shift_name}-empty`}
+                              >
+                                <td
+                                  className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
+                                >
+                                  <div className="font-semibold text-sm">
+                                    {shift.shift_name}
+                                  </div>
                                   <div className="text-xs text-gray-600">
-                                    {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}
+                                    {shift.start_time.slice(0, 5)} -{" "}
+                                    {shift.end_time.slice(0, 5)}
                                   </div>
                                 </td>
                                 <td className="border border-gray-300 bg-gray-50 p-2 text-center text-sm text-gray-400">
@@ -829,96 +842,106 @@ export function ScheduleGenerator({
                             );
                           }
                           return (
-                            <React.Fragment key={`${livestream}-${shift.shift_name}`}>
-                              {roleRowsForShift.map(({ roleKey, slotIndex }, roleIndex) => (
-                                <tr key={`${livestream}-${shift.shift_name}-${roleKey}-${slotIndex}`}>
-                                  {roleIndex === 0 && (
-                                    <td
-                                      rowSpan={roleRowsForShift.length}
-                                      className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <div
-                                          className={`w-10 h-10 rounded border-2 ${getShiftColor(
-                                            shift.shift_name,
-                                          )} flex items-center justify-center`}
-                                        >
-                                          <span
-                                            className={`font-semibold text-sm ${getShiftTextColor(
-                                              shift.shift_name,
-                                            )}`}
-                                          >
-                                            {shift.shift_name}
-                                          </span>
-                                        </div>
-                                        <div>
-                                          <div className="font-semibold text-sm">
-                                            {shift.shift_name}
-                                          </div>
-                                          <div className="text-xs text-gray-600">
-                                            {shift.start_time.slice(0, 5)} -{" "}
-                                            {shift.end_time.slice(0, 5)}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </td>
-                                  )}
-
-                                  <td className="border border-gray-300 bg-gray-50 p-2 text-center font-semibold text-sm capitalize">
-                                    {roleKey.replace(/_/g, " ")}
-                                  </td>
-
-                                  {DAYS.map((day) => {
-                                    const roleAssignments = getAssignments(
-                                      livestream,
-                                      day,
-                                      shift.shift_name,
-                                      roleKey,
-                                    );
-
-                                    const cellAssignment = roleAssignments.find(
-                                      (a) => (a.slot_index ?? 0) === slotIndex,
-                                    );
-
-                                    const isClickable = role === "admin";
-
-                                    return (
+                            <React.Fragment
+                              key={`${livestream}-${shift.shift_name}`}
+                            >
+                              {roleRowsForShift.map(
+                                ({ roleKey, slotIndex }, roleIndex) => (
+                                  <tr
+                                    key={`${livestream}-${shift.shift_name}-${roleKey}-${slotIndex}`}
+                                  >
+                                    {roleIndex === 0 && (
                                       <td
-                                        key={`${livestream}-${day}-${shift.shift_name}-${roleKey}-${slotIndex}`}
-                                        className={`border border-gray-300 p-2 ${
-                                          cellAssignment ? getShiftColor(shift.shift_name) : "bg-white"
-                                        } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
-                                        onClick={() =>
-                                          isClickable &&
-                                          openAssignDialog(
-                                            livestream,
-                                            day,
-                                            shift.shift_name,
-                                            roleKey,
-                                            cellAssignment?.id,
-                                          )
-                                        }
+                                        rowSpan={roleRowsForShift.length}
+                                        className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
                                       >
-                                        {cellAssignment ? (
-                                          <div className="text-center">
-                                            <div
-                                              className={`font-medium text-sm ${getShiftTextColor(
+                                        <div className="flex items-center gap-2">
+                                          <div
+                                            className={`w-10 h-10 rounded border-2 ${getShiftColor(
+                                              shift.shift_name,
+                                            )} flex items-center justify-center`}
+                                          >
+                                            <span
+                                              className={`font-semibold text-sm ${getShiftTextColor(
                                                 shift.shift_name,
                                               )}`}
                                             >
-                                              {cellAssignment.employee}
+                                              {shift.shift_name}
+                                            </span>
+                                          </div>
+                                          <div>
+                                            <div className="font-semibold text-sm">
+                                              {shift.shift_name}
+                                            </div>
+                                            <div className="text-xs text-gray-600">
+                                              {shift.start_time.slice(0, 5)} -{" "}
+                                              {shift.end_time.slice(0, 5)}
                                             </div>
                                           </div>
-                                        ) : (
-                                          <div className="text-center text-gray-300 text-xs py-1">
-                                            {isClickable ? "+" : "-"}
-                                          </div>
-                                        )}
+                                        </div>
                                       </td>
-                                    );
-                                  })}
-                                </tr>
-                              ))}
+                                    )}
+
+                                    <td className="border border-gray-300 bg-gray-50 p-2 text-center font-semibold text-sm capitalize">
+                                      {roleKey.replace(/_/g, " ")}
+                                    </td>
+
+                                    {DAYS.map((day) => {
+                                      const roleAssignments = getAssignments(
+                                        livestream,
+                                        day,
+                                        shift.shift_name,
+                                        roleKey,
+                                      );
+
+                                      const cellAssignment =
+                                        roleAssignments.find(
+                                          (a) =>
+                                            (a.slot_index ?? 0) === slotIndex,
+                                        );
+
+                                      const isClickable = role === "admin";
+
+                                      return (
+                                        <td
+                                          key={`${livestream}-${day}-${shift.shift_name}-${roleKey}-${slotIndex}`}
+                                          className={`border border-gray-300 p-2 ${
+                                            cellAssignment
+                                              ? getShiftColor(shift.shift_name)
+                                              : "bg-white"
+                                          } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                                          onClick={() =>
+                                            isClickable &&
+                                            openAssignDialog(
+                                              livestream,
+                                              day,
+                                              shift.shift_name,
+                                              roleKey,
+                                              cellAssignment?.id,
+                                            )
+                                          }
+                                        >
+                                          {cellAssignment ? (
+                                            <div className="text-center">
+                                              <div
+                                                className={`font-medium text-sm ${getShiftTextColor(
+                                                  shift.shift_name,
+                                                )}`}
+                                              >
+                                                {cellAssignment.employee}
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="text-center text-gray-300 text-xs py-1">
+                                              {isClickable ? "+" : "-"}
+                                            </div>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ),
+                              )}
                             </React.Fragment>
                           );
                         })}
@@ -1070,8 +1093,7 @@ export function ScheduleGenerator({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedCell &&
-              getAssignment()
+              {selectedCell && getAssignment()
                 ? "Modify Assignment"
                 : "Assign Shift"}
             </DialogTitle>
@@ -1088,21 +1110,17 @@ export function ScheduleGenerator({
                     <strong>Shift:</strong>{" "}
                     {
                       shiftTemplates.find(
-                        (s) => s.shift_name === selectedCell.shift
+                        (s) => s.shift_name === selectedCell.shift,
                       )?.shift_name
                     }
                     {" ("}
-                    {
-                      shiftTemplates.find(
-                        (s) => s.shift_name === selectedCell.shift
-                      )?.start_time?.slice(0, 5)
-                    }
+                    {shiftTemplates
+                      .find((s) => s.shift_name === selectedCell.shift)
+                      ?.start_time?.slice(0, 5)}
                     {" - "}
-                    {
-                      shiftTemplates.find(
-                        (s) => s.shift_name === selectedCell.shift
-                      )?.end_time?.slice(0, 5)
-                    }
+                    {shiftTemplates
+                      .find((s) => s.shift_name === selectedCell.shift)
+                      ?.end_time?.slice(0, 5)}
                     {")"}
                   </div>
                   <div>
@@ -1129,25 +1147,21 @@ export function ScheduleGenerator({
             </div>
           </div>
           <DialogFooter className="gap-2">
-            {selectedCell &&
-              getAssignment() && (
-                <Button
-                  variant="destructive"
-                  onClick={handleRemove}
-                  className="gap-2"
-                >
-                  <Trash2 className="size-4" />
-                  Remove
-                </Button>
-              )}
+            {selectedCell && getAssignment() && (
+              <Button
+                variant="destructive"
+                onClick={handleRemove}
+                className="gap-2"
+              >
+                <Trash2 className="size-4" />
+                Remove
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleAssign}>
-              {selectedCell &&
-              getAssignment()
-                ? "Update"
-                : "Assign"}
+              {selectedCell && getAssignment() ? "Update" : "Assign"}
             </Button>
           </DialogFooter>
         </DialogContent>
