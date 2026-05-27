@@ -1070,14 +1070,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       {/* Add Employee Dialog */}
       <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Employee</DialogTitle>
             <DialogDescription>
               Enter employee details to add them to the system
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 py-2">
             <div className="space-y-2">
               <Label htmlFor="employeeName">Employee Name</Label>
               <Input
@@ -1352,7 +1352,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         open={isAvailabilityDialogOpen}
         onOpenChange={setIsAvailabilityDialogOpen}
       >
-        <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] !max-w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Manage Weekly Availability -{" "}
@@ -1363,17 +1363,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-6">
+          <div className="py-3">
             {selectedEmployeeForAvailability && (
               <div className="overflow-x-auto">
                 <div className="min-w-max">
                   {/* DAYS HEADER */}
-                  <div className="grid grid-cols-8 gap-3">
+                  <div className="grid grid-cols-8 gap-2 text-sm">
                     <div></div>
                     {DAYS.map((day) => (
                       <div
                         key={day}
-                        className="p-4 text-center bg-gray-100 rounded"
+                        className="p-2 text-center bg-gray-100 rounded"
                       >
                         {day}
                       </div>
@@ -1384,10 +1384,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   {shiftTemplates.map((shift) => (
                     <div
                       key={shift.shift_name}
-                      className="grid grid-cols-8 gap-3 mt-3"
+                      className="grid grid-cols-8 gap-2 mt-2 text-sm"
                     >
                       {/* SHIFT LABEL */}
-                      <div className="p-4 bg-gray-100 rounded">
+                      <div className="p-2 bg-gray-100 rounded">
                         {shift.shift_name} - {shift.name}
                       </div>
 
@@ -1409,7 +1409,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 shift.shift_name,
                               )
                             }
-                            className={`p-4 rounded border cursor-pointer
+                            className={`p-2 rounded border cursor-pointer text-xs
                         ${
                           isUnavailable
                             ? "bg-gray-300"
