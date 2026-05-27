@@ -316,6 +316,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         throw new Error(errorData?.detail || "Failed to add employee");
       }
 
+      const result = await res.json();
+
       fetchEmployees();
       setIsAddEmployeeOpen(false);
 
@@ -327,7 +329,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       setHostAccounts([]);
       setOperatorAccounts([]);
 
-      toast.success("Employee added");
+      toast.success(result.message || "Employee saved");
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Failed to add employee");
