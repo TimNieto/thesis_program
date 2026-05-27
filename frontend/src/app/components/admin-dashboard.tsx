@@ -185,7 +185,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app//shift-templates",
+        "https://backend-production-6e75.up.railway.app/shift-templates",
       );
 
       const data = await res.json();
