@@ -47,7 +47,7 @@ def get_employees():
 
     try:
         cursor.execute("""
-            SELECT employee_id, full_name, email, main_role, employment_status
+            SELECT employee_id, full_name, email, main_role, employment_status, joined_date
             FROM employees
             WHERE employment_status = 'Active'
             ORDER BY employee_id
@@ -62,7 +62,7 @@ def get_employees():
                 "role": r[3],
                 "status": "Active",
                 "totalShifts": 0,
-                "joinedDate": "2025-01-01",
+                "joinedDate": str(r[5]) if r[5] else None,
                 "accountType": "Employee"
             }
             for r in rows
@@ -255,7 +255,8 @@ def add_employee(data: dict):
                     host_account = %s,
                     can_be_operator = %s,
                     operator_account = %s,
-                    contact_number = %s
+                    contact_number = %s,
+                    joined_date = CURRENT_DATE
                 WHERE employee_id = %s
             """, (
                 name,
@@ -293,7 +294,8 @@ def add_employee(data: dict):
                 host_account,
                 can_be_operator,
                 operator_account,
-                contact_number
+                contact_number,
+                joined_date
             )
             VALUES (
                 %s,
@@ -306,7 +308,8 @@ def add_employee(data: dict):
                 %s,
                 %s,
                 %s,
-                %s
+                %s,
+                CURRENT_DATE
             )
         """, (
             name,
