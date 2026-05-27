@@ -24,7 +24,7 @@ def get_accounts():
                 allow_partial_staffing,
                 operator_policy
             FROM account_settings
-            ORDER BY priority_level ASC, account_name ASC
+            ORDER BY account_setting_id ASC
         """)
 
         rows = cursor.fetchall()
