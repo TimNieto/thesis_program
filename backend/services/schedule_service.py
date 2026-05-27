@@ -162,6 +162,12 @@ def fetch_shifts(cursor):
 
         ORDER BY
             s.shift_date,
+            (
+                SELECT a.account_setting_id
+                FROM account_settings a
+                WHERE a.account_name = s.account
+                LIMIT 1
+            ),
             st.start_time
     """, (start_date, end_date))
 
@@ -447,6 +453,7 @@ def generate_weekly_schedule():
                 operator_policy,
                 allow_partial_staffing
             FROM account_settings
+            ORDER BY account_setting_id ASC
         """)
 
         account_rows = cursor.fetchall()
@@ -605,6 +612,7 @@ def get_generated_schedule():
         cursor.execute("""
             SELECT account_name
             FROM account_settings
+            ORDER BY account_setting_id ASC
         """)
 
         account_rows = cursor.fetchall()
@@ -661,6 +669,7 @@ def ensure_next_week_shifts(cursor):
     cursor.execute("""
         SELECT account_name
         FROM account_settings
+        ORDER BY account_setting_id ASC
     """)
 
     accounts = cursor.fetchall()

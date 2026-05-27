@@ -1131,4 +1131,3 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
         "assignments": context["assignments"],
         "unfilled_slots": unfilled
     }
-

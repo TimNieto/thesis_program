@@ -80,6 +80,8 @@ export function ScheduleGenerator({
 }: ScheduleGeneratorProps) {
   const [livestreams, setLivestreams] = useState<string[]>([]);
 
+  const [accountOrder, setAccountOrder] = useState<string[]>([]);
+
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
@@ -120,6 +122,34 @@ export function ScheduleGenerator({
     } catch (err) {
       console.error("Failed to load staffing requirements", err);
     }
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/accounts",
+      );
+
+      const data = await res.json();
+
+      setAccountOrder((data || []).map((account: any) => account.name));
+    } catch (err) {
+      console.error("Failed to load accounts", err);
+    }
+  };
+
+  const getOrderedLivestreams = (grouped: any) => {
+    const groupedKeys = Object.keys(grouped || {});
+
+    const ordered = accountOrder.filter((account) =>
+      groupedKeys.includes(account),
+    );
+
+    const remaining = groupedKeys.filter(
+      (account) => !ordered.includes(account),
+    );
+
+    return [...ordered, ...remaining];
   };
 
   const formatDate = (date: Date) => {
@@ -218,6 +248,7 @@ export function ScheduleGenerator({
   useEffect(() => {
     fetchShiftTemplates();
     fetchStaffingRequirements();
+    fetchAccounts();
   }, []);
 
   const loadSchedule = async () => {
@@ -233,7 +264,7 @@ export function ScheduleGenerator({
       if (!data.grouped_schedule) return;
 
       setGroupedSchedule(data.grouped_schedule);
-      setLivestreams(Object.keys(data.grouped_schedule));
+      setLivestreams(getOrderedLivestreams(data.grouped_schedule));
 
       const transformed: ShiftAssignment[] = [];
 
@@ -270,8 +301,10 @@ export function ScheduleGenerator({
   };
 
   useEffect(() => {
-    loadSchedule();
-  }, []);
+    if (accountOrder.length > 0) {
+      loadSchedule();
+    }
+  }, [accountOrder]);
 
   useEffect(() => {
     fetchApprovedLeaves();
@@ -444,7 +477,7 @@ export function ScheduleGenerator({
 
       const grouped = data.grouped_schedule || {};
       setGroupedSchedule(grouped);
-      setLivestreams(Object.keys(grouped));
+      setLivestreams(getOrderedLivestreams(grouped));
       console.log("GROUPED:", grouped);
       const unfilled = data.unfilled_slots || [];
 
