@@ -67,6 +67,11 @@ interface Employee {
   status: "Active" | "Inactive";
   totalShifts: number;
   joinedDate: string;
+
+  can_be_host?: boolean;
+  host_accounts?: string | null;
+  can_be_operator?: boolean;
+  operator_accounts?: string | null;
 }
 
 interface Request {
@@ -152,6 +157,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const [accounts, setAccounts] = useState<any[]>([]);
 
+  const [isEditAccountPrefsOpen, setIsEditAccountPrefsOpen] = useState(false);
+
+  const [selectedEmployeeForAccountPrefs, setSelectedEmployeeForAccountPrefs] =
+    useState<Employee | null>(null);
+
+  const [editHostAccounts, setEditHostAccounts] = useState<string[]>([]);
+  const [editOperatorAccounts, setEditOperatorAccounts] = useState<string[]>([]);
+
   // Override Dialog States
   const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] =
@@ -233,6 +246,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   }, [currentUser.role]);
 
+  const parseAccountList = (value?: string | null) => {
+    if (!value) return [];
+
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  };
+
   const toggleAccountSelection = (
     accountName: string,
     selectedAccounts: string[],
@@ -251,6 +273,79 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       return [...prev, accountName];
     });
   };
+
+  const openAccountPrefsDialog = (employee: Employee) => {
+  setSelectedEmployeeForAccountPrefs(employee);
+
+  setEditHostAccounts(parseAccountList(employee.host_accounts));
+  setEditOperatorAccounts(parseAccountList(employee.operator_accounts));
+
+  setIsEditAccountPrefsOpen(true);
+};
+
+
+const saveEmployeeAccountPreferences = async () => {
+  if (!selectedEmployeeForAccountPrefs) return;
+
+  const employee = selectedEmployeeForAccountPrefs;
+
+  if (employee.role === "Host" && editHostAccounts.length === 0) {
+    toast.error("Host account is required for Host role");
+    return;
+  }
+
+  if (employee.role === "Operator" && editOperatorAccounts.length === 0) {
+    toast.error("Operator account is required for Operator role");
+    return;
+  }
+
+  if (
+    employee.role === "Both" &&
+    (editHostAccounts.length === 0 || editOperatorAccounts.length === 0)
+  ) {
+    toast.error("Both role requires host and operator accounts");
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `https://backend-production-6e75.up.railway.app/employees/${employee.id}/account-preferences`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          host_accounts: editHostAccounts.length > 0 ? editHostAccounts : null,
+          operator_accounts:
+            editOperatorAccounts.length > 0 ? editOperatorAccounts : null,
+        }),
+      },
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to update account preferences");
+    }
+
+    toast.success(data.message || "Account preferences updated");
+
+    setIsEditAccountPrefsOpen(false);
+    setSelectedEmployeeForAccountPrefs(null);
+    setEditHostAccounts([]);
+    setEditOperatorAccounts([]);
+
+    fetchEmployees();
+  } catch (err) {
+    console.error(err);
+    toast.error(
+      err instanceof Error
+        ? err.message
+        : "Failed to update account preferences",
+    );
+  }
+};
 
   // Add Employee
   const handleAddEmployee = async () => {
@@ -706,6 +801,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       <TableHead>Name</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Host Accounts</TableHead>
+                      <TableHead>Operator Accounts</TableHead>
                       <TableHead>Total Shifts</TableHead>
                       <TableHead>Joined Date</TableHead>
                       <TableHead>Actions</TableHead>
@@ -715,7 +812,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     {employees.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={8}
                           className="text-center text-gray-500 py-6"
                         >
                           No employees found. Click "Add Employee" to get
@@ -786,7 +883,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 {employee.status}
                               </Badge>
                             </TableCell>
+
+                            <TableCell className="max-w-[180px] truncate">
+                              {employee.host_accounts || "None"}
+                            </TableCell>
+
+                            <TableCell className="max-w-[180px] truncate">
+                              {employee.operator_accounts || "None"}
+                            </TableCell>
+
                             <TableCell>{employee.totalShifts}</TableCell>
+
                             <TableCell>
                               {new Date(
                                 employee.joinedDate,
@@ -804,6 +911,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 >
                                   <CalendarOff className="size-4" />
                                   Availability
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openAccountPrefsDialog(employee)}
+                                >
+                                  Account Preferences
                                 </Button>
                                 <Button
                                   variant="destructive"
@@ -1255,6 +1369,125 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               Cancel
             </Button>
             <Button onClick={handleAddEmployee}>Add Employee</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Employee Account Preferences Dialog */}
+      <Dialog
+        open={isEditAccountPrefsOpen}
+        onOpenChange={setIsEditAccountPrefsOpen}
+      >
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Account Preferences</DialogTitle>
+            <DialogDescription>
+              {selectedEmployeeForAccountPrefs
+                ? `Update account preferences for ${selectedEmployeeForAccountPrefs.name}`
+                : "Update employee account preferences"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Host Accounts</Label>
+
+              <div className="border rounded-md p-3 space-y-2">
+                {accounts.map((account) => (
+                  <div
+                    key={`edit-host-${account.id}`}
+                    className="flex items-center gap-2"
+                  >
+                    <Checkbox
+                      checked={editHostAccounts.includes(account.name)}
+                      onCheckedChange={() =>
+                        toggleAccountSelection(
+                          account.name,
+                          editHostAccounts,
+                          setEditHostAccounts,
+                        )
+                      }
+                    />
+
+                    <span>{account.name}</span>
+                  </div>
+                ))}
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={editHostAccounts.length === 0}
+                    onCheckedChange={() =>
+                      toggleAccountSelection(
+                        "none",
+                        editHostAccounts,
+                        setEditHostAccounts,
+                      )
+                    }
+                  />
+
+                  <span>None</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Operator Accounts</Label>
+
+              <div className="border rounded-md p-3 space-y-2">
+                {accounts.map((account) => (
+                  <div
+                    key={`edit-operator-${account.id}`}
+                    className="flex items-center gap-2"
+                  >
+                    <Checkbox
+                      checked={editOperatorAccounts.includes(account.name)}
+                      onCheckedChange={() =>
+                        toggleAccountSelection(
+                          account.name,
+                          editOperatorAccounts,
+                          setEditOperatorAccounts,
+                        )
+                      }
+                    />
+
+                    <span>{account.name}</span>
+                  </div>
+                ))}
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={editOperatorAccounts.length === 0}
+                    onCheckedChange={() =>
+                      toggleAccountSelection(
+                        "none",
+                        editOperatorAccounts,
+                        setEditOperatorAccounts,
+                      )
+                    }
+                  />
+
+                  <span>None</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditAccountPrefsOpen(false);
+                setSelectedEmployeeForAccountPrefs(null);
+                setEditHostAccounts([]);
+                setEditOperatorAccounts([]);
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button onClick={saveEmployeeAccountPreferences}>
+              Save Preferences
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

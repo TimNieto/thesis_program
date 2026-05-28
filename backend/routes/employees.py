@@ -48,7 +48,18 @@ def get_employees():
 
     try:
         cursor.execute("""
-            SELECT employee_id, full_name, email, main_role, employment_status, joined_date
+            SELECT
+                employee_id,
+                full_name,
+                email,
+                main_role,
+                employment_status,
+                joined_date,
+                can_be_host,
+                host_account,
+                can_be_operator,
+                operator_account,
+                contact_number
             FROM employees
             WHERE employment_status = 'Active'
             ORDER BY employee_id
@@ -64,7 +75,12 @@ def get_employees():
                 "status": "Active",
                 "totalShifts": 0,
                 "joinedDate": str(r[5]) if r[5] else None,
-                "accountType": "Employee"
+                "accountType": "Employee",
+                "can_be_host": r[6],
+                "host_accounts": r[7],
+                "can_be_operator": r[8],
+                "operator_accounts": r[9],
+                "contactNumber": r[10]
             }
             for r in rows
         ]
@@ -82,7 +98,16 @@ def get_employee(employee_id: int):
 
     try:
         cursor.execute("""
-            SELECT employee_id, full_name, email, main_role, contact_number
+            SELECT
+                employee_id,
+                full_name,
+                email,
+                main_role,
+                contact_number,
+                can_be_host,
+                host_account,
+                can_be_operator,
+                operator_account
             FROM employees
             WHERE employee_id = %s
         """, (employee_id,))
@@ -97,7 +122,11 @@ def get_employee(employee_id: int):
             "name": row[1],
             "email": row[2],
             "role": row[3],
-            "contactNumber": row[4]
+            "contactNumber": row[4],
+            "can_be_host": row[5],
+            "host_accounts": row[6],
+            "can_be_operator": row[7],
+            "operator_accounts": row[8]
         }
 
     finally:
@@ -123,6 +152,103 @@ def normalize_accounts(value):
         return None
 
     return ", ".join(cleaned)
+
+@router.put("/employees/{employee_id}/account-preferences")
+def update_employee_account_preferences(employee_id: int, data: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        host_account = normalize_accounts(
+            data.get("host_accounts")
+        )
+
+        operator_account = normalize_accounts(
+            data.get("operator_accounts")
+        )
+
+        cursor.execute("""
+            SELECT main_role
+            FROM employees
+            WHERE employee_id = %s
+            AND employment_status = 'Active'
+        """, (employee_id,))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee not found"
+            )
+
+        role = employee[0]
+
+        if role == "Host" and not host_account:
+            raise HTTPException(
+                status_code=400,
+                detail="Host account required for Host role"
+            )
+
+        if role == "Operator" and not operator_account:
+            raise HTTPException(
+                status_code=400,
+                detail="Operator account required for Operator role"
+            )
+
+        if role == "Both":
+            if not host_account:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Host account required for Both role"
+                )
+
+            if not operator_account:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Operator account required for Both role"
+                )
+
+        can_be_host = host_account is not None
+        can_be_operator = operator_account is not None
+
+        cursor.execute("""
+            UPDATE employees
+            SET
+                can_be_host = %s,
+                host_account = %s,
+                can_be_operator = %s,
+                operator_account = %s
+            WHERE employee_id = %s
+        """, (
+            can_be_host,
+            host_account,
+            can_be_operator,
+            operator_account,
+            employee_id
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "Employee account preferences updated"
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update employee account preferences"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # ADD employee
 @router.post("/employees")
