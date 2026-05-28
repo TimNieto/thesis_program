@@ -74,8 +74,9 @@ interface ShiftApplication {
 
 interface CoverRequest {
   id: string;
-  requester: string;
   schedule_id?: number;
+  requested_by?: number;
+  requester: string;
   livestream: string;
   day: string;
   shift: string;
@@ -226,6 +227,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
           schedule_id: Number(r.schedule_id),
 
+          requested_by: Number(r.requested_by),
+
           requester: r.requester,
 
           livestream: r.livestream,
@@ -356,7 +359,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
         (request) =>
           role !== "admin" &&
           request.status === "pending" &&
-          request.requester === currentUser.name &&
+          Number(request.requested_by) === Number(currentUser.employee_id) &&
           request.schedule_id
       )
       .map((request) => Number(request.schedule_id))

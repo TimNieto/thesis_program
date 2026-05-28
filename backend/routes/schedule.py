@@ -230,6 +230,8 @@ def get_requests(employee_id: int):
                 cr.id,
                        
                 cr.schedule_id,
+                       
+                cr.requested_by,
 
                 e.full_name,
 
@@ -317,18 +319,18 @@ def get_requests(employee_id: int):
             result.append({
                 "id": r[0],
                 "schedule_id": r[1],
-                "requester": r[2],
-                "livestream": r[3],
-                "day": str(r[4]),
-                "shift": r[5],
-                "role": r[6],
-                "reason": r[7],
-                "status": r[8],
-                "request_type": r[9],
-                "created_at": str(r[10]),
-                "is_targeted": r[11]
+                "requested_by": r[2],
+                "requester": r[3],
+                "livestream": r[4],
+                "day": str(r[5]),
+                "shift": r[6],
+                "role": r[7],
+                "reason": r[8],
+                "status": r[9],
+                "request_type": r[10],
+                "created_at": str(r[11]),
+                "is_targeted": r[12]
             })
-
         return result
 
     finally:
@@ -350,6 +352,8 @@ def get_all_requests():
                 cr.id,
                        
                 cr.schedule_id,
+                       
+                cr.requested_by,
 
                 e.full_name,
 
@@ -400,15 +404,16 @@ def get_all_requests():
             result.append({
                 "id": r[0],
                 "schedule_id": r[1],
-                "requester": r[2],
-                "livestream": r[3],
-                "day": str(r[4]),
-                "shift": r[5],
-                "role": r[6],
-                "reason": r[7],
-                "status": r[8],
-                "request_type": r[9],
-                "created_at": str(r[10])
+                "requested_by": r[2],
+                "requester": r[3],
+                "livestream": r[4],
+                "day": str(r[5]),
+                "shift": r[6],
+                "role": r[7],
+                "reason": r[8],
+                "status": r[9],
+                "request_type": r[10],
+                "created_at": str(r[11])
             })
 
         return result
