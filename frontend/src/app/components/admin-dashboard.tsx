@@ -801,9 +801,9 @@ const saveEmployeeAccountPreferences = async () => {
                       <TableHead>Name</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Host Accounts</TableHead>
+                      {/* <TableHead>Host Accounts</TableHead>
                       <TableHead>Operator Accounts</TableHead>
-                      <TableHead>Total Shifts</TableHead>
+                      <TableHead>Total Shifts</TableHead> */}
                       <TableHead>Joined Date</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -812,7 +812,7 @@ const saveEmployeeAccountPreferences = async () => {
                     {employees.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={8}
+                          colSpan={5}
                           className="text-center text-gray-500 py-6"
                         >
                           No employees found. Click "Add Employee" to get
@@ -884,7 +884,7 @@ const saveEmployeeAccountPreferences = async () => {
                               </Badge>
                             </TableCell>
 
-                            <TableCell className="max-w-[180px] truncate">
+                            {/* <TableCell className="max-w-[180px] truncate">
                               {employee.host_accounts || "None"}
                             </TableCell>
 
@@ -892,7 +892,7 @@ const saveEmployeeAccountPreferences = async () => {
                               {employee.operator_accounts || "None"}
                             </TableCell>
 
-                            <TableCell>{employee.totalShifts}</TableCell>
+                            <TableCell>{employee.totalShifts}</TableCell> */}
 
                             <TableCell>
                               {new Date(
