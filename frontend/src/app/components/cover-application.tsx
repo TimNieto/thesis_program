@@ -75,6 +75,7 @@ interface ShiftApplication {
 interface CoverRequest {
   id: string;
   requester: string;
+  schedule_id?: number;
   livestream: string;
   day: string;
   shift: string;
@@ -223,6 +224,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
         data.map((r: any) => ({
           id: String(r.id),
 
+          schedule_id: Number(r.schedule_id),
+
           requester: r.requester,
 
           livestream: r.livestream,
@@ -347,6 +350,26 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       ),
   );
 
+  const pendingCoverRequestScheduleIds = new Set(
+    coverRequests
+      .filter(
+        (request) =>
+          role !== "admin" &&
+          request.status === "pending" &&
+          request.requester === currentUser.name &&
+          request.schedule_id
+      )
+      .map((request) => Number(request.schedule_id))
+  );
+
+  const requestableMyShifts =
+    role === "admin"
+      ? myShifts
+      : myShifts.filter(
+          (shift) =>
+            !pendingCoverRequestScheduleIds.has(Number(shift.schedule_id)),
+        );
+
   const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
 
   const [selectedShift, setSelectedShift] = useState<{
@@ -417,9 +440,18 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
       const data = await res.json();
 
-      toast.success(data.message);
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to submit request");
+      }
 
-      fetchCoverRequests();
+      if (data.message === "Already requested") {
+        toast.info("You already requested cover for this shift.");
+      } else {
+        toast.success(data.message);
+      }
+
+      await fetchCoverRequests();
+      await fetchMyShifts();
 
       setIsCoverDialogOpen(false);
       setCoverReason("");
@@ -793,7 +825,12 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {myShifts.map((slot, index) => {
+                  {requestableMyShifts.length === 0 && (
+                    <p className="text-sm text-gray-500">
+                      No shifts available for cover request. Shifts with pending cover requests are hidden.
+                    </p>
+                  )}
+                  {requestableMyShifts.map((slot, index) => {
                     const shiftInfo = getShiftInfo(slot.shift);
                     return (
                       <Card

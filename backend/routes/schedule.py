@@ -228,6 +228,8 @@ def get_requests(employee_id: int):
             SELECT  
 
                 cr.id,
+                       
+                cr.schedule_id,
 
                 e.full_name,
 
@@ -314,16 +316,17 @@ def get_requests(employee_id: int):
 
             result.append({
                 "id": r[0],
-                "requester": r[1],
-                "livestream": r[2],
-                "day": str(r[3]),
-                "shift": r[4],
-                "role": r[5],
-                "reason": r[6],
-                "status": r[7],
-                "request_type": r[8],
-                "created_at": str(r[9]),
-                "is_targeted": r[10]
+                "schedule_id": r[1],
+                "requester": r[2],
+                "livestream": r[3],
+                "day": str(r[4]),
+                "shift": r[5],
+                "role": r[6],
+                "reason": r[7],
+                "status": r[8],
+                "request_type": r[9],
+                "created_at": str(r[10]),
+                "is_targeted": r[11]
             })
 
         return result
@@ -345,6 +348,8 @@ def get_all_requests():
             SELECT
 
                 cr.id,
+                       
+                cr.schedule_id,
 
                 e.full_name,
 
@@ -394,15 +399,16 @@ def get_all_requests():
 
             result.append({
                 "id": r[0],
-                "requester": r[1],
-                "livestream": r[2],
-                "day": str(r[3]),
-                "shift": r[4],
-                "role": r[5],
-                "reason": r[6],
-                "status": r[7],
-                "request_type": r[8],
-                "created_at": str(r[9])
+                "schedule_id": r[1],
+                "requester": r[2],
+                "livestream": r[3],
+                "day": str(r[4]),
+                "shift": r[5],
+                "role": r[6],
+                "reason": r[7],
+                "status": r[8],
+                "request_type": r[9],
+                "created_at": str(r[10])
             })
 
         return result
