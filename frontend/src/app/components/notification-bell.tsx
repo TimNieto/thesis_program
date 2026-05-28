@@ -21,7 +21,9 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [viewAllOpen, setViewAllOpen] = useState(false);
   const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
-  const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
+  const [lastSeenNotificationId, setLastSeenNotificationId] = useState<
+    number | null
+  >(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const fetchNotifications = async () => {
     try {
@@ -90,7 +92,16 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
   }, [employeeId]);
 
   useEffect(() => {
-    if (unreadCount > previousUnreadCount) {
+    if (notifications.length === 0) return;
+
+    const latestNotificationId = notifications[0].notification_id;
+
+    if (lastSeenNotificationId === null) {
+      setLastSeenNotificationId(latestNotificationId);
+      return;
+    }
+
+    if (latestNotificationId !== lastSeenNotificationId) {
       const audio = new Audio("/notificationSound.mp3");
 
       audio.volume = 1;
@@ -98,10 +109,10 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
       audio.play().catch((err) => {
         console.log("Audio playback blocked", err);
       });
-    }
 
-    setPreviousUnreadCount(unreadCount);
-  }, [unreadCount, previousUnreadCount]);
+      setLastSeenNotificationId(latestNotificationId);
+    }
+  }, [notifications, lastSeenNotificationId]);
 
   const markAllAsRead = async () => {
     try {
