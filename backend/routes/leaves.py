@@ -1,7 +1,10 @@
-from fastapi import APIRouter
+# backend/routes/leaves.py
+
+from fastapi import APIRouter, HTTPException
 from uuid import uuid4
 from datetime import datetime, timedelta
 from db.database import get_connection
+from services.notification_service import create_notification
 
 router = APIRouter()
 
@@ -43,6 +46,25 @@ def create_leave_request(payload: dict):
 
             current += timedelta(days=1)
 
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE main_role = 'Team Leader'
+            AND employment_status = 'Active'
+        """)
+
+        admins = cursor.fetchall()
+
+        for admin in admins:
+
+            create_notification(
+                cursor,
+                admin[0],
+                "New Leave Request",
+                "An employee submitted a leave request.",
+                "leave"
+            )
+
         conn.commit()
 
         return {
@@ -51,8 +73,9 @@ def create_leave_request(payload: dict):
         }
 
     except Exception as e:
+        conn.rollback()
         print("ERROR:", str(e))
-        return {"error": str(e)}  # 🔥 forces JSON response
+        raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         cursor.close()
@@ -152,6 +175,25 @@ def update_leave_status(request_id: str, payload: dict):
             SET status = %s
             WHERE request_id = %s
         """, (status, request_id))
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM leaves
+            WHERE request_id = %s
+            LIMIT 1
+        """, (request_id,))
+
+        employee = cursor.fetchone()
+
+        if employee:
+
+            create_notification(
+                cursor,
+                employee[0],
+                f"Leave Request {status.title()}",
+                f"Your leave request was {status}.",
+                "leave"
+            )
 
         conn.commit()
 

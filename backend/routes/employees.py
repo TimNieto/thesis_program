@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from db.database import get_connection
 from passlib.hash import bcrypt
+from services.notification_service import create_notification
 import traceback
 import hashlib
 
@@ -324,6 +325,25 @@ def add_employee(data: dict):
             operator_account,
             contact_number
         ))
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE main_role = 'Team Leader'
+            AND employment_status = 'Active'
+        """)
+
+        admins = cursor.fetchall()
+
+        for admin in admins:
+
+            create_notification(
+                cursor,
+                admin[0],
+                "New Employee Added",
+                f"{name} was added to the system.",
+                "employee"
+            )
 
         conn.commit()
 

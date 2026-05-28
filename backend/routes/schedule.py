@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from services.schedule_service import generate_weekly_schedule, get_generated_schedule
 from db.database import get_connection
+from services.notification_service import create_notification
 from datetime import datetime
 from fastapi import Body
 from typing import List
@@ -183,6 +184,25 @@ def request_cover(schedule_id: int, payload: dict):
                     request_id,
                     emp[0]
                 ))
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE main_role = 'Team Leader'
+            AND employment_status = 'Active'
+        """)
+
+        admins = cursor.fetchall()
+
+        for admin in admins:
+
+            create_notification(
+                cursor,
+                admin[0],
+                "New Cover Request",
+                "An employee submitted a cover request.",
+                "cover"
+            )
 
         conn.commit()
 
@@ -393,39 +413,106 @@ def get_all_requests():
 
 @router.post("/coverage-requests/{id}/approve")
 def approve_request(id: int):
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        UPDATE coverage_requests
-        SET status = 'approved', approved_at = NOW()
-        WHERE id = %s
-    """, (id,))
+    try:
 
-    conn.commit()
+        # GET REQUESTER
+        cursor.execute("""
+            SELECT requested_by
+            FROM coverage_requests
+            WHERE id = %s
+        """, (id,))
 
-    cursor.close()
-    conn.close()
+        request = cursor.fetchone()
 
-    return {"message": "Approved"}
+        if not request:
+            raise HTTPException(
+                status_code=404,
+                detail="Request not found"
+            )
+
+        requester_id = request[0]
+
+        # APPROVE REQUEST
+        cursor.execute("""
+            UPDATE coverage_requests
+            SET status = 'approved',
+                approved_at = NOW()
+            WHERE id = %s
+        """, (id,))
+
+        # SEND NOTIFICATION
+        create_notification(
+            cursor,
+            requester_id,
+            "Cover Request Approved",
+            "Your cover request was approved.",
+            "cover"
+        )
+
+        conn.commit()
+
+        return {
+            "message": "Approved"
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
 
 @router.post("/coverage-requests/{id}/deny")
 def deny_request(id: int):
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        UPDATE coverage_requests
-        SET status = 'denied'
-        WHERE id = %s
-    """, (id,))
+    try:
 
-    conn.commit()
+        # GET REQUESTER
+        cursor.execute("""
+            SELECT requested_by
+            FROM coverage_requests
+            WHERE id = %s
+        """, (id,))
 
-    cursor.close()
-    conn.close()
+        request = cursor.fetchone()
 
-    return {"message": "Denied"}
+        if not request:
+            raise HTTPException(
+                status_code=404,
+                detail="Request not found"
+            )
+
+        requester_id = request[0]
+
+        # DENY REQUEST
+        cursor.execute("""
+            UPDATE coverage_requests
+            SET status = 'denied'
+            WHERE id = %s
+        """, (id,))
+
+        # SEND NOTIFICATION
+        create_notification(
+            cursor,
+            requester_id,
+            "Cover Request Denied",
+            "Your cover request was denied.",
+            "cover"
+        )
+
+        conn.commit()
+
+        return {
+            "message": "Denied"
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @router.post("/coverage-requests/{id}/apply")
@@ -560,6 +647,25 @@ def apply_for_cover(id: int, payload: dict):
                 reason
             ))
 
+            # NOTIFY REQUESTER
+            cursor.execute("""
+                SELECT requested_by
+                FROM coverage_requests
+                WHERE id = %s
+            """, (id,))
+
+            requester = cursor.fetchone()
+
+            if requester:
+
+                create_notification(
+                    cursor,
+                    requester[0],
+                    "New Cover Applicant",
+                    "Someone applied to cover your shift.",
+                    "cover"
+                )
+
             conn.commit()
 
             return {
@@ -607,6 +713,25 @@ def apply_for_cover(id: int, payload: dict):
             employee_id,
             reason
         ))
+
+        # NOTIFY REQUESTER
+        cursor.execute("""
+            SELECT requested_by
+            FROM coverage_requests
+            WHERE id = %s
+        """, (id,))
+
+        requester = cursor.fetchone()
+
+        if requester:
+
+            create_notification(
+                cursor,
+                requester[0],
+                "New Cover Applicant",
+                "Someone applied to cover your shift.",
+                "cover"
+            )
 
         conn.commit()
 
@@ -784,6 +909,24 @@ def approve_application(id: int):
             id
         ))
 
+        cursor.execute("""
+            SELECT requested_by
+            FROM coverage_requests
+            WHERE id = %s
+        """, (coverage_request_id,))
+
+        requester = cursor.fetchone()
+
+        if requester:
+
+            create_notification(
+                cursor,
+                requester[0],
+                "Cover Request Approved",
+                "Your cover request was approved.",
+                "cover"
+            )
+
         conn.commit()
 
         return {
@@ -802,9 +945,9 @@ def deny_application(id: int):
 
     try:
 
-        # CHECK EXISTS
+        # GET APPLICANT
         cursor.execute("""
-            SELECT id
+            SELECT applicant_id
             FROM shift_applications
             WHERE id = %s
         """, (id,))
@@ -817,12 +960,23 @@ def deny_application(id: int):
                 detail="Application not found"
             )
 
+        applicant_id = app[0]
+
         # DENY APPLICATION
         cursor.execute("""
             UPDATE shift_applications
             SET status = 'denied'
             WHERE id = %s
         """, (id,))
+
+        # SEND NOTIFICATION
+        create_notification(
+            cursor,
+            applicant_id,
+            "Cover Application Denied",
+            "Your application to cover a shift was denied.",
+            "cover"
+        )
 
         conn.commit()
 
@@ -904,6 +1058,24 @@ def save_schedule(assignments: List[dict] = Body(...)):
                     role,
                     slot_index
                 ))
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE employment_status = 'Active'
+        """)
+
+        employees = cursor.fetchall()
+
+        for emp in employees:
+
+            create_notification(
+                cursor,
+                emp[0],
+                "New Schedule Published",
+                "A new schedule has been published.",
+                "schedule"
+            )
 
         conn.commit()
 

@@ -721,4 +721,3 @@ def ensure_next_week_shifts(cursor):
                     account_name,
                     template_id
                 ))
-

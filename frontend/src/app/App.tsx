@@ -7,6 +7,7 @@ import { CoverApplication } from "@/app/components/cover-application";
 import { AdminDashboard } from "@/app/components/admin-dashboard";
 import { EmployeeProfile } from "@/app/components/employee-profile";
 import { CompanySettings } from "@/app/components/company-settings";
+import { NotificationBell } from "@/app/components/notification-bell";
 import { Button } from "@/app/components/ui/button";
 import {
   Tabs,
@@ -72,10 +73,18 @@ export default function App() {
                 </p>
               </div>
             </div>
-            <Button onClick={handleLogout} variant="outline" className="gap-2">
-              <LogOut className="size-4" />
-              Logout
-            </Button>
+            <div className="flex items-center gap-2">
+              <NotificationBell employeeId={user.id} />
+
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="gap-2"
+              >
+                <LogOut className="size-4" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>

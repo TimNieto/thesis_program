@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 from db.database import get_connection
+from services.notification_service import create_notification
 
 router = APIRouter()
 
@@ -81,6 +82,24 @@ def update_settings(payload: dict):
             payload["fairness_weight"],
             payload["absence_replacement_mode"]
         ))
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE employment_status = 'Active'
+        """)
+
+        employees = cursor.fetchall()
+
+        for emp in employees:
+
+            create_notification(
+                cursor,
+                emp[0],
+                "Company Settings Updated",
+                "Company settings were updated.",
+                "settings"
+            )
 
         conn.commit()
 
