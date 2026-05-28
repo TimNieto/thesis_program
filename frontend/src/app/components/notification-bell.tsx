@@ -86,7 +86,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
     const interval = setInterval(() => {
       fetchNotifications();
       fetchUnreadCount();
-    }, 10000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [employeeId]);
