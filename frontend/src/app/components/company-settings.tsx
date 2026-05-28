@@ -1668,6 +1668,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
                   <SelectItem value="50">50 - Maximum Penalty</SelectItem>
               </SelectContent>
             </Select>
+            
 
             <p className="text-xs text-gray-500">
                Higher values make the scheduler avoid assigning employees after a previous GY shift
