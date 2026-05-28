@@ -78,8 +78,13 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="relative">
+        <PopoverTrigger asChild>
+        <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="relative z-50"
+        >
           <Bell className="size-4" />
 
           {unreadCount > 0 && (
@@ -90,7 +95,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80">
+      <PopoverContent align="end" sideOffset={8} className="w-80 z-[9999] bg-white">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">Notifications</h3>
 
