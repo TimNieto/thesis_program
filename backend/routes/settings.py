@@ -145,6 +145,7 @@ def get_account_settings():
                 operator_policy,
                 allow_partial_staffing
             FROM account_settings
+            WHERE pending_delete = FALSE
             ORDER BY priority_level
         """)
 

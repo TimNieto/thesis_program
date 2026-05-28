@@ -24,6 +24,7 @@ def get_accounts():
                 allow_partial_staffing,
                 operator_policy
             FROM account_settings
+            WHERE pending_delete = FALSE
             ORDER BY account_setting_id ASC
         """)
 
@@ -154,50 +155,24 @@ def delete_account(account_name: str):
 
     try:
 
-        # PREVENT DELETING ACCOUNTS USED IN SAVED SCHEDULES
         cursor.execute("""
-            SELECT gs.schedule_id
-
-            FROM generated_schedule gs
-
-            JOIN shifts s
-                ON gs.shift_id = s.shift_id
-
-            WHERE s.account = %s
-            AND gs.is_archived = FALSE
-
-            LIMIT 1
+            UPDATE account_settings
+            SET
+                pending_delete = TRUE,
+                updated_at = NOW()
+            WHERE LOWER(account_name) = LOWER(%s)
         """, (account_name,))
 
-        if cursor.fetchone():
-
+        if cursor.rowcount == 0:
             raise HTTPException(
-                status_code=400,
-                detail="Cannot remove account with generated schedules"
+                status_code=404,
+                detail="Account not found"
             )
-
-        # DELETE AVAILABILITY
-        cursor.execute("""
-            DELETE FROM availability
-            WHERE account = %s
-        """, (account_name,))
-
-        # DELETE SHIFTS
-        cursor.execute("""
-            DELETE FROM shifts
-            WHERE account = %s
-        """, (account_name,))
-
-        # DELETE ACCOUNT
-        cursor.execute("""
-            DELETE FROM account_settings
-            WHERE account_name = %s
-        """, (account_name,))
 
         conn.commit()
 
         return {
-            "message": "Account removed"
+            "message": "Account marked for deletion. It will be removed after a new schedule is saved."
         }
 
     finally:

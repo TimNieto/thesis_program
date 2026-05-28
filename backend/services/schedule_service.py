@@ -159,6 +159,12 @@ def fetch_shifts(cursor):
             AND st.is_active = TRUE
 
         WHERE s.shift_date BETWEEN %s AND %s
+        AND EXISTS (
+            SELECT 1
+            FROM account_settings a
+            WHERE LOWER(a.account_name) = LOWER(s.account)
+            AND a.pending_delete = FALSE
+        )
 
         ORDER BY
             s.shift_date,
@@ -453,6 +459,7 @@ def generate_weekly_schedule():
                 operator_policy,
                 allow_partial_staffing
             FROM account_settings
+            WHERE pending_delete = FALSE
             ORDER BY account_setting_id ASC
         """)
 
@@ -612,6 +619,7 @@ def get_generated_schedule():
         cursor.execute("""
             SELECT account_name
             FROM account_settings
+            WHERE pending_delete = FALSE
             ORDER BY account_setting_id ASC
         """)
 
@@ -669,6 +677,7 @@ def ensure_next_week_shifts(cursor):
     cursor.execute("""
         SELECT account_name
         FROM account_settings
+        WHERE pending_delete = FALSE
         ORDER BY account_setting_id ASC
     """)
 
@@ -721,3 +730,42 @@ def ensure_next_week_shifts(cursor):
                     account_name,
                     template_id
                 ))
+
+
+def cleanup_pending_deleted_accounts(cursor):
+
+    cursor.execute("""
+        SELECT account_name
+        FROM account_settings
+        WHERE pending_delete = TRUE
+    """)
+
+    pending_accounts = cursor.fetchall()
+
+    if not pending_accounts:
+        return
+
+    for row in pending_accounts:
+
+        account_name = row[0]
+
+        cursor.execute("""
+            DELETE FROM availability
+            WHERE LOWER(account) = LOWER(%s)
+        """, (account_name,))
+
+        cursor.execute("""
+            DELETE FROM shifts
+            WHERE LOWER(account) = LOWER(%s)
+            AND shift_id NOT IN (
+                SELECT shift_id
+                FROM generated_schedule
+                WHERE is_archived = FALSE
+            )
+        """, (account_name,))
+
+        cursor.execute("""
+            DELETE FROM account_settings
+            WHERE LOWER(account_name) = LOWER(%s)
+            AND pending_delete = TRUE
+        """, (account_name,))
