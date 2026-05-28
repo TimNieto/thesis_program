@@ -91,7 +91,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
 
   useEffect(() => {
     if (unreadCount > previousUnreadCount) {
-      const audio = new Audio("/notification.mp3");
+      const audio = new Audio("/notificationSound.mp3");
 
       audio.volume = 1;
 
