@@ -25,7 +25,8 @@ def get_settings():
                 allow_double_shifts,
                 fairness_weight,
                 absence_replacement_mode,
-                enable_in_app_notifications
+                enable_in_app_notifications,
+                gy_fatigue_penalty
             FROM company_settings
             LIMIT 1
         """)
@@ -44,7 +45,8 @@ def get_settings():
             "allow_double_shifts": row[5],
             "fairness_weight": row[6],
             "absence_replacement_mode": row[7],
-            "enable_in_app_notifications": row[8]
+            "enable_in_app_notifications": row[8],
+            "gy_fatigue_penalty": row[9]
         }
 
     finally:
@@ -61,6 +63,19 @@ def update_settings(payload: dict):
     cursor = conn.cursor()
 
     try:
+        gy_fatigue_penalty = payload.get("gy_fatigue_penalty", 20)
+
+        try:
+            gy_fatigue_penalty = int(gy_fatigue_penalty)
+        except (TypeError, ValueError):
+            gy_fatigue_penalty = 20
+
+        if gy_fatigue_penalty < 0:
+            gy_fatigue_penalty = 0
+
+        if gy_fatigue_penalty > 100:
+            gy_fatigue_penalty = 100
+
         cursor.execute("""
             UPDATE company_settings
             SET
@@ -73,6 +88,7 @@ def update_settings(payload: dict):
                 fairness_weight = %s,
                 absence_replacement_mode = %s,
                 enable_in_app_notifications = %s,
+                gy_fatigue_penalty = %s,
                 updated_at = NOW()
             WHERE settings_id = 1
         """, (
@@ -84,9 +100,10 @@ def update_settings(payload: dict):
             payload["allow_double_shifts"],
             payload["fairness_weight"],
             payload["absence_replacement_mode"],
-            payload.get("enable_in_app_notifications", True)
+            payload.get("enable_in_app_notifications", True),
+            gy_fatigue_penalty
         ))
-        
+
         updated_by = payload.get("updated_by")
 
         if updated_by:
@@ -106,7 +123,6 @@ def update_settings(payload: dict):
         employees = cursor.fetchall()
 
         for emp in employees:
-
             create_notification(
                 cursor,
                 emp[0],

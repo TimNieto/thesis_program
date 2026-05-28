@@ -115,7 +115,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
 
   const [fairnessWeight, setFairnessWeight] = useState("3");
 
-  const [gyPenalty, setGyPenalty] = useState("5");
+  const [gyPenalty, setGyPenalty] = useState("20");
   const [accountPolicies, setAccountPolicies] = useState<any[]>([]);
 
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -169,7 +169,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
 
       setFairnessWeight(String(data.fairness_weight));
 
-      setGyPenalty(String(data.gy_shift_penalty));
+      setGyPenalty(String(data.gy_fatigue_penalty ?? 20));
 
       setInAppNotifications(data.enable_in_app_notifications);
 
@@ -701,7 +701,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
 
             fairness_weight: Number(fairnessWeight),
 
-            gy_shift_penalty: Number(gyPenalty),
+            gy_fatigue_penalty: Number(gyPenalty),
 
             absence_replacement_mode: absenceReplacementMode,
 
@@ -1655,20 +1655,22 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
               </SelectTrigger>
 
               <SelectContent>
-                <SelectItem value="0">0 - No Penalty</SelectItem>
+                  <SelectItem value="0">0 - No Penalty</SelectItem>
 
-                <SelectItem value="2">2 - Low Penalty</SelectItem>
+                  <SelectItem value="10">10 - Low Penalty</SelectItem>
 
-                <SelectItem value="5">5 - Moderate Penalty</SelectItem>
+                  <SelectItem value="20">20 - Moderate Penalty</SelectItem>
 
-                <SelectItem value="8">8 - High Penalty</SelectItem>
+                  <SelectItem value="30">30 - High Penalty</SelectItem>
 
-                <SelectItem value="10">10 - Very High Penalty</SelectItem>
+                  <SelectItem value="40">40 - Very High Penalty</SelectItem>
+
+                  <SelectItem value="50">50 - Maximum Penalty</SelectItem>
               </SelectContent>
             </Select>
 
             <p className="text-xs text-gray-500">
-              Higher values avoid assigning GY shifts
+               Higher values make the scheduler avoid assigning employees after a previous GY shift
             </p>
           </div>
         </CardContent>

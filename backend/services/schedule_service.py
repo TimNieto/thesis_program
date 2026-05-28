@@ -134,7 +134,7 @@ def get_next_week_range():
 
     return next_monday.date(), next_sunday.date()
 
-def fetch_shifts(cursor):
+def fetch_shifts(cursor, gy_fatigue_penalty=20):
     start_date, end_date = get_next_week_range()
 
     staffing_requirements_map = fetch_staffing_requirements_map(cursor)
@@ -188,9 +188,17 @@ def fetch_shifts(cursor):
             "shift_type": r[4],
             "start_time": r[5],
             "end_time": r[6],
-            "fatigue_penalty": r[7],
+            "fatigue_penalty": (
+                gy_fatigue_penalty
+                if str(r[4]).upper() == "GY"
+                else r[7]
+            ),
             "difficulty_weight": r[8],
-            "is_overnight": r[9],
+            "is_overnight": (
+                True
+                if str(r[4]).upper() == "GY"
+                else r[9]
+            ),
             "staffing_requirements": staffing_requirements_map.get(r[3], [])
         }
         for r in rows
@@ -412,16 +420,7 @@ def generate_weekly_schedule():
     cursor = conn.cursor()
 
     try:
-        ensure_next_week_shifts(cursor)
-        conn.commit()
-        # Fetch all data
         employees = fetch_employees(cursor)
-        shifts = fetch_shifts(cursor)
-        availability = fetch_availability(cursor)
-        leaves = fetch_leaves(cursor)
-        leaves_map = build_leaves_map(leaves)
-        absences_map = {}
-        #absences = fetch_absences(cursor)
 
         # -------------------------
         # FETCH SETTINGS
@@ -432,7 +431,8 @@ def generate_weekly_schedule():
                 max_shifts_per_day,
                 max_shifts_per_week,
                 allow_double_shifts,
-                fairness_weight
+                fairness_weight,
+                gy_fatigue_penalty
             FROM company_settings
             LIMIT 1
         """)
@@ -444,8 +444,21 @@ def generate_weekly_schedule():
             "max_shifts_per_day": settings_row[1],
             "max_shifts_per_week": settings_row[2],
             "allow_double_shifts": settings_row[3],
-            "fairness_weight": settings_row[4]
+            "fairness_weight": settings_row[4],
+            "gy_fatigue_penalty": settings_row[5]
         }
+
+        shifts = fetch_shifts(
+            cursor,
+            settings["gy_fatigue_penalty"]
+        )
+
+        availability = fetch_availability(cursor)
+        leaves = fetch_leaves(cursor)
+        leaves_map = build_leaves_map(leaves)
+        absences_map = {}
+        #absences = fetch_absences(cursor)
+
 
         # -------------------------
         # FETCH ACCOUNT SETTINGS
