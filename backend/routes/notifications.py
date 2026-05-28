@@ -93,6 +93,30 @@ def get_all_notifications(employee_id: int):
         cursor.close()
         conn.close()
 
+@router.get("/notifications/{employee_id}/unread-count")
+def get_unread_notification_count(employee_id: int):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM notifications
+            WHERE recipient_employee_id = %s
+            AND is_read = FALSE
+        """, (employee_id,))
+
+        count = cursor.fetchone()[0]
+
+        return {
+            "unread_count": count
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
+        
 # -----------------------------------
 # MARK AS READ
 # -----------------------------------

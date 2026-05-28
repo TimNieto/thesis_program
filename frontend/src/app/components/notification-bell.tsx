@@ -22,6 +22,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
   const [viewAllOpen, setViewAllOpen] = useState(false);
   const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
   const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const fetchNotifications = async () => {
     try {
       const res = await fetch(
@@ -57,19 +58,36 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
     }
   };
 
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/notifications/${employeeId}/unread-count`,
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch unread count");
+      }
+
+      const data = await res.json();
+      setUnreadCount(data.unread_count || 0);
+    } catch (err) {
+      console.error("Failed to fetch unread count", err);
+    }
+  };
+
   useEffect(() => {
     if (!employeeId) return;
 
     fetchNotifications();
+    fetchUnreadCount();
 
     const interval = setInterval(() => {
       fetchNotifications();
+      fetchUnreadCount();
     }, 10000);
 
     return () => clearInterval(interval);
   }, [employeeId]);
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   useEffect(() => {
     if (unreadCount > previousUnreadCount) {
@@ -99,6 +117,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
       }
 
       fetchNotifications();
+      fetchUnreadCount();
     } catch (err) {
       console.error("Failed to mark notifications as read", err);
     }
