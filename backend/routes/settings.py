@@ -24,7 +24,8 @@ def get_settings():
                 max_shifts_per_week,
                 allow_double_shifts,
                 fairness_weight,
-                absence_replacement_mode
+                absence_replacement_mode,
+                enable_in_app_notifications
             FROM company_settings
             LIMIT 1
         """)
@@ -42,7 +43,8 @@ def get_settings():
             "max_shifts_per_week": row[4],
             "allow_double_shifts": row[5],
             "fairness_weight": row[6],
-            "absence_replacement_mode": row[7]
+            "absence_replacement_mode": row[7],
+            "enable_in_app_notifications": row[8]
         }
 
     finally:
@@ -70,6 +72,7 @@ def update_settings(payload: dict):
                 allow_double_shifts = %s,
                 fairness_weight = %s,
                 absence_replacement_mode = %s,
+                enable_in_app_notifications = %s,
                 updated_at = NOW()
             WHERE settings_id = 1
         """, (
@@ -80,7 +83,8 @@ def update_settings(payload: dict):
             payload["max_shifts_per_week"],
             payload["allow_double_shifts"],
             payload["fairness_weight"],
-            payload["absence_replacement_mode"]
+            payload["absence_replacement_mode"],
+            payload.get("enable_in_app_notifications", True)
         ))
 
         cursor.execute("""

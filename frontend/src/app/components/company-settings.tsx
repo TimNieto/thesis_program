@@ -160,6 +160,9 @@ export function CompanySettings() {
       setFairnessWeight(String(data.fairness_weight));
 
       setGyPenalty(String(data.gy_shift_penalty));
+
+      setInAppNotifications(data.enable_in_app_notifications);
+
     } catch (err) {
       console.error("Failed to fetch settings", err);
     }
@@ -691,6 +694,8 @@ export function CompanySettings() {
             gy_shift_penalty: Number(gyPenalty),
 
             absence_replacement_mode: absenceReplacementMode,
+
+            enable_in_app_notifications: inAppNotifications,
           }),
         },
       );
