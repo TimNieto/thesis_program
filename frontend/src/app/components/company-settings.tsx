@@ -110,7 +110,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
 
   // Notification Preferences
   const [inAppNotifications, setInAppNotifications] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(false);
   const [smsNotifications, setSmsNotifications] = useState(false);
 
   const [fairnessWeight, setFairnessWeight] = useState("3");
