@@ -128,3 +128,4 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
         )}
     </div>
     );
+}
