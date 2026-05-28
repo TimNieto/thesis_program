@@ -51,7 +51,8 @@ def create_leave_request(payload: dict):
             FROM employees
             WHERE main_role = 'Team Leader'
             AND employment_status = 'Active'
-        """)
+            AND employee_id != %s
+        """, (employee_id,))
 
         admins = cursor.fetchall()
 

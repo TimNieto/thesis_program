@@ -326,12 +326,23 @@ def add_employee(data: dict):
             contact_number
         ))
 
-        cursor.execute("""
-            SELECT employee_id
-            FROM employees
-            WHERE main_role = 'Team Leader'
-            AND employment_status = 'Active'
-        """)
+        created_by = data.get("created_by")
+
+        if created_by:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE main_role = 'Team Leader'
+                AND employment_status = 'Active'
+                AND employee_id != %s
+            """, (created_by,))
+        else:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE main_role = 'Team Leader'
+                AND employment_status = 'Active'
+            """)
 
         admins = cursor.fetchall()
 

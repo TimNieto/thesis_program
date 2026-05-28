@@ -307,6 +307,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             host_accounts: hostAccounts.length > 0 ? hostAccounts : null,
             operator_accounts:
               operatorAccounts.length > 0 ? operatorAccounts : null,
+            created_by: currentUser.id,
           }),
         },
       );

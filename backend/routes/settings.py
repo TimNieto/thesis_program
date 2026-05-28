@@ -86,12 +86,22 @@ def update_settings(payload: dict):
             payload["absence_replacement_mode"],
             payload.get("enable_in_app_notifications", True)
         ))
+        
+        updated_by = payload.get("updated_by")
 
-        cursor.execute("""
-            SELECT employee_id
-            FROM employees
-            WHERE employment_status = 'Active'
-        """)
+        if updated_by:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE employment_status = 'Active'
+                AND employee_id != %s
+            """, (updated_by,))
+        else:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE employment_status = 'Active'
+            """)
 
         employees = cursor.fetchall()
 

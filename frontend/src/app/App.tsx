@@ -138,13 +138,17 @@ export default function App() {
               </TabsContent>
 
               <TabsContent value="settings">
-                <CompanySettings />
+                <CompanySettings currentUser={user} />
               </TabsContent>
             </>
           )}
 
           <TabsContent value="schedule">
-            <ScheduleGenerator currentUser={user.email} role={user.role} />
+            <ScheduleGenerator
+              currentUser={user.email}
+              currentUserId={user.id}
+              role={user.role}
+            />
           </TabsContent>
 
           <TabsContent value="cover">

@@ -61,6 +61,7 @@ interface LeaveRequest {
 
 interface ScheduleGeneratorProps {
   currentUser: string;
+  currentUserId: number;
   role: string;
 }
 
@@ -76,6 +77,7 @@ const DAYS = [
 
 export function ScheduleGenerator({
   currentUser,
+  currentUserId,
   role,
 }: ScheduleGeneratorProps) {
   const [livestreams, setLivestreams] = useState<string[]>([]);
@@ -566,7 +568,10 @@ export function ScheduleGenerator({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            assignments: payload,
+            saved_by: currentUserId,
+          }),
         },
       );
 

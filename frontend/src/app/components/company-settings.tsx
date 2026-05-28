@@ -57,7 +57,17 @@ interface StaffingRequirement {
   required_count: number;
 }
 
-export function CompanySettings() {
+interface CompanySettingsProps {
+  currentUser: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    displayRole: string;
+  };
+}
+
+export function CompanySettings({ currentUser }: CompanySettingsProps) {
   // Company Profile
   const [companyType, setCompanyType] = useState("Live Selling");
   const [companyName, setCompanyName] = useState("Live Stream Operations");
@@ -696,6 +706,8 @@ export function CompanySettings() {
             absence_replacement_mode: absenceReplacementMode,
 
             enable_in_app_notifications: inAppNotifications,
+
+            updated_by: currentUser.id,
           }),
         },
       );

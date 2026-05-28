@@ -989,9 +989,11 @@ def deny_application(id: int):
         conn.close()
 
 @router.post("/save-schedule")
-def save_schedule(assignments: List[dict] = Body(...)):
+def save_schedule(payload: dict = Body(...)):
     conn = get_connection()
     cursor = conn.cursor()
+    assignments = payload.get("assignments", [])
+    saved_by = payload.get("saved_by")
 
     try:
         cursor.execute("UPDATE emergency_cover_targets SET is_archived = TRUE")
@@ -1059,11 +1061,19 @@ def save_schedule(assignments: List[dict] = Body(...)):
                     slot_index
                 ))
 
-        cursor.execute("""
-            SELECT employee_id
-            FROM employees
-            WHERE employment_status = 'Active'
-        """)
+        if saved_by:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE employment_status = 'Active'
+                AND employee_id != %s
+            """, (saved_by,))
+        else:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE employment_status = 'Active'
+            """)
 
         employees = cursor.fetchall()
 
