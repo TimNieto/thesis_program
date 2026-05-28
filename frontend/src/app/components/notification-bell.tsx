@@ -2,12 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
-import { Button } from "@/app/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/app/components/ui/popover";
 
 interface Notification {
   notification_id: number;
@@ -24,7 +18,7 @@ interface NotificationBellProps {
 
 export function NotificationBell({ employeeId }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-
+  const [open, setOpen] = useState(false);
   const fetchNotifications = async () => {
     try {
       const res = await fetch(
@@ -76,62 +70,61 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
     }
   };
 
-  return (
-    <Popover>
-        <PopoverTrigger asChild>
-        <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="relative z-50"
+    return (
+    <div className="relative">
+        <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="relative inline-flex size-9 items-center justify-center rounded-md border bg-white hover:bg-gray-100"
         >
-          <Bell className="size-4" />
+        <Bell className="size-4" />
 
-          {unreadCount > 0 && (
+        {unreadCount > 0 && (
             <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1">
-              {unreadCount}
+            {unreadCount}
             </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+        )}
+        </button>
 
-      <PopoverContent align="end" sideOffset={8} className="w-80 z-[9999] bg-white">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Notifications</h3>
+        {open && (
+        <div className="absolute right-0 mt-2 w-80 z-[9999] rounded-md border bg-white p-4 shadow-lg">
+            <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Notifications</h3>
 
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllAsRead}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              Mark all as read
-            </button>
-          )}
+            {unreadCount > 0 && (
+                <button
+                type="button"
+                onClick={markAllAsRead}
+                className="text-xs text-blue-600 hover:underline"
+                >
+                Mark all as read
+                </button>
+            )}
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+            {notifications.length === 0 ? (
+                <p className="text-sm text-gray-500">No notifications</p>
+            ) : (
+                notifications.map((notification) => (
+                <div
+                    key={notification.notification_id}
+                    className={`border rounded-lg p-3 ${
+                    notification.is_read ? "bg-white" : "bg-blue-50"
+                    }`}
+                >
+                    <p className="font-medium text-sm">{notification.title}</p>
+                    <p className="text-sm text-gray-600">
+                    {notification.message}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                    {new Date(notification.created_at).toLocaleString()}
+                    </p>
+                </div>
+                ))
+            )}
+            </div>
         </div>
-
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-          {notifications.length === 0 ? (
-            <p className="text-sm text-gray-500">No notifications</p>
-          ) : (
-            notifications.map((notification) => (
-              <div
-                key={notification.notification_id}
-                className={`border rounded-lg p-3 ${
-                  notification.is_read ? "bg-white" : "bg-blue-50"
-                }`}
-              >
-                <p className="font-medium text-sm">{notification.title}</p>
-                <p className="text-sm text-gray-600">
-                  {notification.message}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {new Date(notification.created_at).toLocaleString()}
-                </p>
-              </div>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
+        )}
+    </div>
+    );
