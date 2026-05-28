@@ -32,7 +32,7 @@ def get_notifications(employee_id: int):
 
             ORDER BY created_at DESC
 
-            LIMIT 50
+            LIMIT 3
         """, (employee_id,))
 
         rows = cursor.fetchall()
@@ -53,6 +53,45 @@ def get_notifications(employee_id: int):
         cursor.close()
         conn.close()
 
+@router.get("/notifications/all/{employee_id}")
+def get_all_notifications(employee_id: int):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+
+        cursor.execute("""
+            SELECT
+                notification_id,
+                title,
+                message,
+                type,
+                is_read,
+                created_at
+            FROM notifications
+            WHERE recipient_employee_id = %s
+            ORDER BY created_at DESC
+            LIMIT 20
+        """, (employee_id,))
+
+        rows = cursor.fetchall()
+
+        return [
+            {
+                "notification_id": r[0],
+                "title": r[1],
+                "message": r[2],
+                "notification_type": r[3],
+                "is_read": r[4],
+                "created_at": str(r[5])
+            }
+            for r in rows
+        ]
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # -----------------------------------
 # MARK AS READ
