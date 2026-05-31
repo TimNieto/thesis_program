@@ -163,7 +163,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     useState<Employee | null>(null);
 
   const [editHostAccounts, setEditHostAccounts] = useState<string[]>([]);
-  const [editOperatorAccounts, setEditOperatorAccounts] = useState<string[]>([]);
+  const [editOperatorAccounts, setEditOperatorAccounts] = useState<string[]>(
+    [],
+  );
 
   // Override Dialog States
   const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
@@ -275,77 +277,77 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   const openAccountPrefsDialog = (employee: Employee) => {
-  setSelectedEmployeeForAccountPrefs(employee);
+    setSelectedEmployeeForAccountPrefs(employee);
 
-  setEditHostAccounts(parseAccountList(employee.host_accounts));
-  setEditOperatorAccounts(parseAccountList(employee.operator_accounts));
+    setEditHostAccounts(parseAccountList(employee.host_accounts));
+    setEditOperatorAccounts(parseAccountList(employee.operator_accounts));
 
-  setIsEditAccountPrefsOpen(true);
-};
+    setIsEditAccountPrefsOpen(true);
+  };
 
+  const saveEmployeeAccountPreferences = async () => {
+    if (!selectedEmployeeForAccountPrefs) return;
 
-const saveEmployeeAccountPreferences = async () => {
-  if (!selectedEmployeeForAccountPrefs) return;
+    const employee = selectedEmployeeForAccountPrefs;
 
-  const employee = selectedEmployeeForAccountPrefs;
-
-  if (employee.role === "Host" && editHostAccounts.length === 0) {
-    toast.error("Host account is required for Host role");
-    return;
-  }
-
-  if (employee.role === "Operator" && editOperatorAccounts.length === 0) {
-    toast.error("Operator account is required for Operator role");
-    return;
-  }
-
-  if (
-    employee.role === "Both" &&
-    (editHostAccounts.length === 0 || editOperatorAccounts.length === 0)
-  ) {
-    toast.error("Both role requires host and operator accounts");
-    return;
-  }
-
-  try {
-    const res = await fetch(
-      `https://backend-production-6e75.up.railway.app/employees/${employee.id}/account-preferences`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          host_accounts: editHostAccounts.length > 0 ? editHostAccounts : null,
-          operator_accounts:
-            editOperatorAccounts.length > 0 ? editOperatorAccounts : null,
-        }),
-      },
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.detail || "Failed to update account preferences");
+    if (employee.role === "Host" && editHostAccounts.length === 0) {
+      toast.error("Host account is required for Host role");
+      return;
     }
 
-    toast.success(data.message || "Account preferences updated");
+    if (employee.role === "Operator" && editOperatorAccounts.length === 0) {
+      toast.error("Operator account is required for Operator role");
+      return;
+    }
 
-    setIsEditAccountPrefsOpen(false);
-    setSelectedEmployeeForAccountPrefs(null);
-    setEditHostAccounts([]);
-    setEditOperatorAccounts([]);
+    if (
+      employee.role === "Both" &&
+      (editHostAccounts.length === 0 || editOperatorAccounts.length === 0)
+    ) {
+      toast.error("Both role requires host and operator accounts");
+      return;
+    }
 
-    fetchEmployees();
-  } catch (err) {
-    console.error(err);
-    toast.error(
-      err instanceof Error
-        ? err.message
-        : "Failed to update account preferences",
-    );
-  }
-};
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/employees/${employee.id}/account-preferences`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            host_accounts:
+              editHostAccounts.length > 0 ? editHostAccounts : null,
+            operator_accounts:
+              editOperatorAccounts.length > 0 ? editOperatorAccounts : null,
+          }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to update account preferences");
+      }
+
+      toast.success(data.message || "Account preferences updated");
+
+      setIsEditAccountPrefsOpen(false);
+      setSelectedEmployeeForAccountPrefs(null);
+      setEditHostAccounts([]);
+      setEditOperatorAccounts([]);
+
+      fetchEmployees();
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update account preferences",
+      );
+    }
+  };
 
   // Add Employee
   const handleAddEmployee = async () => {
@@ -428,7 +430,9 @@ const saveEmployeeAccountPreferences = async () => {
       toast.success(result.message || "Employee saved");
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to add employee");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to add employee",
+      );
     }
   };
 
@@ -762,15 +766,18 @@ const saveEmployeeAccountPreferences = async () => {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="employees" className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-2">
+        <TabsList className="grid w-full max-w-md grid-cols-1">
           <TabsTrigger value="employees" className="gap-2">
             <Users className="size-4" />
             Employees
           </TabsTrigger>
+
+          {/*
           <TabsTrigger value="assignments" className="gap-2">
             <Calendar className="size-4" />
             Assignments
           </TabsTrigger>
+          */}
         </TabsList>
 
         {/* Employees Tab */}
@@ -915,7 +922,9 @@ const saveEmployeeAccountPreferences = async () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => openAccountPrefsDialog(employee)}
+                                  onClick={() =>
+                                    openAccountPrefsDialog(employee)
+                                  }
                                 >
                                   Account Preferences
                                 </Button>
@@ -1071,7 +1080,7 @@ const saveEmployeeAccountPreferences = async () => {
           </Card>
         </TabsContent>
 
-        {/* Assignments Tab */}
+        {/* Assignments Tab }
         <TabsContent value="assignments" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1181,6 +1190,7 @@ const saveEmployeeAccountPreferences = async () => {
             </CardContent>
           </Card>
         </TabsContent>
+        */}
       </Tabs>
 
       {/* Add Employee Dialog */}
@@ -1237,9 +1247,7 @@ const saveEmployeeAccountPreferences = async () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="employeeContactNumber">
-                Contact Number
-              </Label>
+              <Label htmlFor="employeeContactNumber">Contact Number</Label>
               <Input
                 id="employeeContactNumber"
                 placeholder="Enter employee contact number"
@@ -1315,7 +1323,6 @@ const saveEmployeeAccountPreferences = async () => {
                   />
 
                   <span>None</span>
-
                 </div>
               </div>
             </div>
@@ -1357,7 +1364,6 @@ const saveEmployeeAccountPreferences = async () => {
 
                   <span>None</span>
                 </div>
-                
               </div>
             </div>
           </div>
