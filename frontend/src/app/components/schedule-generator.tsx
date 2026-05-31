@@ -416,7 +416,11 @@ export function ScheduleGenerator({
           a.day === day &&
           a.shift === shift &&
           a.shift_id,
-      )?.shift_id || null
+      )?.shift_id ||
+      assignments.find(
+        (a) => a.livestream === livestream && a.shift === shift && a.shift_id,
+      )?.shift_id ||
+      null
     );
   };
 
@@ -642,27 +646,49 @@ export function ScheduleGenerator({
       return;
     }
     try {
-      const payload = assignments
-        .filter((a) => a.shift_id)
-        .map((a) => {
-          const dayIndex = DAYS.indexOf(a.day);
+      const payload = livestreams.flatMap((livestream) =>
+        getVisibleShifts(livestream).flatMap((shift) =>
+          getRoleRowsForShift(livestream, shift.shift_name).flatMap(
+            ({ roleKey, slotIndex }) =>
+              DAYS.flatMap((day) => {
+                const dayIndex = DAYS.indexOf(day);
 
-          return {
-            shift_id: a.shift_id,
+                const cellAssignment = getAssignments(
+                  livestream,
+                  day,
+                  shift.shift_name,
+                  roleKey,
+                ).find((a) => (a.slot_index ?? 0) === slotIndex);
 
-            employee_id: a.employee_id ?? null,
+                const shiftId =
+                  cellAssignment?.shift_id ||
+                  getShiftIdForCell(livestream, day, shift.shift_name);
 
-            role: a.role.toLowerCase().replace(/\s+/g, "_"),
+                if (!shiftId) {
+                  return [];
+                }
 
-            shift_date: formatDate(weekDates[dayIndex]),
+                return [
+                  {
+                    shift_id: shiftId,
 
-            shift_type: a.shift,
+                    employee_id: cellAssignment?.employee_id ?? null,
 
-            account: a.livestream,
+                    role: roleKey.toLowerCase().replace(/\s+/g, "_"),
 
-            slot_index: a.slot_index ?? 0,
-          };
-        });
+                    shift_date: formatDate(weekDates[dayIndex]),
+
+                    shift_type: shift.shift_name,
+
+                    account: livestream,
+
+                    slot_index: slotIndex,
+                  },
+                ];
+              }),
+          ),
+        ),
+      );
 
       console.log(payload);
 
@@ -759,53 +785,55 @@ export function ScheduleGenerator({
   };
 
   const getRoleRowsForShift = (livestream: string, shiftName: string) => {
-    if (scheduleMode === "saved") {
-      const roleCounts: Record<string, number> = {};
-
-      DAYS.forEach((day) => {
-        assignments
-          .filter(
-            (a) =>
-              a.livestream === livestream &&
-              a.day === day &&
-              a.shift === shiftName,
-          )
-          .forEach((a) => {
-            roleCounts[a.role] = Math.max(
-              roleCounts[a.role] || 0,
-              (a.slot_index ?? 0) + 1,
-            );
-          });
-      });
-
-      return Object.entries(roleCounts).flatMap(([roleKey, count]) =>
-        Array.from({ length: count }, (_, index) => ({
-          roleKey,
-          slotIndex: index,
-        })),
-      );
-    }
-
     const shiftTemplate = shiftTemplates.find(
       (s) => s.shift_name === shiftName,
     );
 
-    if (!shiftTemplate) return [];
+    if (shiftTemplate) {
+      const shiftTemplateId = Number(shiftTemplate.shift_template_id);
 
-    const shiftTemplateId = Number(shiftTemplate.shift_template_id);
+      const rowsFromRequirements = staffingRequirements
+        .filter(
+          (req) =>
+            Number(req.shift_template_id) === shiftTemplateId &&
+            Number(req.required_count) > 0,
+        )
+        .flatMap((req) =>
+          Array.from({ length: Number(req.required_count) }, (_, index) => ({
+            roleKey: req.role_key,
+            slotIndex: index,
+          })),
+        );
 
-    return staffingRequirements
-      .filter(
-        (req) =>
-          Number(req.shift_template_id) === shiftTemplateId &&
-          Number(req.required_count) > 0,
-      )
-      .flatMap((req) =>
-        Array.from({ length: Number(req.required_count) }, (_, index) => ({
-          roleKey: req.role_key,
-          slotIndex: index,
-        })),
-      );
+      if (rowsFromRequirements.length > 0) {
+        return rowsFromRequirements;
+      }
+    }
+
+    const roleCounts: Record<string, number> = {};
+
+    DAYS.forEach((day) => {
+      assignments
+        .filter(
+          (a) =>
+            a.livestream === livestream &&
+            a.day === day &&
+            a.shift === shiftName,
+        )
+        .forEach((a) => {
+          roleCounts[a.role] = Math.max(
+            roleCounts[a.role] || 0,
+            (a.slot_index ?? 0) + 1,
+          );
+        });
+    });
+
+    return Object.entries(roleCounts).flatMap(([roleKey, count]) =>
+      Array.from({ length: count }, (_, index) => ({
+        roleKey,
+        slotIndex: index,
+      })),
+    );
   };
 
   const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
@@ -1236,7 +1264,7 @@ export function ScheduleGenerator({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedCell && getAssignment()
+              {selectedCell && getAssignment()?.employee_id
                 ? "Modify Assignment"
                 : "Assign Shift"}
             </DialogTitle>
@@ -1296,7 +1324,7 @@ export function ScheduleGenerator({
             </div>
           </div>
           <DialogFooter className="gap-2">
-            {selectedCell && getAssignment() && (
+            {selectedCell && getAssignment()?.employee_id && (
               <Button
                 variant="destructive"
                 onClick={handleRemove}
@@ -1310,7 +1338,9 @@ export function ScheduleGenerator({
               Cancel
             </Button>
             <Button onClick={handleAssign}>
-              {selectedCell && getAssignment() ? "Update" : "Assign"}
+              {selectedCell && getAssignment()?.employee_id
+                ? "Update"
+                : "Assign"}
             </Button>
           </DialogFooter>
         </DialogContent>
