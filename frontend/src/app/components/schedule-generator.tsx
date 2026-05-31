@@ -1079,8 +1079,15 @@ export function ScheduleGenerator({
                                           className={`border border-gray-300 p-2 ${
                                             cellAssignment?.employee_id
                                               ? getShiftColor(shift.shift_name)
-                                              : "bg-white"
-                                          } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                                              : "bg-white text-gray-300"
+                                          } ${
+                                            isClickable &&
+                                            cellAssignment?.employee_id
+                                              ? "cursor-pointer hover:bg-gray-100"
+                                              : isClickable
+                                                ? "cursor-pointer hover:bg-white"
+                                                : ""
+                                          }`}
                                           onClick={() =>
                                             isClickable &&
                                             openAssignDialog(
