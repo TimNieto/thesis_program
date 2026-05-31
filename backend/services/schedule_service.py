@@ -420,6 +420,9 @@ def generate_weekly_schedule():
     cursor = conn.cursor()
 
     try:
+        ensure_next_week_shifts(cursor)
+        conn.commit()
+
         employees = fetch_employees(cursor)
 
         # -------------------------
