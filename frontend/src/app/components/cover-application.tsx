@@ -132,7 +132,6 @@ const LEAVE_TYPES = [
 ];
 
 export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
-
   const [applications, setApplications] = useState<ShiftApplication[]>([]);
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
   const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
@@ -262,7 +261,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/shift-templates"
+        "https://backend-production-6e75.up.railway.app/shift-templates",
       );
 
       const data = await res.json();
@@ -360,9 +359,9 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           role !== "admin" &&
           request.status === "pending" &&
           Number(request.requested_by) === Number(currentUser.employee_id) &&
-          request.schedule_id
+          request.schedule_id,
       )
-      .map((request) => Number(request.schedule_id))
+      .map((request) => Number(request.schedule_id)),
   );
 
   const requestableMyShifts =
@@ -558,12 +557,9 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           ? `/shift-applications/${id}/approve`
           : `/shift-applications/${id}/deny`;
 
-      await fetch(
-        `https://backend-production-6e75.up.railway.app${endpoint}`,
-        {
-          method: "POST",
-        },
-      );
+      await fetch(`https://backend-production-6e75.up.railway.app${endpoint}`, {
+        method: "POST",
+      });
 
       toast.success(`Application ${status}`);
 
@@ -667,8 +663,42 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     );
   };
 
-  const getShiftColor = () => {
-    return "bg-gray-50 text-gray-700 border-gray-200";
+  const getShiftColor = (shift: string) => {
+    switch (shift) {
+      case "AM":
+        return "bg-blue-100 border-blue-300";
+
+      case "NN":
+        return "bg-yellow-100 border-yellow-300";
+
+      case "PM":
+        return "bg-orange-100 border-orange-300";
+
+      case "GY":
+        return "bg-purple-100 border-purple-300";
+
+      default:
+        return "bg-gray-100 border-gray-300";
+    }
+  };
+
+  const getShiftTextColor = (shift: string) => {
+    switch (shift) {
+      case "AM":
+        return "text-blue-700";
+
+      case "NN":
+        return "text-yellow-700";
+
+      case "PM":
+        return "text-orange-700";
+
+      case "GY":
+        return "text-purple-700";
+
+      default:
+        return "text-gray-700";
+    }
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -678,9 +708,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const getShiftInfo = (code: string) => {
-    return shiftTemplates.find(
-      (s) => s.shift_name === code
-    );
+    return shiftTemplates.find((s) => s.shift_name === code);
   };
 
   const fetchMyShifts = async () => {
@@ -776,7 +804,11 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                         <CardContent className="pt-6">
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                              <Badge className="text-base px-3 py-1">
+                              <Badge
+                                className={`text-base px-3 py-1 border ${getShiftColor(
+                                  slot.shift,
+                                )} ${getShiftTextColor(slot.shift)}`}
+                              >
                                 {slot.shift}
                               </Badge>
                               <Badge className={getRoleBadgeColor(slot.role)}>
@@ -830,7 +862,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {requestableMyShifts.length === 0 && (
                     <p className="text-sm text-gray-500">
-                      No shifts available for cover request. Shifts with pending cover requests are hidden.
+                      No shifts available for cover request. Shifts with pending
+                      cover requests are hidden.
                     </p>
                   )}
                   {requestableMyShifts.map((slot, index) => {
@@ -843,7 +876,11 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                         <CardContent className="pt-6">
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                              <Badge className="text-base px-3 py-1">
+                              <Badge
+                                className={`text-base px-3 py-1 border ${getShiftColor(
+                                  slot.shift,
+                                )} ${getShiftTextColor(slot.shift)}`}
+                              >
                                 {slot.shift}
                               </Badge>
                               <Badge className={getRoleBadgeColor(slot.role)}>
