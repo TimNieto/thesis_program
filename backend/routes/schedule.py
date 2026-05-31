@@ -996,7 +996,7 @@ def process_automatic_cover_requests():
             AND cr.request_type = 'normal'
             AND (
                 s.shift_date + st.start_time
-            ) <= NOW() + INTERVAL '999 hours'
+            ) <= NOW() + INTERVAL '12 hours'
         """)
 
         requests = cursor.fetchall()
