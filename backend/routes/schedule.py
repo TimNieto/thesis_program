@@ -4,11 +4,167 @@ from fastapi import APIRouter, HTTPException
 from services.schedule_service import generate_weekly_schedule, get_generated_schedule
 from db.database import get_connection
 from services.notification_service import create_notification
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import Body
 from typing import List
 
 router = APIRouter()
+
+def get_week_bounds_for_shift(cursor, coverage_request_id: int):
+    cursor.execute("""
+        SELECT
+            s.shift_date
+        FROM coverage_requests cr
+        JOIN generated_schedule gs
+            ON cr.schedule_id = gs.schedule_id
+        JOIN shifts s
+            ON gs.shift_id = s.shift_id
+        WHERE cr.id = %s
+    """, (coverage_request_id,))
+
+    row = cursor.fetchone()
+
+    if not row:
+        return None, None
+
+    shift_date = row[0]
+
+    week_start = shift_date - timedelta(days=shift_date.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    return week_start, week_end
+
+def select_best_weekly_cover_applicant(cursor, coverage_request_id: int):
+    week_start, week_end = get_week_bounds_for_shift(
+        cursor,
+        coverage_request_id
+    )
+
+    if not week_start or not week_end:
+        return None
+
+    cursor.execute("""
+        SELECT
+            sa.id,
+            sa.applicant_id,
+            sa.applied_at,
+            (
+                SELECT COUNT(*)
+                FROM shift_applications past_sa
+                JOIN coverage_requests past_cr
+                    ON past_sa.coverage_request_id = past_cr.id
+                JOIN generated_schedule past_gs
+                    ON past_cr.schedule_id = past_gs.schedule_id
+                JOIN shifts past_s
+                    ON past_gs.shift_id = past_s.shift_id
+                WHERE past_sa.applicant_id = sa.applicant_id
+                AND past_sa.status = 'approved'
+                AND past_sa.is_archived = FALSE
+                AND past_cr.is_archived = FALSE
+                AND past_s.shift_date BETWEEN %s AND %s
+            ) AS weekly_approved_cover_count
+        FROM shift_applications sa
+        WHERE sa.coverage_request_id = %s
+        AND sa.status = 'pending'
+        AND sa.is_archived = FALSE
+        ORDER BY
+            weekly_approved_cover_count ASC,
+            sa.applied_at ASC
+        LIMIT 1
+    """, (
+        week_start,
+        week_end,
+        coverage_request_id
+    ))
+
+    return cursor.fetchone()
+
+def auto_approve_cover_application(cursor, application_id: int):
+    cursor.execute("""
+        SELECT
+            sa.applicant_id,
+            cr.schedule_id,
+            cr.id,
+            cr.requested_by
+        FROM shift_applications sa
+        JOIN coverage_requests cr
+            ON sa.coverage_request_id = cr.id
+        WHERE sa.id = %s
+        AND sa.status = 'pending'
+        AND cr.status = 'pending'
+        AND sa.is_archived = FALSE
+        AND cr.is_archived = FALSE
+    """, (application_id,))
+
+    row = cursor.fetchone()
+
+    if not row:
+        return False
+
+    applicant_id = row[0]
+    schedule_id = row[1]
+    coverage_request_id = row[2]
+    requester_id = row[3]
+
+    cursor.execute("""
+        UPDATE generated_schedule
+        SET employee_id = %s
+        WHERE schedule_id = %s
+        AND is_archived = FALSE
+    """, (
+        applicant_id,
+        schedule_id
+    ))
+
+    cursor.execute("""
+        UPDATE coverage_requests
+        SET
+            status = 'approved',
+            accepted_by = %s,
+            approved_at = NOW()
+        WHERE id = %s
+    """, (
+        applicant_id,
+        coverage_request_id
+    ))
+
+    cursor.execute("""
+        UPDATE shift_applications
+        SET status = 'approved'
+        WHERE id = %s
+    """, (application_id,))
+
+    cursor.execute("""
+        UPDATE shift_applications
+        SET status = 'denied'
+        WHERE coverage_request_id = %s
+        AND id != %s
+        AND status = 'pending'
+        AND is_archived = FALSE
+    """, (
+        coverage_request_id,
+        application_id
+    ))
+
+    create_notification(
+        cursor,
+        requester_id,
+        "Cover Request Automatically Approved",
+        "Your cover request was automatically assigned.",
+        "cover"
+    )
+
+    create_notification(
+        cursor,
+        applicant_id,
+        "Cover Application Approved",
+        "You were selected to cover a shift.",
+        "cover"
+    )
+
+    return True
+
+
 
 @router.get("/generate-schedule")
 def generate_schedule():
@@ -682,6 +838,50 @@ def apply_for_cover(id: int, payload: dict):
             return {
                 "message": "Application submitted for admin approval"
             }
+        
+                # -----------------------------
+        # AUTOMATIC NORMAL REQUEST FLOW
+        # -----------------------------
+        # Normal automatic requests collect applicants first.
+        # The system will choose fairly when the shift reaches 12 hours before start.
+        if replacement_mode == "automatic" and request_type == "normal":
+
+            cursor.execute("""
+                INSERT INTO shift_applications (
+                    coverage_request_id,
+                    applicant_id,
+                    reason,
+                    status
+                )
+                VALUES (%s, %s, %s, 'pending')
+            """, (
+                id,
+                employee_id,
+                reason
+            ))
+
+            cursor.execute("""
+                SELECT requested_by
+                FROM coverage_requests
+                WHERE id = %s
+            """, (id,))
+
+            requester = cursor.fetchone()
+
+            if requester:
+                create_notification(
+                    cursor,
+                    requester[0],
+                    "New Cover Applicant",
+                    "Someone applied to cover your shift.",
+                    "cover"
+                )
+
+            conn.commit()
+
+            return {
+                "message": "Application submitted. Automatic weekly-fair selection will happen 12 hours before the shift."
+            }
 
         # -----------------------------
         # AUTO APPROVAL FLOW
@@ -749,6 +949,95 @@ def apply_for_cover(id: int, payload: dict):
         return {
             "message": "Shift automatically transferred"
         }
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.post("/coverage-requests/process-automatic")
+def process_automatic_cover_requests():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT absence_replacement_mode
+            FROM company_settings
+            LIMIT 1
+        """)
+
+        mode_row = cursor.fetchone()
+
+        replacement_mode = (
+            mode_row[0].lower()
+            if mode_row and mode_row[0]
+            else "manual"
+        )
+
+        if replacement_mode != "automatic":
+            return {
+                "message": "Automatic replacement mode is not enabled",
+                "processed": 0
+            }
+
+        cursor.execute("""
+            SELECT
+                cr.id
+            FROM coverage_requests cr
+            JOIN generated_schedule gs
+                ON cr.schedule_id = gs.schedule_id
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+            WHERE cr.status = 'pending'
+            AND cr.is_archived = FALSE
+            AND gs.is_archived = FALSE
+            AND cr.request_type = 'normal'
+            AND (
+                s.shift_date + st.start_time
+            ) <= NOW() + INTERVAL '12 hours'
+        """)
+
+        requests = cursor.fetchall()
+
+        processed = 0
+
+        for request in requests:
+            coverage_request_id = request[0]
+
+            best = select_best_weekly_cover_applicant(
+                cursor,
+                coverage_request_id
+            )
+
+            if not best:
+                continue
+
+            application_id = best[0]
+
+            approved = auto_approve_cover_application(
+                cursor,
+                application_id
+            )
+
+            if approved:
+                processed += 1
+
+        conn.commit()
+
+        return {
+            "message": "Automatic cover requests processed",
+            "processed": processed
+        }
+
+    except Exception as e:
+        conn.rollback()
+        print("PROCESS AUTOMATIC COVER ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
     finally:
         cursor.close()

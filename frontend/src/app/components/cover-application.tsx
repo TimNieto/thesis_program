@@ -321,16 +321,49 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       .catch(() => console.log("Failed to load employees"));
   };
 
-  useEffect(() => {
-    fetchMyShifts();
-    fetchEmployees();
-    fetchApplications();
-    fetchCoverRequests();
-    fetchShiftTemplates();
+  const processAutomaticCoverRequests = async () => {
+  try {
+    const res = await fetch(
+      "https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic",
+      {
+        method: "POST",
+      },
+    );
 
-    if (role !== "admin") {
-      fetchMyLeaves();
-    }
+    const data = await res.json();
+
+    console.log("AUTOMATIC COVER PROCESS:", data);
+  } catch (err) {
+    console.error("Failed to process automatic cover requests", err);
+  }
+};
+
+  useEffect(() => {
+    const loadData = async () => {
+      await processAutomaticCoverRequests();
+
+      fetchMyShifts();
+      fetchEmployees();
+      fetchApplications();
+      fetchCoverRequests();
+      fetchShiftTemplates();
+
+      if (role !== "admin") {
+        fetchMyLeaves();
+      }
+    };
+
+    loadData();
+
+    const interval = setInterval(() => {
+      processAutomaticCoverRequests().then(() => {
+        fetchCoverRequests();
+        fetchApplications();
+        fetchMyShifts();
+      });
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
