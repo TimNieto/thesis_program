@@ -386,8 +386,8 @@ def group_schedule(assignments, active_roles):
         schedule[account][day][shift][role].append({
             "schedule_id": a.get("schedule_id"),
             "shift_id": a.get("shift_id"),
-            "employee_id": a["employee_id"],
-            "employee_name": a["employee_name"],
+            "employee_id": a.get("employee_id"),
+            "employee_name": a.get("employee_name") or "",
             "slot_index": slot_index
         })
 
@@ -593,7 +593,7 @@ def get_generated_schedule():
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
 
-            JOIN employees e
+            LEFT JOIN employees e
                 ON g.employee_id = e.employee_id
 
             WHERE g.is_archived = FALSE
@@ -615,7 +615,7 @@ def get_generated_schedule():
                 "account": r[3],
                 "shift_type": r[4],
                 "employee_id": r[5],
-                "employee_name": r[6],
+                "employee_name": r[6] if r[6] else "",
                 "role": r[7],
                 "slot_index": r[8]
             }

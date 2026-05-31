@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
-import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import {
   Card,
@@ -27,6 +26,13 @@ import {
   TabsTrigger,
 } from "@/app/components/ui/tabs";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
+import {
   Calendar,
   Download,
   Trash2,
@@ -40,7 +46,7 @@ interface ShiftAssignment {
   id: string;
   schedule_id?: number;
   shift_id?: number;
-  employee_id?: number;
+  employee_id?: number | null;
   livestream: string;
   day: string;
   shift: string;
@@ -57,6 +63,14 @@ interface LeaveRequest {
   endDate: string;
   status: "pending" | "approved" | "denied";
   reason: string;
+}
+
+interface Employee {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
 }
 
 interface ScheduleGeneratorProps {
@@ -98,6 +112,8 @@ export function ScheduleGenerator({
 
   const [approvedLeaves, setApprovedLeaves] = useState<LeaveRequest[]>([]);
 
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
@@ -137,6 +153,20 @@ export function ScheduleGenerator({
       setAccountOrder((data || []).map((account: any) => account.name));
     } catch (err) {
       console.error("Failed to load accounts", err);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/employees",
+      );
+
+      const data = await res.json();
+
+      setEmployees(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load employees", err);
     }
   };
 
@@ -240,6 +270,7 @@ export function ScheduleGenerator({
   } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [leaveWeekOffset, setLeaveWeekOffset] = useState(0); // 0 = current week, 1 = next week
   const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
 
@@ -251,6 +282,7 @@ export function ScheduleGenerator({
     fetchShiftTemplates();
     fetchStaffingRequirements();
     fetchAccounts();
+    fetchEmployees();
   }, []);
 
   const loadSchedule = async () => {
@@ -372,6 +404,22 @@ export function ScheduleGenerator({
     return assignments.find((a) => a.id === selectedCell.assignmentId) || null;
   };
 
+  const getShiftIdForCell = (
+    livestream: string,
+    day: string,
+    shift: string,
+  ) => {
+    return (
+      assignments.find(
+        (a) =>
+          a.livestream === livestream &&
+          a.day === day &&
+          a.shift === shift &&
+          a.shift_id,
+      )?.shift_id || null
+    );
+  };
+
   const openAssignDialog = (
     livestream: string,
     day: string,
@@ -385,12 +433,24 @@ export function ScheduleGenerator({
 
     setSelectedCell({ livestream, day, shift, role, assignmentId });
     setEmployeeName(existing?.employee || "");
+    setSelectedEmployeeId(
+      existing?.employee_id ? String(existing.employee_id) : "",
+    );
     setIsDialogOpen(true);
   };
 
   const handleAssign = () => {
-    if (!selectedCell || !employeeName.trim()) {
-      toast.error("Please enter an employee name");
+    if (!selectedCell || !selectedEmployeeId) {
+      toast.error("Please select an employee");
+      return;
+    }
+
+    const selectedEmployee = employees.find(
+      (emp) => emp.id === Number(selectedEmployeeId),
+    );
+
+    if (!selectedEmployee) {
+      toast.error("Selected employee not found");
       return;
     }
 
@@ -399,25 +459,57 @@ export function ScheduleGenerator({
     if (existing) {
       setAssignments(
         assignments.map((a) =>
-          a.id === existing.id ? { ...a, employee: employeeName } : a,
+          a.id === existing.id
+            ? {
+                ...a,
+                employee_id: selectedEmployee.id,
+                employee: selectedEmployee.name,
+              }
+            : a,
         ),
       );
+
       toast.success("Shift updated successfully");
     } else {
+      const shiftId = getShiftIdForCell(
+        selectedCell.livestream,
+        selectedCell.day,
+        selectedCell.shift,
+      );
+
+      if (!shiftId) {
+        toast.error(
+          "Cannot assign this empty slot because shift ID is missing",
+        );
+        return;
+      }
+
       const newAssignment: ShiftAssignment = {
         id: Date.now().toString(),
+        shift_id: shiftId,
+        employee_id: selectedEmployee.id,
         livestream: selectedCell.livestream,
         day: selectedCell.day,
         shift: selectedCell.shift,
         role: selectedCell.role,
-        employee: employeeName,
+        employee: selectedEmployee.name,
+        slot_index: getAssignments(
+          selectedCell.livestream,
+          selectedCell.day,
+          selectedCell.shift,
+          selectedCell.role,
+        ).length,
       };
+
       setAssignments([...assignments, newAssignment]);
+
       toast.success("Shift assigned successfully");
     }
 
+    setScheduleMode("preview");
     setIsDialogOpen(false);
     setEmployeeName("");
+    setSelectedEmployeeId("");
     setSelectedCell(null);
   };
 
@@ -427,12 +519,25 @@ export function ScheduleGenerator({
     const existing = getAssignment();
 
     if (existing) {
-      setAssignments(assignments.filter((a) => a.id !== existing.id));
+      setAssignments(
+        assignments.map((a) =>
+          a.id === existing.id
+            ? {
+                ...a,
+                employee_id: null,
+                employee: "",
+              }
+            : a,
+        ),
+      );
+
+      setScheduleMode("preview");
       toast.success("Assignment removed");
     }
 
     setIsDialogOpen(false);
     setEmployeeName("");
+    setSelectedEmployeeId("");
     setSelectedCell(null);
   };
 
@@ -538,14 +643,14 @@ export function ScheduleGenerator({
     }
     try {
       const payload = assignments
-        .filter((a) => a.shift_id && a.employee_id)
+        .filter((a) => a.shift_id)
         .map((a) => {
           const dayIndex = DAYS.indexOf(a.day);
 
           return {
             shift_id: a.shift_id,
 
-            employee_id: a.employee_id,
+            employee_id: a.employee_id ?? null,
 
             role: a.role.toLowerCase().replace(/\s+/g, "_"),
 
@@ -944,7 +1049,7 @@ export function ScheduleGenerator({
                                         <td
                                           key={`${livestream}-${day}-${shift.shift_name}-${roleKey}-${slotIndex}`}
                                           className={`border border-gray-300 p-2 ${
-                                            cellAssignment
+                                            cellAssignment?.employee_id
                                               ? getShiftColor(shift.shift_name)
                                               : "bg-white"
                                           } ${isClickable ? "cursor-pointer hover:bg-gray-100" : ""}`}
@@ -959,7 +1064,7 @@ export function ScheduleGenerator({
                                             )
                                           }
                                         >
-                                          {cellAssignment ? (
+                                          {cellAssignment?.employee_id ? (
                                             <div className="text-center">
                                               <div
                                                 className={`font-medium text-sm ${getShiftTextColor(
@@ -1170,18 +1275,24 @@ export function ScheduleGenerator({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="employeeName">Employee Name</Label>
-              <Input
-                id="employeeName"
-                placeholder="Enter employee name"
-                value={employeeName}
-                onChange={(e) => setEmployeeName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleAssign();
-                  }
-                }}
-              />
+              <Label>Employee Name</Label>
+
+              <Select
+                value={selectedEmployeeId}
+                onValueChange={setSelectedEmployeeId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={String(employee.id)}>
+                      {employee.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter className="gap-2">

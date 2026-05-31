@@ -1067,9 +1067,9 @@ def save_schedule(payload: dict = Body(...)):
                     VALUES (%s, %s, %s, %s)
                 """, (
                     shift_id,
-                    a["employee_id"],
+                    a.get("employee_id"),
                     role,
-                    slot_index
+                    a.get("slot_index", slot_index)
                 ))
 
         if saved_by:
