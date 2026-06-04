@@ -8,6 +8,8 @@ import { AdminDashboard } from "@/app/components/admin-dashboard";
 import { EmployeeProfile } from "@/app/components/employee-profile";
 import { CompanySettings } from "@/app/components/company-settings";
 import { NotificationBell } from "@/app/components/notification-bell";
+import { DataReport } from "@/app/components/data-report";
+import { SuperAdmin } from "@/app/components/super-admin";
 import { Button } from "@/app/components/ui/button";
 import {
   Tabs,
@@ -22,6 +24,8 @@ import {
   LayoutDashboard,
   User,
   Settings,
+  Shield,
+  BarChart3,
 } from "lucide-react";
 import { Toaster } from "@/app/components/ui/sonner";
 
@@ -55,6 +59,39 @@ export default function App() {
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} />;
   }
+
+  if (user.role === "super-admin") {
+  return (
+    <div className="size-full bg-gray-50">
+      <Toaster />
+
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Shield className="size-8 text-blue-600" />
+              <div>
+                <h1 className="text-2xl">Super Admin Panel</h1>
+                <p className="text-sm text-gray-600">
+                  Welcome, {user.name} ({user.displayRole})
+                </p>
+              </div>
+            </div>
+
+            <Button onClick={handleLogout} variant="outline" className="gap-2">
+              <LogOut className="size-4" />
+              Logout
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <SuperAdmin />
+      </main>
+    </div>
+  );
+}
 
   return (
     <div className="size-full bg-gray-50">
@@ -98,7 +135,7 @@ export default function App() {
           <TabsList
             className={`grid w-full ${
               user.role === "admin"
-                ? "max-w-5xl grid-cols-5"
+                ? "max-w-5xl grid-cols-6"
                 : "max-w-3xl grid-cols-3"
             }`}
           >
@@ -125,6 +162,13 @@ export default function App() {
               Cover Requests
             </TabsTrigger>
 
+            {user.role === "admin" && (
+              <TabsTrigger value="reports" className="gap-2">
+                <BarChart3 className="size-4" />
+                Reports
+              </TabsTrigger>
+            )}
+
             <TabsTrigger value="profile" className="gap-2">
               <User className="size-4" />
               Profile
@@ -140,6 +184,10 @@ export default function App() {
               <TabsContent value="settings">
                 <CompanySettings currentUser={user} />
               </TabsContent>
+
+                <TabsContent value="reports">
+                  <DataReport />
+                </TabsContent>
             </>
           )}
 
