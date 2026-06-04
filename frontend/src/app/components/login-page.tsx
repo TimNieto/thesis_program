@@ -111,7 +111,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </div>
             {error && <div className="text-sm text-red-600">{error}</div>}
           </CardContent>
-          <CardFooter>
+          <CardFooter className="pt-4">
             <Button type="submit" className="w-full">
               Sign In
             </Button>
