@@ -7,67 +7,17 @@ from passlib.hash import bcrypt
 
 router = APIRouter()
 
-def verify_password(password: str, hashed: str) -> bool:
-    # ✅ support old plain text users
-    if password == hashed:
-        return True
-
-    # ✅ bcrypt (new passwords)
-    try:
-        return bcrypt.verify(password, hashed)
-    except Exception:
-        return False
-
 class LoginRequest(BaseModel):
     email: str
     password: str
 
-class ChangePasswordRequest(BaseModel):
-    user_id: int
-    current_password: str
-    new_password: str
-
-@router.post("/change-password")
-def change_password(data: ChangePasswordRequest):
-    conn = get_connection()
-    cursor = conn.cursor()
-
+def verify_password(password: str, hashed: str) -> bool:
+    if password == hashed:
+        return True
     try:
-        # 1. Get current password
-        cursor.execute(
-            "SELECT password FROM employees WHERE employee_id = %s",
-            (data.user_id,)
-        )
-        user = cursor.fetchone()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        db_password = user[0]
-
-        # 2. Verify current password
-        if not verify_password(data.current_password, db_password):
-            raise HTTPException(status_code=401, detail="Current password is incorrect")
-
-        # 3. Validate new password
-        if len(data.new_password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
-
-        # 4. ✅ Hash new password (THIS FIXES YOUR ERROR)
-        new_hashed_password = bcrypt.hash(data.new_password)
-
-        # 5. Save to database
-        cursor.execute(
-            "UPDATE employees SET password = %s WHERE employee_id = %s",
-            (new_hashed_password, data.user_id)
-        )
-        conn.commit()
-
-        return {"message": "Password changed successfully"}
-
-    finally:
-        cursor.close()
-        conn.close()
+        return bcrypt.verify(password, hashed)
+    except Exception:
+        return False
 
 @router.post("/login")
 def login(data: LoginRequest):
@@ -100,8 +50,8 @@ def login(data: LoginRequest):
 
         return {
             "message": "Login successful",
-            "role": role,                 # system role (admin, host, etc.)
-            "displayRole": main_role,     # 👈 ADD THIS (Human readable)
+            "role": role,
+            "displayRole": main_role,
             "user": {
                 "id": employee_id,
                 "name": full_name

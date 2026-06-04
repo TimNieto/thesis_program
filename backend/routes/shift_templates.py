@@ -50,13 +50,11 @@ def build_time_ranges(start, end):
     s = time_to_minutes(start)
     e = time_to_minutes(end)
 
-    # Normal same-day shift
     if e > s:
         return [
             (s, e)
         ]
 
-    # Overnight shift, split into two ranges
     return [
         (s, 1440),
         (0, e)
@@ -290,6 +288,17 @@ def create_shift_template(payload: dict):
             "end_time": str(created[3])
         }
 
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create shift template"
+        )
+
     finally:
         cursor.close()
         conn.close()
@@ -351,7 +360,6 @@ def update_shift_template(
 
         if existing_name:
 
-            existing_id = existing_name[0]
             existing_is_active = existing_name[1]
 
             if existing_is_active:
@@ -412,13 +420,22 @@ def update_shift_template(
             shift_template_id
         ))
 
-        # IMPORTANT:
-
         conn.commit()
 
         return {
             "message": "Shift template updated"
         }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update shift template"
+        )
 
     finally:
         cursor.close()
@@ -459,6 +476,17 @@ def delete_shift_template(shift_template_id: int):
         return {
             "message": "Shift template deleted successfully"
         }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete shift template"
+        )
 
     finally:
         cursor.close()

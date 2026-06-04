@@ -6,9 +6,7 @@ from db.database import get_connection
 router = APIRouter()
 
 
-# -----------------------------------
-# GET USER NOTIFICATIONS
-# -----------------------------------
+# Get user notifications
 @router.get("/notifications/{employee_id}")
 def get_notifications(employee_id: int):
 
@@ -117,9 +115,7 @@ def get_unread_notification_count(employee_id: int):
         cursor.close()
         conn.close()
         
-# -----------------------------------
-# MARK AS READ
-# -----------------------------------
+# Mark notification as read
 @router.put("/notifications/{notification_id}/read")
 def mark_notification_read(notification_id: int):
 
@@ -140,14 +136,16 @@ def mark_notification_read(notification_id: int):
             "message": "Notification marked as read"
         }
 
+    except Exception:
+        conn.rollback()
+        raise
+
     finally:
         cursor.close()
         conn.close()
 
 
-# -----------------------------------
-# MARK ALL AS READ
-# -----------------------------------
+# Mark all notifications as read
 @router.put("/notifications/{employee_id}/read-all")
 def mark_all_notifications_read(employee_id: int):
 
@@ -167,6 +165,10 @@ def mark_all_notifications_read(employee_id: int):
         return {
             "message": "All notifications marked as read"
         }
+
+    except Exception:
+        conn.rollback()
+        raise
 
     finally:
         cursor.close()

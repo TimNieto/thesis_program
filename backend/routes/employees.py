@@ -4,43 +4,22 @@ from fastapi import APIRouter, HTTPException
 from db.database import get_connection
 from passlib.hash import bcrypt
 from services.notification_service import create_notification
-import traceback
-import hashlib
 
 router = APIRouter()
 
-# ✅ ADD THIS FUNCTION
 def hash_password(password: str) -> str:
-    prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
-    return bcrypt.hash(prehashed)
+    return bcrypt.hash(password)
 
-# ✅ ADD THIS TOO (for verification)
 def verify_password(password: str, hashed: str) -> bool:
-    import hashlib
 
-    # 1. Try new system (SHA256 → bcrypt)
-    try:
-        prehashed = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        if bcrypt.verify(prehashed, hashed):
-            return True
-    except Exception:
-        pass
-
-    # 2. Try old bcrypt
     try:
         if hashed.startswith("$2"):
-            if bcrypt.verify(password, hashed):
-                return True
+            return bcrypt.verify(password, hashed)
     except Exception:
         pass
 
-    # 3. Try plain text (VERY IMPORTANT)
-    if password == hashed:
-        return True
+    return password == hashed
 
-    return False
-
-# GET all employees
 @router.get("/employees")
 def get_employees():
     conn = get_connection()
@@ -250,7 +229,6 @@ def update_employee_account_preferences(employee_id: int, data: dict):
         cursor.close()
         conn.close()
 
-# ADD employee
 @router.post("/employees")
 def add_employee(data: dict):
     conn = get_connection()
@@ -270,10 +248,6 @@ def add_employee(data: dict):
         operator_account = normalize_accounts(
             data.get("operator_accounts")
         )
-
-        # -------------------------
-        # VALIDATIONS
-        # -------------------------
 
         if not name:
             raise HTTPException(
@@ -310,10 +284,6 @@ def add_employee(data: dict):
                 detail="Invalid role"
             )
 
-        # -------------------------
-        # ROLE RULES
-        # -------------------------
-
         if role == "Host" and not host_account:
             raise HTTPException(
                 status_code=400,
@@ -340,16 +310,8 @@ def add_employee(data: dict):
                     detail="Operator account required for Both role"
                 )
 
-        # -------------------------
-        # CAPABILITIES
-        # -------------------------
-
         can_be_host = host_account is not None
         can_be_operator = operator_account is not None
-
-        # -------------------------
-        # EXISTING EMAIL CHECK
-        # -------------------------
 
         cursor.execute("""
             SELECT employee_id, employment_status
@@ -404,10 +366,6 @@ def add_employee(data: dict):
             return {
                 "message": "Employee reactivated"
             }
-
-        # -------------------------
-        # INSERT
-        # -------------------------
 
         cursor.execute("""
             INSERT INTO employees (
@@ -505,14 +463,12 @@ def add_employee(data: dict):
         cursor.close()
         conn.close()
 
-# DELETE employee
 @router.delete("/employees/{employee_id}")
 def delete_employee(employee_id: int):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        # ✅ 1. Check if employee exists
         cursor.execute(
             "SELECT employment_status FROM employees WHERE employee_id = %s",
             (employee_id,)
@@ -524,11 +480,9 @@ def delete_employee(employee_id: int):
 
         current_status = row[0]
 
-        # ✅ 2. Prevent redundant updates
         if current_status == "Inactive":
             return {"message": "Employee already inactive"}
 
-        # ✅ 3. Soft delete (mark as inactive)
         cursor.execute(
             "UPDATE employees SET employment_status = 'Inactive' WHERE employee_id = %s",
             (employee_id,)
@@ -547,8 +501,6 @@ def delete_employee(employee_id: int):
         cursor.close()
         conn.close()
 
-
-# UPDATE role
 @router.put("/employees/{employee_id}/role")
 def update_role(employee_id: int, data: dict):
     conn = get_connection()
@@ -567,7 +519,6 @@ def update_role(employee_id: int, data: dict):
         cursor.close()
         conn.close()
 
-# UPDATE employee profile
 @router.put("/employees/{employee_id}")
 def update_employee(employee_id: int, data: dict):
     conn = get_connection()
@@ -597,7 +548,6 @@ def update_employee(employee_id: int, data: dict):
         cursor.close()
         conn.close()
 
-# CHANGE PASSWORD   
 @router.put("/employees/{employee_id}/password")
 def change_password(employee_id: int, data: dict):
     conn = get_connection()
@@ -615,24 +565,18 @@ def change_password(employee_id: int, data: dict):
 
         stored_password = row[0]
 
-        current = data.get("currentPassword")
-        new_password = data.get("newPassword")
+        current = data.get("currentPassword", "").strip()
+        new_password = data.get("newPassword", "").strip()
 
-        # ✅ validate + trim
-        if not current or not new_password or not current.strip() or not new_password.strip():
+        if not current or not new_password:
             raise HTTPException(status_code=400, detail="Missing fields")
-
-        current = current.strip()
-        new_password = new_password.strip()
-
-        # check if stored password is bcrypt (starts with $2b$ or $2a$)
+        
         if not verify_password(current, stored_password):
             raise HTTPException(status_code=400, detail="Incorrect current password")
         
         if len(new_password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
         
-        # store new password as hashed
         cursor.execute(
             "UPDATE employees SET password = %s WHERE employee_id = %s",
             (hash_password(new_password), employee_id)
@@ -643,12 +587,15 @@ def change_password(employee_id: int, data: dict):
         return {"message": "Password updated"}
 
     except HTTPException:
-        raise  # ✅ preserve original error
-
-    except Exception as e:
         conn.rollback()
-        traceback.print_exc()   # 👈 prints real error in Railway logs
-        raise HTTPException(status_code=500, detail=str(e))
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to change password"
+        )
 
     finally:
         cursor.close()
@@ -706,7 +653,6 @@ def update_availability(data: dict):
         is_available = data["is_available"]
         account = data["account"]
 
-        # 🔍 Check if record already exists
         cursor.execute("""
             SELECT availability_id
             FROM availability
@@ -719,7 +665,6 @@ def update_availability(data: dict):
         existing = cursor.fetchone()
 
         if existing:
-            # 🔄 UPDATE existing row
             cursor.execute("""
                 UPDATE availability
                 SET is_available = %s
@@ -727,7 +672,6 @@ def update_availability(data: dict):
             """, (is_available, existing[0]))
 
         else:
-            # ➕ INSERT new row
             cursor.execute("""
                 INSERT INTO availability (
                     employee_id,

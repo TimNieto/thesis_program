@@ -322,21 +322,21 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const processAutomaticCoverRequests = async () => {
-  try {
-    const res = await fetch(
-      "https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic",
-      {
-        method: "POST",
-      },
-    );
+    try {
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic",
+        {
+          method: "POST",
+        },
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    console.log("AUTOMATIC COVER PROCESS:", data);
-  } catch (err) {
-    console.error("Failed to process automatic cover requests", err);
-  }
-};
+      console.log("AUTOMATIC COVER PROCESS:", data);
+    } catch (err) {
+      console.error("Failed to process automatic cover requests", err);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {

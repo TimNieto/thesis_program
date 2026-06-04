@@ -172,7 +172,6 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
       setGyPenalty(String(data.gy_fatigue_penalty ?? 20));
 
       setInAppNotifications(data.enable_in_app_notifications);
-
     } catch (err) {
       console.error("Failed to fetch settings", err);
     }
@@ -678,7 +677,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
     }
 
     setSavingChanges(true);
-    
+
     try {
       const res = await fetch(
         "https://backend-production-6e75.up.railway.app/settings",
@@ -731,7 +730,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
           throw new Error(data.detail || "Failed to delete shift");
         }
       }
-      
+
       const shiftIdMap: Record<number, number> = {};
 
       // 2. CREATE or RESTORE newly added shifts
@@ -890,11 +889,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
             roleIdMap[req.staffing_role_id] || req.staffing_role_id,
           required_count: req.required_count,
         }))
-        .filter(
-          (req) =>
-            req.shift_template_id > 0 &&
-            req.staffing_role_id > 0,
-        );
+        .filter((req) => req.shift_template_id > 0 && req.staffing_role_id > 0);
 
       const staffingRes = await fetch(
         "https://backend-production-6e75.up.railway.app/staffing-requirements",
@@ -926,7 +921,6 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
       setNewRoleName("");
 
       toast.success("Company settings saved successfully");
-
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to save settings");
@@ -1655,23 +1649,23 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
               </SelectTrigger>
 
               <SelectContent>
-                  <SelectItem value="0">0 - No Penalty</SelectItem>
+                <SelectItem value="0">0 - No Penalty</SelectItem>
 
-                  <SelectItem value="10">10 - Low Penalty</SelectItem>
+                <SelectItem value="10">10 - Low Penalty</SelectItem>
 
-                  <SelectItem value="20">20 - Moderate Penalty</SelectItem>
+                <SelectItem value="20">20 - Moderate Penalty</SelectItem>
 
-                  <SelectItem value="30">30 - High Penalty</SelectItem>
+                <SelectItem value="30">30 - High Penalty</SelectItem>
 
-                  <SelectItem value="40">40 - Very High Penalty</SelectItem>
+                <SelectItem value="40">40 - Very High Penalty</SelectItem>
 
-                  <SelectItem value="50">50 - Maximum Penalty</SelectItem>
+                <SelectItem value="50">50 - Maximum Penalty</SelectItem>
               </SelectContent>
             </Select>
-            
 
             <p className="text-xs text-gray-500">
-               Higher values make the scheduler avoid assigning employees after a previous GY shift
+              Higher values make the scheduler avoid assigning employees after a
+              previous GY shift
             </p>
           </div>
         </CardContent>

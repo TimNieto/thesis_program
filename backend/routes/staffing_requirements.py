@@ -191,11 +191,11 @@ def create_staffing_role(payload: dict):
         conn.rollback()
         raise
 
-    except Exception as e:
+    except Exception:
         conn.rollback()
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail="Failed to save staffing role"
         )
 
     finally:
@@ -249,11 +249,11 @@ def delete_staffing_role(staffing_role_id: int):
         conn.rollback()
         raise
 
-    except Exception as e:
+    except Exception:
         conn.rollback()
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail="Failed to remove staffing role"
         )
 
     finally:
@@ -334,11 +334,11 @@ def update_staffing_requirements(payload: dict):
         conn.rollback()
         raise
 
-    except Exception as e:
+    except Exception:
         conn.rollback()
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail="Failed to save staffing requirements"
         )
 
     finally:

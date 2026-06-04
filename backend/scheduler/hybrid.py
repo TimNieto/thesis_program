@@ -449,12 +449,12 @@ def generate_schedule(
             parent_b = tournament_select(population)
 
             child = crossover(
-            parent_a,
-            parent_b,
-            history_scores,
-            shifts,
-            account_settings
-        )
+                parent_a,
+                parent_b,
+                history_scores,
+                shifts,
+                account_settings
+            )
 
             child = mutate_schedule(
                 child,

@@ -74,9 +74,7 @@ def create_account(payload: dict):
             WHERE LOWER(account_name) = LOWER(%s)
         """, (account_name,))
 
-        existing = cursor.fetchone()
-
-        if existing:
+        if cursor.fetchone():
 
             raise HTTPException(
                 status_code=400,
@@ -142,6 +140,17 @@ def create_account(payload: dict):
             "message": "Account created"
         }
 
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create account"
+        )
+
     finally:
         cursor.close()
         conn.close()
@@ -174,6 +183,17 @@ def delete_account(account_name: str):
         return {
             "message": "Account marked for deletion. It will be removed after a new schedule is saved."
         }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete account"
+        )
 
     finally:
         cursor.close()

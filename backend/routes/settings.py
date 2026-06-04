@@ -6,9 +6,7 @@ from services.notification_service import create_notification
 
 router = APIRouter()
 
-# -------------------------
 # GET SETTINGS
-# -------------------------
 @router.get("/settings")
 def get_settings():
     conn = get_connection()
@@ -53,10 +51,7 @@ def get_settings():
         cursor.close()
         conn.close()
 
-
-# -------------------------
 # UPDATE SETTINGS
-# -------------------------
 @router.put("/settings")
 def update_settings(payload: dict):
     conn = get_connection()
@@ -136,6 +131,10 @@ def update_settings(payload: dict):
         return {
             "status": "success"
         }
+
+    except Exception:
+        conn.rollback()
+        raise
 
     finally:
         cursor.close()
@@ -220,6 +219,10 @@ def update_account_settings(
         return {
             "status": "success"
         }
+
+    except Exception:
+        conn.rollback()
+        raise
 
     finally:
         cursor.close()

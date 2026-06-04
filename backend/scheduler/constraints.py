@@ -2,10 +2,7 @@
 
 from datetime import datetime
 
-# -------------------------------
-# BASIC HELPERS
-# -------------------------------
-
+# Basic helpers
 def normalize_date(d):
     if isinstance(d, datetime):
         return d.strftime("%Y-%m-%d")
@@ -20,10 +17,7 @@ def get_day_of_week(date):
     return date.strftime("%A").lower()
 
 
-# -------------------------------
-# AVAILABILITY
-# -------------------------------
-
+# Availability
 def is_available(employee_id, shift, availability_map, context=None):
     """
     Strict availability:
@@ -42,9 +36,9 @@ def is_available(employee_id, shift, availability_map, context=None):
         return False
 
     account_data = (
-    emp_availability.get(account)
-    or emp_availability.get("default")
-)
+        emp_availability.get(account)
+        or emp_availability.get("default")
+    )
     
 
     # STRICT MODE
@@ -85,29 +79,10 @@ def is_available(employee_id, shift, availability_map, context=None):
 
     return False
 
-# -------------------------------
 # LEAVES & ABSENCES
-# -------------------------------
-
-# def is_on_leave(employee_id, shift_date, leaves_map):
-#     """
-#     leaves_map: {
-#         employee_id: set(date_str)
-#     }
-#     """
-#     if isinstance(shift_date, datetime):
-#         shift_date = normalize_date(shift_date)
-
-#     return shift_date in leaves_map.get(employee_id, set())
-
 def is_on_leave(employee_id, shift_date, leaves_map):
     shift_date = normalize_date(shift_date)
-
-    if shift_date in leaves_map.get(employee_id, set()):
-        # print(f"🚫 BLOCKED (LEAVE): {employee_id} on {shift_date}")
-        return True
-
-    return False
+    return shift_date in leaves_map.get(employee_id, set())
 
 
 def is_absent(employee_id, shift_date, absences_map):
@@ -133,10 +108,7 @@ def is_unavailable(employee_id, shift, context):
     )
 
 
-# -------------------------------
-# ROLE CHECK
-# -------------------------------
-
+# Role check
 def has_role(employee, role, context=None):
 
     role = role.lower()
@@ -159,16 +131,11 @@ def has_role(employee, role, context=None):
     if role == "operator":
         return employee.get("can_be_operator", False)
 
-    # CUSTOM ROLES ARE DATABASE-BASED,
-    # BUT EMPLOYEE CAPABILITY FOR CUSTOM ROLES
-    # DOES NOT EXIST YET.
+    # Custom roles are database-based, but employee capability for custom roles does not exist yet.
     return False
 
 
-# -------------------------------
-# ASSIGNMENT CHECKS
-# -------------------------------
-
+# Assignment checks
 def already_assigned(employee_id, shift_id, context):
     assignments = context["context_assignments_by_employee"].get(employee_id, [])
 
@@ -201,12 +168,7 @@ def assigned_count_same_day(employee_id, shift, context):
 
     return count
 
-# -------------------------------
-# MAIN VALIDATION
-# -------------------------------
-
-
-
+# Main validation
 def is_valid_candidate(employee, shift, role, context):
     """
     Master function used by scheduler
@@ -230,9 +192,7 @@ def is_valid_candidate(employee, shift, role, context):
     if already_assigned_same_time(employee_id, shift, context):
         return False
     
-    allow_double_shifts = (
-        context["settings"]["allow_double_shifts"]
-    )
+    allow_double_shifts = context["settings"]["allow_double_shifts"]
 
     max_shifts = 2 if allow_double_shifts else 1
 
@@ -246,9 +206,7 @@ def is_valid_candidate(employee, shift, role, context):
     projected_days = set(days)
     projected_days.add(candidate_day)
 
-    max_days = (
-    context["settings"]["max_working_days"]
-        )   
+    max_days = context["settings"]["max_working_days"]
 
     if len(projected_days) > max_days:
 
@@ -271,41 +229,3 @@ def working_days(employee_id, context):
         days.add(normalize_date(a["shift_date"]))
 
     return days
-
-
-# def is_valid_candidate(employee, shift, role, context):
-#     employee_id = employee["employee_id"]
-#     shift_id = shift["shift_id"]
-
-#     print(f"\nCHECKING EMP {employee_id} FOR {role} {shift['shift_type']} {shift['shift_date']}")
-
-#     if not has_role(employee, role):
-#         print("❌ role fail")
-#         return False
-
-#     if not is_available(employee_id, shift, context["availability_map"]):
-#         print("❌ availability fail")
-#         return False
-
-#     if is_on_leave(employee_id, shift["shift_date"], context["leaves_map"]):
-#         print("❌ on leave")
-#         return False
-
-#     if is_absent(employee_id, shift["shift_date"], context["absences_map"]):
-#         print("❌ absent")
-#         return False
-
-#     if already_assigned(employee_id, shift_id, context):
-#         print("❌ already assigned same shift")
-#         return False
-    
-#     if already_assigned_same_time(employee_id, shift, context):
-#         print("❌ same time conflict")
-#         return False
-    
-#     if assigned_count_same_day(employee_id, shift, context) >= MAX_SHIFTS_PER_DAY:
-#         print("❌ max shifts reached")
-#         return False
-
-#     print("✅ VALID")
-#     return True

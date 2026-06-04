@@ -8,9 +8,6 @@ from services.notification_service import create_notification
 
 router = APIRouter()
 
-# -------------------------------
-# CREATE LEAVE REQUEST
-# -------------------------------
 @router.post("/leaves")
 def create_leave_request(payload: dict):
     conn = get_connection()
@@ -73,19 +70,21 @@ def create_leave_request(payload: dict):
             "request_id": request_id
         }
 
-    except Exception as e:
+    except HTTPException:
         conn.rollback()
-        print("ERROR:", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create leave request"
+        )
 
     finally:
         cursor.close()
         conn.close()
 
-
-# -------------------------------
-# GET EMPLOYEE LEAVE REQUESTS
-# -------------------------------
 @router.get("/leaves/{employee_id}")
 def get_employee_leaves(employee_id: int):
     conn = get_connection()
@@ -169,7 +168,10 @@ def update_leave_status(request_id: str, payload: dict):
         status = payload.get("status")
 
         if status not in ["approved", "rejected"]:
-            return {"error": "Invalid status"}
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid status"
+            )
 
         cursor.execute("""
             UPDATE leaves
@@ -199,6 +201,17 @@ def update_leave_status(request_id: str, payload: dict):
         conn.commit()
 
         return {"status": "success"}
+    
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update leave status"
+        )
 
     finally:
         cursor.close()
@@ -235,7 +248,7 @@ def get_approved_leaves(start: str, end: str):
                 "reason": r[4]
             }
             for r in rows
-]
+        ]
 
     finally:
         cursor.close()

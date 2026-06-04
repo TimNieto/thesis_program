@@ -1,12 +1,10 @@
 # backend/routes/schedule.py
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 from services.schedule_service import generate_weekly_schedule, get_generated_schedule
 from db.database import get_connection
 from services.notification_service import create_notification
 from datetime import datetime, timedelta
-from fastapi import Body
-from typing import List
 
 router = APIRouter()
 
@@ -174,7 +172,7 @@ def generate_schedule():
         return {
             "status": "success",
             "assignments": result["assignments"],
-            "grouped_schedule": result["grouped_schedule"],  # ✅ ADD THIS
+            "grouped_schedule": result["grouped_schedule"],
             "unfilled_slots": result["unfilled_slots"]
         }
 
@@ -367,6 +365,17 @@ def request_cover(schedule_id: int, payload: dict):
             "request_type": request_type
         }
 
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to request cover"
+        )
+
     finally:
         cursor.close()
         conn.close()
@@ -462,8 +471,8 @@ def get_requests(employee_id: int):
                 ORDER BY cr.created_at DESC
 
         """, (
-            employee_id,  # for LEFT JOIN
-            employee_id   # for own requests
+            employee_id,
+            employee_id
         ))
 
         rows = cursor.fetchall()
@@ -626,6 +635,17 @@ def approve_request(id: int):
             "message": "Approved"
         }
 
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to approve request"
+        )
+
     finally:
         cursor.close()
         conn.close()
@@ -676,6 +696,17 @@ def deny_request(id: int):
         return {
             "message": "Denied"
         }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to deny request"
+        )
 
     finally:
         cursor.close()
@@ -795,9 +826,7 @@ def apply_for_cover(id: int, payload: dict):
         elif replacement_mode == "automatic":
             requires_admin = False
 
-        # -----------------------------
         # MANUAL APPROVAL FLOW
-        # -----------------------------
         if requires_admin:
 
             cursor.execute("""
@@ -839,11 +868,6 @@ def apply_for_cover(id: int, payload: dict):
                 "message": "Application submitted for admin approval"
             }
         
-                # -----------------------------
-        # AUTOMATIC NORMAL REQUEST FLOW
-        # -----------------------------
-        # Normal automatic requests collect applicants first.
-        # The system will choose fairly when the shift reaches 12 hours before start.
         if replacement_mode == "automatic" and request_type == "normal":
 
             cursor.execute("""
@@ -882,10 +906,6 @@ def apply_for_cover(id: int, payload: dict):
             return {
                 "message": "Application submitted. Automatic weekly-fair selection will happen 12 hours before the shift."
             }
-
-        # -----------------------------
-        # AUTO APPROVAL FLOW
-        # -----------------------------
 
         # TRANSFER SHIFT
         cursor.execute("""
@@ -949,6 +969,17 @@ def apply_for_cover(id: int, payload: dict):
         return {
             "message": "Shift automatically transferred"
         }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to apply for cover"
+        )
 
     finally:
         cursor.close()
@@ -1233,6 +1264,17 @@ def approve_application(id: int):
             "message": "Application approved"
         }
 
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to approve application"
+        )
+
     finally:
         cursor.close()
         conn.close()
@@ -1283,6 +1325,17 @@ def deny_application(id: int):
         return {
             "message": "Application denied"
         }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception:
+        conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to deny application"
+        )
 
     finally:
         cursor.close()

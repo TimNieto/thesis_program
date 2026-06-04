@@ -14,16 +14,11 @@ from scheduler.constraints import (
 )
 
 
-# -------------------------------
-# CONTEXT PREPARATION
-# -------------------------------
-
+# Context preparation
 def prepare_context(employees, shifts, availability, leaves, absences, settings, account_settings):
     """
     Converts raw DB data into fast lookup structures
     """
-    ##availability_map:
-    # { employee_id: { "monday": { "am": {is_available} } } }
 
     availability_map = defaultdict(
         lambda: defaultdict(
@@ -33,7 +28,7 @@ def prepare_context(employees, shifts, availability, leaves, absences, settings,
 
     for row in availability:
         if not row["preferred_shift"]:
-            continue  # skip nulls
+            continue
 
         emp_id = row["employee_id"]
         account = row["account"].lower()
@@ -44,11 +39,8 @@ def prepare_context(employees, shifts, availability, leaves, absences, settings,
             "is_available": row["is_available"]
         }
 
+    leaves_map = leaves
 
-    # leaves_map: { employee_id: set(date_str) }
-    leaves_map = leaves   # 👈 already a map
-
-    # absences_map: same structure
     absences_map = defaultdict(set)
     for row in absences:
         absences_map[row["employee_id"]].add(row["date"])
@@ -91,15 +83,10 @@ def prepare_context(employees, shifts, availability, leaves, absences, settings,
         e["employee_id"]: e for e in employees
     }
 
-    # print("\n🔥 LEAVES MAP:", context["leaves_map"])
-
     return context
 
 
-# -------------------------------
-# SHIFT DIFFICULTY
-# -------------------------------
-
+# Shift difficulty
 def estimate_candidates(employees, shift, role, context):
     """
     Rough count of how many can fill this shift
@@ -155,7 +142,6 @@ def sort_shifts_by_difficulty(shifts, employees, context):
         difficulty_score = total_candidates
 
         # Higher priority accounts
-        # scheduled FIRST
         difficulty_score += (
             priority_level * 100
         )
@@ -169,14 +155,7 @@ def sort_shifts_by_difficulty(shifts, employees, context):
     return sorted(shifts, key=difficulty)
 
 
-# -------------------------------
-# SCORING
-# -------------------------------
-
-# -------------------------------
-# FLEXIBILITY ESTIMATION
-# -------------------------------
-
+# Flexibility estimation
 def estimate_future_options(employee, shifts, role, context):
     """
     Count how many remaining shifts
@@ -215,17 +194,7 @@ def score_employee(employee, shift, role, context):
         )
     )
 
-    # print(
-    #     "ACCOUNT:",
-    #     shift["account"],
-    #     "POLICY:",
-    #     operator_policy
-    # )
-
-    # --------------------------------
     # 1. FAIRNESS
-    # --------------------------------
-
     assignment_count = context["assignment_counts"][emp_id]
 
     # stronger fairness penalty
@@ -234,10 +203,7 @@ def score_employee(employee, shift, role, context):
         )
     score -= assignment_count * fairness_weight
 
-    # --------------------------------
     # 1.5 MAIN ROLE PRIORITY
-    # --------------------------------
-
     main_role = (employee.get("main_role") or "").strip()
 
     if role == "host":
@@ -256,19 +222,13 @@ def score_employee(employee, shift, role, context):
         else:
             score -= 6
 
-
-    # --------------------------------
     # OPERATOR POLICY
-    # --------------------------------
-
     if (
         role == "operator"
         and
         operator_policy == "avoid"
     ):
 
-        # discourage assigning operators
-        # unless necessary
         score -= 50
 
     if (
@@ -278,16 +238,7 @@ def score_employee(employee, shift, role, context):
     ):
         score += 15
 
-        # print(
-        #     f"⚠️ AVOIDING OPERATOR "
-        #     f"{employee['employee_id']} "
-        #     f"for {shift['account']}"
-        # )
-
-    # --------------------------------
     # 2. PRESERVE FLEXIBLE EMPLOYEES
-    # --------------------------------
-
     remaining_shifts = [
         s for s in context["remaining_shifts"]
         if s["shift_id"] != shift["shift_id"]
@@ -300,14 +251,10 @@ def score_employee(employee, shift, role, context):
         context
     )
 
-    # IMPORTANT:
     # More future options = lower priority
     score -= future_options * 0.5
 
-    # --------------------------------
     # 3. PREFERRED SHIFT BONUS
-    # --------------------------------
-
     day_name = shift["shift_date"].strftime("%A").lower()
 
     availability = context["availability_map"].get(emp_id, {})
@@ -324,10 +271,7 @@ def score_employee(employee, shift, role, context):
     if shift_pref and shift_pref.get("is_available"):
         score += 2
 
-    # --------------------------------
     # 4. GY FATIGUE PENALTY
-    # --------------------------------
-
     if shift.get("is_overnight"):
 
         previous_assignments = context[
@@ -350,15 +294,10 @@ def score_employee(employee, shift, role, context):
 
     return score
 
-
-# -------------------------------
 # CANDIDATES
-# -------------------------------
-
 def get_candidates(employees, shift, role, context):
-    key = (shift["shift_id"], role)
 
-    # 🔥 USE ROLE POOL INSTEAD OF ALL EMPLOYEES
+    # USE ROLE POOL INSTEAD OF ALL EMPLOYEES
     if context["context_flags"].get("relax_role"):
         pool = employees
     else:
@@ -371,10 +310,7 @@ def get_candidates(employees, shift, role, context):
 
     return candidates
 
-# -------------------------------
 # ASSIGNMENT
-# -------------------------------
-
 def assign_employee(employee, shift, role, context):
     """
     Save assignment in memory
@@ -416,11 +352,7 @@ def assign_employee(employee, shift, role, context):
     context["assignment_counts"][employee["employee_id"]] += 1
     context["context_assignments_by_employee"][employee["employee_id"]].append(assignment)
 
-
-# -------------------------------
 # ROLE FILLING
-# -------------------------------
-
 def fill_role(shift, role, required_count, employees, context):
     """
     Greedy assignment per role
@@ -432,9 +364,8 @@ def fill_role(shift, role, required_count, employees, context):
         candidates = get_candidates(employees, shift, role, context)
 
         if not candidates:
-            return assigned  # stop early
+            return assigned
 
-        # pick best
         best = max(candidates, key=lambda e: score_employee(e, shift, role, context))
 
         assign_employee(best, shift, role, context)
@@ -494,19 +425,15 @@ def try_fill_unfilled_slot(
 
         emp_id = emp["employee_id"]
 
-        # skip if not valid at all
         if not is_valid_candidate(emp, shift, role, context):
             continue
 
-        # check if already assigned somewhere else
         existing_list = context["context_assignments_by_employee"].get(emp_id, [])
 
-        # free employee
         if not existing_list:
             assign_employee(emp, shift, role, context)
             return True
 
-        # try every existing assignment
         for existing_assignment in existing_list[:]:
 
             old_shift = context["shift_map"].get(
@@ -515,10 +442,8 @@ def try_fill_unfilled_slot(
 
             old_role = existing_assignment["role"]
 
-            # remove temporarily
             remove_assignment(existing_assignment, context)
 
-            # check if someone else can fill old slot
             if context["context_flags"].get("relax_role"):
                 replacement_pool = employees
             else:
@@ -621,7 +546,6 @@ def try_fill_unfilled_slot(
                     context
                 )
 
-            # restore original assignment
             assign_employee(
                 context["employee_map"][existing_assignment["employee_id"]],
                 old_shift,
@@ -692,10 +616,7 @@ def fill_shift_staffing_requirements(
                     "role": role
                 })
                 
-# -------------------------------
 # MAIN GENERATOR
-# -------------------------------
-
 def generate_schedule(employees, shifts, availability, leaves, absences, settings, account_settings):
     """
     Main entry point
@@ -828,10 +749,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
     while context["remaining_shifts"]:
 
-        # --------------------------------
         # Dynamically pick hardest shift
-        # --------------------------------
-
         shift = min(
             context["remaining_shifts"],
             key=lambda s: sum(
@@ -854,22 +772,15 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
             unfilled
         )
 
-    # NEW: attempt to fix unfilled slots
-    # --------------------------------
     # STRICT REPAIR
-    # --------------------------------
-
     unfilled = repair_schedule(
         unfilled,
         employees,
         shifts,
         context
     )
-
-    # --------------------------------
+    
     # RELAX ACCOUNT → FULL REBUILD
-    # --------------------------------
-
     if unfilled:
 
         print("\n🔥 RELAXING ACCOUNT CONSTRAINT")
@@ -921,10 +832,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
             context
         )
 
-    # --------------------------------
     # RELAX ROLE → FULL REBUILD
-    # --------------------------------
-
     if unfilled:
 
         print("\n🔥 RELAXING ROLE CONSTRAINT")
@@ -974,10 +882,7 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
             context
         )
 
-    # --------------------------------
     # DOUBLE SHIFT → FULL REBUILD
-    # --------------------------------
-
     if (
     unfilled and
     context["settings"]["allow_double_shifts"]

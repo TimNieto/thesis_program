@@ -6,10 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 
-# -------------------------------
-# FETCH HELPERS
-# -------------------------------
-
+# Fetch helpers
 def fetch_shift_templates(cursor):
 
     cursor.execute("""
@@ -128,7 +125,7 @@ def fetch_employees(cursor):
 def get_next_week_range():
     today = datetime.today()
 
-    days_ahead = 7 - today.weekday()  # Monday = 0
+    days_ahead = 7 - today.weekday()
     next_monday = today + timedelta(days=days_ahead)
     next_sunday = next_monday + timedelta(days=6)
 
@@ -235,12 +232,12 @@ def fetch_leaves(cursor):
         FROM leaves
         WHERE LOWER(status) = 'approved'
     """)
-    return cursor.fetchall()   # returns tuples
+    return cursor.fetchall()
 
 def build_leaves_map(leaves):
     leaves_map = {}
 
-    for emp_id, date in leaves:   # 👈 unpack tuple
+    for emp_id, date in leaves:
 
         date_str = str(date)
 
@@ -250,25 +247,6 @@ def build_leaves_map(leaves):
         leaves_map[emp_id].add(date_str)
 
     return leaves_map
-
-
-def fetch_absences(cursor):
-    cursor.execute("""
-        SELECT employee_id, date
-        FROM absences
-        WHERE status = 'approved'
-        AND employee_id IS NOT NULL
-    """)
-
-    rows = cursor.fetchall()
-
-    return [
-        {
-            "employee_id": r[0],
-            "date": str(r[1])
-        }
-        for r in rows
-    ]
 
 def fetch_history_scores(cursor):
     cursor.execute("""
@@ -411,10 +389,7 @@ def group_schedule(assignments, active_roles):
 
     return result
 
-# -------------------------------
-# MAIN SERVICE
-# -------------------------------
-
+# Main service
 def generate_weekly_schedule():
     conn = get_connection()
     cursor = conn.cursor()
@@ -425,9 +400,7 @@ def generate_weekly_schedule():
 
         employees = fetch_employees(cursor)
 
-        # -------------------------
-        # FETCH SETTINGS
-        # -------------------------
+        # Fetch settings
         cursor.execute("""
             SELECT
                 max_working_days,
@@ -460,12 +433,8 @@ def generate_weekly_schedule():
         leaves = fetch_leaves(cursor)
         leaves_map = build_leaves_map(leaves)
         absences_map = {}
-        #absences = fetch_absences(cursor)
 
-
-        # -------------------------
         # FETCH ACCOUNT SETTINGS
-        # -------------------------
         cursor.execute("""
             SELECT
                 account_name,
@@ -528,6 +497,8 @@ def generate_weekly_schedule():
             active_roles
         )
 
+        shift_templates = fetch_shift_templates(cursor)
+        
         for account_name in account_settings.keys():
 
             if account_name not in grouped:
@@ -546,8 +517,6 @@ def generate_weekly_schedule():
                 if day not in grouped[account_name]:
                     grouped[account_name][day] = {}
                 
-                shift_templates = fetch_shift_templates(cursor)
-                
                 for template in shift_templates:
 
                     shift_name = template["shift_name"]
@@ -557,8 +526,8 @@ def generate_weekly_schedule():
                         grouped[account_name][day][shift_name] = build_empty_roles(active_roles)
         return {
             "status": "success",
-            "assignments": result["assignments"],      # keep raw (important for debugging)
-            "grouped_schedule": grouped,               # ✅ NEW structured data
+            "assignments": result["assignments"],
+            "grouped_schedule": grouped, 
             "unfilled_slots": result["unfilled_slots"]
         }
 
@@ -641,6 +610,8 @@ def get_generated_schedule():
 
         account_rows = cursor.fetchall()
 
+        shift_templates = fetch_shift_templates(cursor)
+
         for row in account_rows:
 
             account_name = row[0]
@@ -660,8 +631,6 @@ def get_generated_schedule():
 
                 if day not in grouped[account_name]:
                     grouped[account_name][day] = {}
-                
-                shift_templates = fetch_shift_templates(cursor)
                 
                 for template in shift_templates:
 
