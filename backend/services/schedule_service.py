@@ -35,12 +35,13 @@ def fetch_shift_templates(cursor):
 def fetch_active_staffing_roles(cursor):
     cursor.execute("""
         SELECT
-            staffing_role_id,
+            role_id,
             role_name,
             role_key
-        FROM staffing_roles
+        FROM roles
         WHERE is_active = TRUE
-        ORDER BY staffing_role_id
+        AND role_key IN ('host', 'operator')
+        ORDER BY role_id
     """)
 
     rows = cursor.fetchall()
@@ -59,19 +60,20 @@ def fetch_staffing_requirements_map(cursor):
     cursor.execute("""
         SELECT
             ssr.shift_template_id,
-            sr.staffing_role_id,
-            sr.role_name,
-            sr.role_key,
+            r.role_id,
+            r.role_name,
+            r.role_key,
             ssr.required_count
         FROM shift_staffing_requirements ssr
 
-        JOIN staffing_roles sr
-            ON ssr.staffing_role_id = sr.staffing_role_id
+        JOIN roles r
+            ON ssr.role_id = r.role_id
+            AND ssr.company_id = r.company_id
 
         WHERE ssr.is_active = TRUE
-        AND sr.is_active = TRUE
+        AND r.is_active = TRUE
 
-        ORDER BY sr.staffing_role_id
+        ORDER BY r.role_id
     """)
 
     rows = cursor.fetchall()
@@ -104,23 +106,55 @@ def build_empty_roles(active_roles):
 
 def fetch_employees(cursor):
     cursor.execute("""
-        SELECT employee_id, full_name, main_role, can_be_host, can_be_operator
-        FROM employees
-        WHERE employment_status = 'Active'
+        SELECT
+            e.employee_id,
+            e.full_name,
+            e.company_id
+        FROM employees e
+        WHERE e.employment_status = 'Active'
     """)
 
-    rows = cursor.fetchall()
+    employee_rows = cursor.fetchall()
+    employees = []
 
-    return [
-        {
-            "employee_id": r[0],
-            "full_name": r[1],
-            "main_role": r[2],
-            "can_be_host": r[3],
-            "can_be_operator": r[4]
-        }
-        for r in rows
-    ]
+    for employee_id, full_name, company_id in employee_rows:
+        cursor.execute("""
+            SELECT r.role_key
+            FROM employee_roles er
+            JOIN roles r
+                ON er.role_id = r.role_id
+                AND er.company_id = r.company_id
+            WHERE er.employee_id = %s
+            AND er.company_id = %s
+            AND r.is_active = TRUE
+        """, (employee_id, company_id))
+
+        role_keys = [r[0] for r in cursor.fetchall()]
+
+        can_be_host = "host" in role_keys
+        can_be_operator = "operator" in role_keys
+
+        if "host" in role_keys and "operator" in role_keys:
+            main_role = "Both"
+        elif "host" in role_keys:
+            main_role = "Host"
+        elif "operator" in role_keys:
+            main_role = "Operator"
+        elif "hr_manager" in role_keys:
+            main_role = "Team Leader"
+        else:
+            main_role = "Employee"
+
+        employees.append({
+            "employee_id": employee_id,
+            "full_name": full_name,
+            "main_role": main_role,
+            "can_be_host": can_be_host,
+            "can_be_operator": can_be_operator,
+            "company_id": company_id
+        })
+
+    return employees
 
 def get_next_week_range():
     today = datetime.today()
@@ -131,6 +165,8 @@ def get_next_week_range():
 
     return next_monday.date(), next_sunday.date()
 
+
+
 def fetch_shifts(cursor, gy_fatigue_penalty=20):
     start_date, end_date = get_next_week_range()
 
@@ -140,7 +176,7 @@ def fetch_shifts(cursor, gy_fatigue_penalty=20):
         SELECT
             s.shift_id,
             s.shift_date,
-            s.account,
+            a.account_name,
             st.shift_template_id,
             st.shift_name,
             st.start_time,
@@ -151,26 +187,21 @@ def fetch_shifts(cursor, gy_fatigue_penalty=20):
 
         FROM shifts s
 
+        JOIN accounts a
+            ON s.account_id = a.account_id
+            AND s.company_id = a.company_id
+            AND a.is_active = TRUE
+
         JOIN shift_templates st
             ON s.shift_template_id = st.shift_template_id
+            AND s.company_id = st.company_id
             AND st.is_active = TRUE
 
         WHERE s.shift_date BETWEEN %s AND %s
-        AND EXISTS (
-            SELECT 1
-            FROM account_settings a
-            WHERE LOWER(a.account_name) = LOWER(s.account)
-            AND a.pending_delete = FALSE
-        )
 
         ORDER BY
             s.shift_date,
-            (
-                SELECT a.account_setting_id
-                FROM account_settings a
-                WHERE a.account_name = s.account
-                LIMIT 1
-            ),
+            a.account_id,
             st.start_time
     """, (start_date, end_date))
 
@@ -434,18 +465,16 @@ def generate_weekly_schedule():
         leaves_map = build_leaves_map(leaves)
         absences_map = {}
 
-        # FETCH ACCOUNT SETTINGS
+        # FETCH ACCOUNT SETTINGS FROM NEW accounts TABLE
         cursor.execute("""
             SELECT
                 account_name,
                 priority_level,
-                require_host,
-                require_operator,
                 operator_policy,
                 allow_partial_staffing
-            FROM account_settings
-            WHERE pending_delete = FALSE
-            ORDER BY account_setting_id ASC
+            FROM accounts
+            WHERE is_active = TRUE
+            ORDER BY account_id ASC
         """)
 
         account_rows = cursor.fetchall()
@@ -453,15 +482,14 @@ def generate_weekly_schedule():
         account_settings = {}
 
         for row in account_rows:
-
             account_name = row[0]
 
             account_settings[account_name] = {
                 "priority_level": row[1],
-                "require_host": row[2],
-                "require_operator": row[3],
-                "operator_policy": row[4],
-                "allow_partial_staffing": row[5]
+                "require_host": True,
+                "require_operator": True,
+                "operator_policy": row[2] or "optional",
+                "allow_partial_staffing": row[3]
             }
 
 
@@ -651,26 +679,21 @@ def get_generated_schedule():
         conn.close()
 
 def ensure_next_week_shifts(cursor):
-
     today = datetime.today()
-
     days_ahead = 7 - today.weekday()
-
     next_monday = today + timedelta(days=days_ahead)
 
-    # GET ACCOUNTS
     cursor.execute("""
-        SELECT account_name
-        FROM account_settings
-        WHERE pending_delete = FALSE
-        ORDER BY account_setting_id ASC
+        SELECT account_id, company_id
+        FROM accounts
+        WHERE is_active = TRUE
+        ORDER BY account_id ASC
     """)
 
     accounts = cursor.fetchall()
 
-    # GET SHIFT TEMPLATES
     cursor.execute("""
-        SELECT shift_template_id
+        SELECT shift_template_id, company_id
         FROM shift_templates
         WHERE is_active = TRUE
         ORDER BY start_time
@@ -678,42 +701,35 @@ def ensure_next_week_shifts(cursor):
 
     templates = cursor.fetchall()
 
-    # GENERATE 7 DAYS
     for day_offset in range(7):
+        new_date = (next_monday + timedelta(days=day_offset)).date()
 
-        new_date = (
-            next_monday + timedelta(days=day_offset)
-        ).date()
-
-        for account in accounts:
-
-            account_name = account[0]
-
-            for template in templates:
-
-                template_id = template[0]
+        for account_id, account_company_id in accounts:
+            for template_id, template_company_id in templates:
+                if account_company_id != template_company_id:
+                    continue
 
                 cursor.execute("""
                     INSERT INTO shifts (
                         shift_date,
-                        account,
-                        shift_template_id
+                        account_id,
+                        shift_template_id,
+                        company_id
                     )
-                    VALUES (
-                        %s,
-                        %s,
-                        %s
-                    )
+                    VALUES (%s, %s, %s, %s)
+
                     ON CONFLICT (
                         shift_date,
-                        account,
-                        shift_template_id
+                        account_id,
+                        shift_template_id,
+                        company_id
                     )
                     DO NOTHING
                 """, (
                     new_date,
-                    account_name,
-                    template_id
+                    account_id,
+                    template_id,
+                    account_company_id
                 ))
 
 

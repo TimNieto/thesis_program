@@ -5,6 +5,7 @@ from services.schedule_service import generate_weekly_schedule, get_generated_sc
 from db.database import get_connection
 from services.notification_service import create_notification
 from datetime import datetime, timedelta
+from services.role_service import get_company_admin_employee_ids
 
 router = APIRouter()
 
@@ -212,6 +213,23 @@ def request_cover(schedule_id: int, payload: dict):
                 status_code=400,
                 detail="user_id required"
             )
+        
+        cursor.execute("""
+            SELECT company_id
+            FROM employees
+            WHERE employee_id = %s
+            AND employment_status = 'Active'
+        """, (user_id,))
+
+        employee_row = cursor.fetchone()
+
+        if not employee_row:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee not found"
+            )
+
+        company_id = employee_row[0]
 
         # GET SHIFT INFO
         cursor.execute("""
@@ -339,20 +357,15 @@ def request_cover(schedule_id: int, payload: dict):
                     emp[0]
                 ))
 
-        cursor.execute("""
-            SELECT employee_id
-            FROM employees
-            WHERE main_role = 'Team Leader'
-            AND employment_status = 'Active'
-        """)
+        admin_ids = get_company_admin_employee_ids(
+            cursor,
+            company_id
+        )
 
-        admins = cursor.fetchall()
-
-        for admin in admins:
-
+        for admin_id in admin_ids:
             create_notification(
                 cursor,
-                admin[0],
+                admin_id,
                 "New Cover Request",
                 "An employee submitted a cover request.",
                 "cover"

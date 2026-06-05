@@ -5,6 +5,7 @@ from uuid import uuid4
 from datetime import datetime, timedelta
 from db.database import get_connection
 from services.notification_service import create_notification
+from services.role_service import get_company_admin_employee_ids
 
 router = APIRouter()
 
@@ -20,6 +21,20 @@ def create_leave_request(payload: dict):
         leave_type = payload["leave_type"]
         reason = payload.get("reason", "")
 
+        cursor.execute("""
+            SELECT company_id
+            FROM employees
+            WHERE employee_id = %s
+            AND employment_status = 'Active'
+        """, (employee_id,))
+
+        employee_row = cursor.fetchone()
+
+        if not employee_row:
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+        company_id = employee_row[0]
+
         start = datetime.strptime(payload["from"], "%Y-%m-%d")
         end = datetime.strptime(payload["to"], "%Y-%m-%d")
 
@@ -31,33 +46,37 @@ def create_leave_request(payload: dict):
             print("INSERTING:", employee_id, current.date(), leave_type)
 
             cursor.execute("""
-                INSERT INTO leaves (request_id, employee_id, date, leave_type, reason, status)
-                VALUES (%s::uuid, %s, %s, %s, %s, 'pending')
-            """, (
+            INSERT INTO leaves (
                 request_id,
                 employee_id,
-                current.date(),
+                date,
                 leave_type,
-                reason
-            ))
+                reason,
+                status,
+                company_id
+            )
+            VALUES (%s::uuid, %s, %s, %s, %s, 'pending', %s)
+        """, (
+            request_id,
+            employee_id,
+            current.date(),
+            leave_type,
+            reason,
+            company_id
+        ))
 
             current += timedelta(days=1)
 
-        cursor.execute("""
-            SELECT employee_id
-            FROM employees
-            WHERE main_role = 'Team Leader'
-            AND employment_status = 'Active'
-            AND employee_id != %s
-        """, (employee_id,))
+        admin_ids = get_company_admin_employee_ids(
+            cursor,
+            company_id,
+            exclude_employee_id=employee_id
+        )
 
-        admins = cursor.fetchall()
-
-        for admin in admins:
-
+        for admin_id in admin_ids:
             create_notification(
                 cursor,
-                admin[0],
+                admin_id,
                 "New Leave Request",
                 "An employee submitted a leave request.",
                 "leave"
