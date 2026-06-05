@@ -77,6 +77,7 @@ interface ScheduleGeneratorProps {
   currentUser: string;
   currentUserId: number;
   role: string;
+  companyId: number | null;
 }
 
 const DAYS = [
@@ -93,6 +94,7 @@ export function ScheduleGenerator({
   currentUser,
   currentUserId,
   role,
+  companyId,
 }: ScheduleGeneratorProps) {
   const [livestreams, setLivestreams] = useState<string[]>([]);
 
@@ -288,7 +290,7 @@ export function ScheduleGenerator({
   const loadSchedule = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/generated-schedule",
+        `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${companyId}`,
       );
 
       const data = await res.json();
@@ -574,7 +576,7 @@ export function ScheduleGenerator({
   const generateSchedule = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/generate-schedule",
+        `https://backend-production-6e75.up.railway.app/generate-schedule?company_id=${companyId}`,
       );
       const data = await res.json();
 

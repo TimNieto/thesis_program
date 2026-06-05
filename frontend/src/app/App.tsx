@@ -204,6 +204,7 @@ export default function App() {
               currentUser={user.email}
               currentUserId={user.id}
               role={user.role}
+              companyId={user.company_id}
             />
           </TabsContent>
 

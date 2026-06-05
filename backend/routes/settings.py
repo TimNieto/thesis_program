@@ -1,63 +1,75 @@
-# backend/routes/settings.py
-
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from db.database import get_connection
 from services.notification_service import create_notification
 
 router = APIRouter()
 
-# GET SETTINGS
+
 @router.get("/settings")
-def get_settings():
+def get_settings(company_id: int = 1):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
         cursor.execute("""
             SELECT
-                company_name,
-                company_type,
-                max_working_days,
-                max_shifts_per_day,
-                max_shifts_per_week,
-                allow_double_shifts,
-                fairness_weight,
-                absence_replacement_mode,
-                enable_in_app_notifications,
-                gy_fatigue_penalty
-            FROM company_settings
+                c.company_name,
+                cs.max_working_days,
+                cs.max_shifts_per_day,
+                cs.max_shifts_per_week,
+                cs.allow_double_shifts,
+                cs.fairness_weight,
+                cs.absence_replacement_mode,
+                cs.enable_in_app_notifications,
+                cs.gy_fatigue_penalty
+            FROM company_settings cs
+            JOIN companies c
+                ON cs.company_id = c.company_id
+            WHERE cs.company_id = %s
             LIMIT 1
-        """)
+        """, (company_id,))
 
         row = cursor.fetchone()
 
         if not row:
-            return {"error": "Settings not found"}
+            raise HTTPException(
+                status_code=404,
+                detail="Settings not found for this company"
+            )
 
         return {
             "company_name": row[0],
-            "company_type": row[1],
-            "max_working_days": row[2],
-            "max_shifts_per_day": row[3],
-            "max_shifts_per_week": row[4],
-            "allow_double_shifts": row[5],
-            "fairness_weight": row[6],
-            "absence_replacement_mode": row[7],
-            "enable_in_app_notifications": row[8],
-            "gy_fatigue_penalty": row[9]
+            "company_type": "Live Selling",
+            "max_working_days": row[1],
+            "max_shifts_per_day": row[2],
+            "max_shifts_per_week": row[3],
+            "allow_double_shifts": row[4],
+            "fairness_weight": row[5],
+            "absence_replacement_mode": row[6],
+            "enable_in_app_notifications": row[7],
+            "gy_fatigue_penalty": row[8],
+            "company_id": company_id
         }
 
     finally:
         cursor.close()
         conn.close()
 
-# UPDATE SETTINGS
+
 @router.put("/settings")
 def update_settings(payload: dict):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
+        company_id = payload.get("company_id")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
         gy_fatigue_penalty = payload.get("gy_fatigue_penalty", 20)
 
         try:
@@ -65,17 +77,21 @@ def update_settings(payload: dict):
         except (TypeError, ValueError):
             gy_fatigue_penalty = 20
 
-        if gy_fatigue_penalty < 0:
-            gy_fatigue_penalty = 0
+        gy_fatigue_penalty = max(0, min(100, gy_fatigue_penalty))
 
-        if gy_fatigue_penalty > 100:
-            gy_fatigue_penalty = 100
+        cursor.execute("""
+            UPDATE companies
+            SET company_name = %s,
+                updated_at = NOW()
+            WHERE company_id = %s
+        """, (
+            payload["company_name"],
+            company_id
+        ))
 
         cursor.execute("""
             UPDATE company_settings
             SET
-                company_name = %s,
-                company_type = %s,
                 max_working_days = %s,
                 max_shifts_per_day = %s,
                 max_shifts_per_week = %s,
@@ -85,10 +101,8 @@ def update_settings(payload: dict):
                 enable_in_app_notifications = %s,
                 gy_fatigue_penalty = %s,
                 updated_at = NOW()
-            WHERE settings_id = 1
+            WHERE company_id = %s
         """, (
-            payload["company_name"],
-            payload["company_type"],
             payload["max_working_days"],
             payload["max_shifts_per_day"],
             payload["max_shifts_per_week"],
@@ -96,7 +110,8 @@ def update_settings(payload: dict):
             payload["fairness_weight"],
             payload["absence_replacement_mode"],
             payload.get("enable_in_app_notifications", True),
-            gy_fatigue_penalty
+            gy_fatigue_penalty,
+            company_id
         ))
 
         updated_by = payload.get("updated_by")
@@ -105,15 +120,17 @@ def update_settings(payload: dict):
             cursor.execute("""
                 SELECT employee_id
                 FROM employees
-                WHERE employment_status = 'Active'
+                WHERE company_id = %s
+                AND employment_status = 'Active'
                 AND employee_id != %s
-            """, (updated_by,))
+            """, (company_id, updated_by))
         else:
             cursor.execute("""
                 SELECT employee_id
                 FROM employees
-                WHERE employment_status = 'Active'
-            """)
+                WHERE company_id = %s
+                AND employment_status = 'Active'
+            """, (company_id,))
 
         employees = cursor.fetchall()
 
@@ -129,100 +146,21 @@ def update_settings(payload: dict):
         conn.commit()
 
         return {
-            "status": "success"
+            "status": "success",
+            "message": "Company settings updated"
         }
 
-    except Exception:
+    except HTTPException:
         conn.rollback()
         raise
 
-    finally:
-        cursor.close()
-        conn.close()
-
-
-
-@router.get("/account-settings")
-def get_account_settings():
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-
-        cursor.execute("""
-            SELECT
-                account_setting_id,
-                account_name,
-                priority_level,
-                require_host,
-                require_operator,
-                operator_policy,
-                allow_partial_staffing
-            FROM account_settings
-            WHERE pending_delete = FALSE
-            ORDER BY priority_level
-        """)
-
-        rows = cursor.fetchall()
-
-        return [
-            {
-                "account_setting_id": r[0],
-                "account_name": r[1],
-                "priority_level": r[2],
-                "require_host": r[3],
-                "require_operator": r[4],
-                "operator_policy": r[5],
-                "allow_partial_staffing": r[6]
-            }
-            for r in rows
-        ]
-
-    finally:
-        cursor.close()
-        conn.close()
-
-
-@router.put("/account-settings/{account_setting_id}")
-def update_account_settings(
-    account_setting_id: int,
-    payload: dict
-):
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-
-        cursor.execute("""
-            UPDATE account_settings
-            SET
-                priority_level = %s,
-                require_host = %s,
-                require_operator = %s,
-                operator_policy = %s,
-                allow_partial_staffing = %s,
-                updated_at = NOW()
-            WHERE account_setting_id = %s
-        """, (
-            payload["priority_level"],
-            payload["require_host"],
-            payload["require_operator"],
-            payload["operator_policy"],
-            payload["allow_partial_staffing"],
-            account_setting_id
-        ))
-
-        conn.commit()
-
-        return {
-            "status": "success"
-        }
-
-    except Exception:
+    except Exception as e:
         conn.rollback()
-        raise
+        print("UPDATE SETTINGS ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
     finally:
         cursor.close()

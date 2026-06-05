@@ -64,6 +64,8 @@ interface CompanySettingsProps {
     email: string;
     role: string;
     displayRole: string;
+    company_id: number | null;
+    company_name: string | null;
   };
 }
 
@@ -148,9 +150,10 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/settings",
-      );
+        const res = await fetch(
+          `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
+        );
+
 
       const data = await res.json();
 
@@ -687,6 +690,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            company_id: currentUser.company_id,
             company_name: companyName,
             company_type: companyType,
 

@@ -166,9 +166,9 @@ def auto_approve_cover_application(cursor, application_id: int):
 
 
 @router.get("/generate-schedule")
-def generate_schedule():
+def generate_schedule(company_id: int):
     try:
-        result = generate_weekly_schedule()
+        result = generate_weekly_schedule(company_id)
 
         return {
             "status": "success",
@@ -182,9 +182,9 @@ def generate_schedule():
         raise HTTPException(status_code=500, detail=str(e)) 
     
 @router.get("/generated-schedule")
-def get_schedule():
+def get_schedule(company_id: int):
     try:
-        result = get_generated_schedule()
+        result = get_generated_schedule(company_id)
 
         return {
             "status": "success",
