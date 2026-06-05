@@ -37,6 +37,8 @@ export default function App() {
     email: "",
     role: "",
     displayRole: "",
+    company_id: null as number | null,
+    company_name: null as string | null,
   });
 
   const handleLogin = (userData: any) => {
@@ -53,6 +55,8 @@ export default function App() {
       email: "",
       role: "",
       displayRole: "",
+      company_id: null,
+      company_name: null,
     });
   };
 
@@ -61,37 +65,41 @@ export default function App() {
   }
 
   if (user.role === "super-admin") {
-  return (
-    <div className="size-full bg-gray-50">
-      <Toaster />
+    return (
+      <div className="size-full bg-gray-50">
+        <Toaster />
 
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Shield className="size-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl">Super Admin Panel</h1>
-                <p className="text-sm text-gray-600">
-                  Welcome, {user.name} ({user.displayRole})
-                </p>
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="size-8 text-blue-600" />
+                <div>
+                  <h1 className="text-2xl">Super Admin Panel</h1>
+                  <p className="text-sm text-gray-600">
+                    Welcome, {user.name} ({user.displayRole})
+                  </p>
+                </div>
               </div>
+
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="gap-2"
+              >
+                <LogOut className="size-4" />
+                Logout
+              </Button>
             </div>
-
-            <Button onClick={handleLogout} variant="outline" className="gap-2">
-              <LogOut className="size-4" />
-              Logout
-            </Button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <SuperAdmin />
-      </main>
-    </div>
-  );
-}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <SuperAdmin />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="size-full bg-gray-50">
@@ -185,9 +193,9 @@ export default function App() {
                 <CompanySettings currentUser={user} />
               </TabsContent>
 
-                <TabsContent value="reports">
-                  <DataReport />
-                </TabsContent>
+              <TabsContent value="reports">
+                <DataReport />
+              </TabsContent>
             </>
           )}
 
