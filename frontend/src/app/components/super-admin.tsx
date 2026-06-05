@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
@@ -16,7 +16,15 @@ import {
   Shield,
   Settings,
   Users,
-  ToggleLeft
+  ToggleLeft,
+  Upload,
+  FileSpreadsheet,
+  UserSquare2,
+  Briefcase,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Download
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -97,6 +105,77 @@ export function SuperAdmin() {
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newCompanyType, setNewCompanyType] = useState("Live Selling");
+
+  // Import States
+  type ImportStatus = "idle" | "parsing" | "success" | "error";
+  type ImportCategory = "employees" | "departments" | "staffing" | "roles";
+  interface ImportRecord {
+    id: string;
+    category: ImportCategory;
+    fileName: string;
+    rowCount: number;
+    importedAt: string;
+    status: "success" | "error";
+    errors?: string[];
+  }
+  const [importRecords, setImportRecords] = useState<ImportRecord[]>([]);
+  const [importStatuses, setImportStatuses] = useState<Record<ImportCategory, ImportStatus>>({
+    employees: "idle",
+    departments: "idle",
+    staffing: "idle",
+    roles: "idle",
+  });
+  const [importPreviews, setImportPreviews] = useState<Record<ImportCategory, string[][]>>({
+    employees: [],
+    departments: [],
+    staffing: [],
+    roles: [],
+  });
+
+  const handleFileImport = (category: ImportCategory, file: File) => {
+    if (!file) return;
+    setImportStatuses((prev) => ({ ...prev, [category]: "parsing" }));
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const rows = text.trim().split("\n").map((r) => r.split(",").map((c) => c.replace(/^"|"$/g, "").trim()));
+        if (rows.length < 2) throw new Error("File has no data rows");
+        setImportPreviews((prev) => ({ ...prev, [category]: rows.slice(0, 6) }));
+        setImportStatuses((prev) => ({ ...prev, [category]: "success" }));
+        const record: ImportRecord = {
+          id: Date.now().toString(),
+          category,
+          fileName: file.name,
+          rowCount: rows.length - 1,
+          importedAt: new Date().toLocaleString(),
+          status: "success",
+        };
+        setImportRecords((prev) => [record, ...prev]);
+        toast.success(`Imported ${rows.length - 1} rows from ${file.name}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to parse file";
+        setImportStatuses((prev) => ({ ...prev, [category]: "error" }));
+        const record: ImportRecord = {
+          id: Date.now().toString(),
+          category,
+          fileName: file.name,
+          rowCount: 0,
+          importedAt: new Date().toLocaleString(),
+          status: "error",
+          errors: [msg],
+        };
+        setImportRecords((prev) => [record, ...prev]);
+        toast.error(`Import failed: ${msg}`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const clearImport = (category: ImportCategory) => {
+    setImportStatuses((prev) => ({ ...prev, [category]: "idle" }));
+    setImportPreviews((prev) => ({ ...prev, [category]: [] }));
+  };
 
   // Setting Management States
   const [isAddSettingOpen, setIsAddSettingOpen] = useState(false);
@@ -324,7 +403,7 @@ export function SuperAdmin() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="companies" className="space-y-6">
-        <TabsList className={`grid w-full ${selectedCompany ? "max-w-3xl grid-cols-3" : "max-w-xs grid-cols-1"}`}>
+        <TabsList className={`grid w-full ${selectedCompany ? "max-w-4xl grid-cols-4" : "max-w-xs grid-cols-1"}`}>
           <TabsTrigger value="companies" className="gap-2">
             <Building2 className="size-4" />
             Companies
@@ -338,6 +417,10 @@ export function SuperAdmin() {
               <TabsTrigger value="permissions" className="gap-2">
                 <Shield className="size-4" />
                 Role Permissions
+              </TabsTrigger>
+              <TabsTrigger value="imports" className="gap-2">
+                <Upload className="size-4" />
+                Imports
               </TabsTrigger>
             </>
           )}
@@ -652,6 +735,356 @@ export function SuperAdmin() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Imports Tab */}
+        <TabsContent value="imports" className="space-y-6">
+          {!selectedCompany ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12 text-gray-500">
+                  <Upload className="size-12 mx-auto mb-3 text-gray-400" />
+                  <p>Please select a company from the Companies tab to manage its imports</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-6">
+                {(
+                  [
+                    {
+                      key: "employees" as ImportCategory,
+                      label: "Employee Data",
+                      icon: <Users className="size-5 text-blue-600" />,
+                      description: "Import employee profiles including names, IDs, contact info, and hire dates.",
+                      templateHeaders: "employee_id,first_name,last_name,email,phone,hire_date,position,department",
+                    },
+                    {
+                      key: "departments" as ImportCategory,
+                      label: "Account / Department Data",
+                      icon: <Briefcase className="size-5 text-purple-600" />,
+                      description: "Import account or department records such as department codes, names, and managers.",
+                      templateHeaders: "department_id,department_name,account_code,manager_name,head_count",
+                    },
+                    {
+                      key: "staffing" as ImportCategory,
+                      label: "Staffing Requirements",
+                      icon: <FileSpreadsheet className="size-5 text-green-600" />,
+                      description: "Import shift staffing requirements per stream and time slot.",
+                      templateHeaders: "stream,shift_code,shift_start,shift_end,required_hosts,required_operators",
+                    },
+                    {
+                      key: "roles" as ImportCategory,
+                      label: "Roles",
+                      icon: <UserSquare2 className="size-5 text-orange-600" />,
+                      description: "Import role definitions and access levels for this company.",
+                      templateHeaders: "role_id,role_name,role_level,can_manage_schedule,can_approve_requests",
+                    },
+                  ] as { key: ImportCategory; label: string; icon: React.ReactNode; description: string; templateHeaders: string }[]
+                ).map(({ key, label, icon, description, templateHeaders }) => {
+                  const status = importStatuses[key];
+                  const preview = importPreviews[key];
+                  return (
+                    <Card key={key}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {icon}
+                            <div>
+                              <CardTitle className="text-base">{label}</CardTitle>
+                              <CardDescription className="text-xs mt-0.5">{description}</CardDescription>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {status === "success" && (
+                              <Badge className="gap-1 bg-green-100 text-green-700 border-green-300">
+                                <CheckCircle2 className="size-3" /> Imported
+                              </Badge>
+                            )}
+                            {status === "error" && (
+                              <Badge className="gap-1 bg-red-100 text-red-700 border-red-300">
+                                <AlertCircle className="size-3" /> Error
+                              </Badge>
+                            )}
+                            {status !== "idle" && (
+                              <Button variant="ghost" size="sm" onClick={() => clearImport(key)} className="gap-1 text-gray-500 h-7 px-2">
+                                <X className="size-3" /> Clear
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 h-7 text-xs"
+                              onClick={() => {
+                                const blob = new Blob([templateHeaders + "\n"], { type: "text/csv" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `${key}_template.csv`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }}
+                            >
+                              <Download className="size-3" /> Template
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Existing Data Section */}
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Existing Data</h4>
+                          <div className="overflow-x-auto rounded border bg-gray-50">
+                            {key === "employees" ? (
+                              <table className="w-full text-xs">
+                                <thead className="bg-gray-100 border-b">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Employee ID</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Name</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Email</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Position</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Department</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">EMP001</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">John Doe</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">john.doe@example.com</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Host</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Live Stream Ops</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">EMP002</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Jane Smith</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">jane.smith@example.com</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Operator</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Live Stream Ops</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            ) : key === "departments" ? (
+                              <table className="w-full text-xs">
+                                <thead className="bg-gray-100 border-b">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Department ID</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Department Name</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Account Code</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Manager</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Head Count</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">DEPT001</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Live Stream Operations</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ACC-LS-001</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Admin Manager</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">45</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">DEPT002</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Technical Support</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ACC-TS-002</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Support Lead</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">20</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            ) : key === "staffing" ? (
+                              <table className="w-full text-xs">
+                                <thead className="bg-gray-100 border-b">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Stream</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Shift Code</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Shift Time</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Required Hosts</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Required Operators</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Mommypoko</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">GY</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">01:00 - 07:00</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Mommypoko</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">AM</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">07:00 - 13:00</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Sofy</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">GY</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">01:00 - 07:00</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Sofy</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">AM</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">07:00 - 13:00</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            ) : key === "roles" ? (
+                              <table className="w-full text-xs">
+                                <thead className="bg-gray-100 border-b">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Role ID</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Role Name</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Level</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Manage Schedule</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Approve Requests</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE001</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Admin</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">High</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE002</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Team Leader (Admin)</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Medium</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE003</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Host</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Basic</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE004</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Operator</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Basic</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            ) : (
+                              <div className="px-3 py-8 text-center text-gray-400 text-xs">No existing data</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Upload Section */}
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Import New Data</h4>
+                          {status === "idle" || status === "error" ? (
+                            <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-200 rounded-lg p-8 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                              <Upload className="size-7 text-gray-400 mb-2" />
+                              <span className="text-sm font-medium text-gray-600">Click to upload CSV file</span>
+                              <span className="text-xs text-gray-400 mt-1">Only .csv files are supported</span>
+                              <input
+                                type="file"
+                                accept=".csv"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleFileImport(key, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                          ) : status === "parsing" ? (
+                            <div className="flex items-center justify-center py-8 gap-3 text-gray-500">
+                              <div className="size-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-sm">Parsing file…</span>
+                            </div>
+                          ) : (
+                            preview.length > 0 && (
+                              <div className="overflow-x-auto rounded border">
+                                <table className="w-full text-xs">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      {preview[0].map((header, i) => (
+                                        <th key={i} className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{header}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {preview.slice(1).map((row, ri) => (
+                                      <tr key={ri} className="border-t">
+                                        {row.map((cell, ci) => (
+                                          <td key={ci} className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{cell}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                <p className="text-xs text-gray-400 px-3 py-1.5 border-t">Showing up to 5 preview rows</p>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Import History */}
+              {importRecords.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Import History</CardTitle>
+                    <CardDescription>Recent import activity for {selectedCompany.name}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Category</TableHead>
+                            <TableHead>File</TableHead>
+                            <TableHead>Rows</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Imported At</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {importRecords.map((r) => (
+                            <TableRow key={r.id}>
+                              <TableCell className="capitalize font-medium">{r.category}</TableCell>
+                              <TableCell className="text-gray-600 text-xs">{r.fileName}</TableCell>
+                              <TableCell>{r.rowCount > 0 ? r.rowCount : "—"}</TableCell>
+                              <TableCell>
+                                {r.status === "success" ? (
+                                  <Badge className="gap-1 bg-green-100 text-green-700 border-green-300 text-xs">
+                                    <CheckCircle2 className="size-3" /> Success
+                                  </Badge>
+                                ) : (
+                                  <Badge className="gap-1 bg-red-100 text-red-700 border-red-300 text-xs">
+                                    <AlertCircle className="size-3" /> Failed
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs text-gray-500">{r.importedAt}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
         </TabsContent>
       </Tabs>
 

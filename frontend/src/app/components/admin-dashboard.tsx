@@ -55,6 +55,16 @@ import {
   RefreshCw,
   Calendar,
   CalendarOff,
+  PartyPopper,
+  Trash2,
+  Upload,
+  FileSpreadsheet,
+  UserSquare2,
+  Briefcase,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -131,6 +141,52 @@ const DAYS = [
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+
+  interface Holiday {
+    id: string;
+    name: string;
+    date: string;
+  }
+
+  const [holidays, setHolidays] = useState<Holiday[]>([
+    { id: "1", name: "New Year's Day", date: "2025-01-01" },
+    { id: "2", name: "Christmas Day", date: "2025-12-25" },
+  ]);
+
+  const [newHolidayName, setNewHolidayName] = useState("");
+  const [newHolidayDate, setNewHolidayDate] = useState("");
+
+  type ImportStatus = "idle" | "parsing" | "success" | "error";
+  type ImportCategory = "employees" | "departments" | "staffing" | "roles";
+
+  interface ImportRecord {
+    id: string;
+    category: ImportCategory;
+    fileName: string;
+    rowCount: number;
+    importedAt: string;
+    status: "success" | "error";
+  }
+
+  const [importRecords, setImportRecords] = useState<ImportRecord[]>([]);
+
+  const [importStatuses, setImportStatuses] = useState<
+    Record<ImportCategory, ImportStatus>
+  >({
+    employees: "idle",
+    departments: "idle",
+    staffing: "idle",
+    roles: "idle",
+  });
+
+  const [importPreviews, setImportPreviews] = useState<
+    Record<ImportCategory, string[][]>
+  >({
+    employees: [],
+    departments: [],
+    staffing: [],
+    roles: [],
+  });
 
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
@@ -348,6 +404,127 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       );
     }
   };
+
+const handleAddHoliday = () => {
+  if (!newHolidayName.trim()) {
+    toast.error("Please enter a holiday name");
+    return;
+  }
+
+  if (!newHolidayDate) {
+    toast.error("Please select a date");
+    return;
+  }
+
+  setHolidays((prev) => [
+    ...prev,
+    {
+      id: Date.now().toString(),
+      name: newHolidayName.trim(),
+      date: newHolidayDate,
+    },
+  ]);
+
+  setNewHolidayName("");
+  setNewHolidayDate("");
+
+  toast.success("Holiday added");
+};
+
+const handleRemoveHoliday = (id: string) => {
+  setHolidays((prev) => prev.filter((h) => h.id !== id));
+  toast.success("Holiday removed");
+};
+
+
+
+const handleFileImport = (category: ImportCategory, file: File) => {
+  setImportStatuses((prev) => ({
+    ...prev,
+    [category]: "parsing",
+  }));
+
+  const reader = new FileReader();
+
+  reader.onload = (e) => {
+    try {
+      const text = e.target?.result as string;
+
+      const rows = text
+        .trim()
+        .split("\n")
+        .map((r) =>
+          r
+            .split(",")
+            .map((c) => c.replace(/^"|"$/g, "").trim()),
+        );
+
+      if (rows.length < 2) {
+        throw new Error("File has no data rows");
+      }
+
+      setImportPreviews((prev) => ({
+        ...prev,
+        [category]: rows.slice(0, 6),
+      }));
+
+      setImportStatuses((prev) => ({
+        ...prev,
+        [category]: "success",
+      }));
+
+      setImportRecords((prev) => [
+        {
+          id: Date.now().toString(),
+          category,
+          fileName: file.name,
+          rowCount: rows.length - 1,
+          importedAt: new Date().toLocaleString(),
+          status: "success",
+        },
+        ...prev,
+      ]);
+
+      toast.success(`Imported ${rows.length - 1} rows from ${file.name}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to parse file";
+
+      setImportStatuses((prev) => ({
+        ...prev,
+        [category]: "error",
+      }));
+
+      setImportRecords((prev) => [
+        {
+          id: Date.now().toString(),
+          category,
+          fileName: file.name,
+          rowCount: 0,
+          importedAt: new Date().toLocaleString(),
+          status: "error",
+        },
+        ...prev,
+      ]);
+
+      toast.error(`Import failed: ${msg}`);
+    }
+  };
+
+  reader.readAsText(file);
+};
+
+const clearImport = (category: ImportCategory) => {
+  setImportStatuses((prev) => ({
+    ...prev,
+    [category]: "idle",
+  }));
+
+  setImportPreviews((prev) => ({
+    ...prev,
+    [category]: [],
+  }));
+};
+
 
   // Add Employee
   const handleAddEmployee = async () => {
@@ -766,10 +943,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="employees" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-1">
+        <TabsList className="grid w-full max-w-3xl grid-cols-2">
           <TabsTrigger value="employees" className="gap-2">
             <Users className="size-4" />
             Employees
+          </TabsTrigger>
+
+          <TabsTrigger value="imports" className="gap-2">
+            <Upload className="size-4" />
+            Imports
           </TabsTrigger>
 
           {/*
@@ -808,9 +990,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       <TableHead>Name</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
-                      {/* <TableHead>Host Accounts</TableHead>
-                      <TableHead>Operator Accounts</TableHead>
-                      <TableHead>Total Shifts</TableHead> */}
                       <TableHead>Joined Date</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -891,15 +1070,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               </Badge>
                             </TableCell>
 
-                            {/* <TableCell className="max-w-[180px] truncate">
-                              {employee.host_accounts || "None"}
-                            </TableCell>
-
-                            <TableCell className="max-w-[180px] truncate">
-                              {employee.operator_accounts || "None"}
-                            </TableCell>
-
-                            <TableCell>{employee.totalShifts}</TableCell> */}
 
                             <TableCell>
                               {new Date(
@@ -1078,7 +1248,338 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               )}
             </CardContent>
           </Card>
+
+          {/* Holidays Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PartyPopper className="size-5 text-rose-500" />
+                Holidays
+              </CardTitle>
+              <CardDescription>
+                Set company holidays so they are reflected in schedules and requests
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-5">
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs font-medium text-gray-600">
+                    Holiday Name
+                  </Label>
+                  <Input
+                    placeholder="e.g. Independence Day"
+                    value={newHolidayName}
+                    onChange={(e) => setNewHolidayName(e.target.value)}
+                    className="w-56"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddHoliday();
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs font-medium text-gray-600">
+                    Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={newHolidayDate}
+                    onChange={(e) => setNewHolidayDate(e.target.value)}
+                    className="w-44"
+                  />
+                </div>
+
+                <Button onClick={handleAddHoliday} className="gap-2">
+                  <CheckCircle2 className="size-4" />
+                  Add Holiday
+                </Button>
+              </div>
+
+              {holidays.length > 0 ? (
+                <div className="overflow-x-auto rounded border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Holiday Name</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Day</TableHead>
+                        <TableHead className="w-16"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {[...holidays]
+                        .sort((a, b) => a.date.localeCompare(b.date))
+                        .map((h) => (
+                          <TableRow key={h.id}>
+                            <TableCell className="font-medium">
+                              {h.name}
+                            </TableCell>
+
+                            <TableCell>
+                              {new Date(
+                                h.date + "T00:00:00",
+                              ).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })}
+                            </TableCell>
+
+                            <TableCell className="text-gray-500">
+                              {new Date(
+                                h.date + "T00:00:00",
+                              ).toLocaleDateString("en-US", {
+                                weekday: "long",
+                              })}
+                            </TableCell>
+
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 h-7 px-2"
+                                onClick={() => handleRemoveHoliday(h.id)}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <PartyPopper className="size-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No holidays added yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
+
+
+        {/* Imports Tab */}
+        <TabsContent value="imports" className="space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+            {[
+              {
+                key: "employees" as ImportCategory,
+                label: "Employee Data",
+                icon: <Users className="size-5 text-blue-600" />,
+                description:
+                  "Import employee profiles: names, IDs, contact info, hire dates.",
+                templateHeaders:
+                  "employee_id,first_name,last_name,email,phone,hire_date,position,department",
+              },
+              {
+                key: "departments" as ImportCategory,
+                label: "Account / Department Data",
+                icon: <Briefcase className="size-5 text-purple-600" />,
+                description:
+                  "Import account or department records: codes, names, and managers.",
+                templateHeaders:
+                  "department_id,department_name,account_code,manager_name,head_count",
+              },
+              {
+                key: "staffing" as ImportCategory,
+                label: "Staffing Requirements",
+                icon: <FileSpreadsheet className="size-5 text-green-600" />,
+                description:
+                  "Import shift staffing requirements per stream and time slot.",
+                templateHeaders:
+                  "stream,shift_code,shift_start,shift_end,required_hosts,required_operators",
+              },
+              {
+                key: "roles" as ImportCategory,
+                label: "Roles",
+                icon: <UserSquare2 className="size-5 text-orange-600" />,
+                description:
+                  "Import role definitions and access levels.",
+                templateHeaders:
+                  "role_id,role_name,role_level,can_manage_schedule,can_approve_requests",
+              },
+            ].map(({ key, label, icon, description, templateHeaders }) => {
+              const status = importStatuses[key];
+              const preview = importPreviews[key];
+
+              return (
+                <Card key={key}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {icon}
+                        <div>
+                          <CardTitle className="text-base">{label}</CardTitle>
+                          <CardDescription className="text-xs mt-0.5">
+                            {description}
+                          </CardDescription>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {status === "success" && (
+                          <Badge className="gap-1 bg-green-100 text-green-700 border-green-300">
+                            <CheckCircle2 className="size-3" />
+                            Imported
+                          </Badge>
+                        )}
+
+                        {status === "error" && (
+                          <Badge className="gap-1 bg-red-100 text-red-700 border-red-300">
+                            <AlertCircle className="size-3" />
+                            Error
+                          </Badge>
+                        )}
+
+                        {status !== "idle" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => clearImport(key)}
+                            className="gap-1 text-gray-500 h-7 px-2"
+                          >
+                            <X className="size-3" />
+                            Clear
+                          </Button>
+                        )}
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 h-7 text-xs"
+                          onClick={() => {
+                            const blob = new Blob([templateHeaders + "\n"], {
+                              type: "text/csv",
+                            });
+
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+
+                            a.href = url;
+                            a.download = `${key}_template.csv`;
+                            a.click();
+
+                            URL.revokeObjectURL(url);
+                          }}
+                        >
+                          <Download className="size-3" />
+                          Template
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <Label className="text-sm font-medium">
+                        Upload CSV File
+                      </Label>
+
+                      <Input
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="mt-2"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+
+                          if (file) {
+                            handleFileImport(key, file);
+                          }
+
+                          e.currentTarget.value = "";
+                        }}
+                      />
+
+                      <p className="text-xs text-gray-500 mt-2">
+                        Upload a CSV file. This currently previews/imports on the
+                        frontend only.
+                      </p>
+                    </div>
+
+                    {preview.length > 0 && (
+                      <div className="overflow-x-auto rounded border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {preview[0].map((header, index) => (
+                                <TableHead key={index}>{header}</TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+
+                          <TableBody>
+                            {preview.slice(1).map((row, rowIndex) => (
+                              <TableRow key={rowIndex}>
+                                {row.map((cell, cellIndex) => (
+                                  <TableCell key={cellIndex}>{cell}</TableCell>
+                                ))}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Import History</CardTitle>
+              <CardDescription>
+                Recently imported CSV files in this session
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              {importRecords.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead>File</TableHead>
+                      <TableHead>Rows</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Imported At</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {importRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell className="capitalize">
+                          {record.category}
+                        </TableCell>
+                        <TableCell>{record.fileName}</TableCell>
+                        <TableCell>{record.rowCount}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              record.status === "success"
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {record.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{record.importedAt}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-gray-500">No imports yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         {/* Assignments Tab }
         <TabsContent value="assignments" className="space-y-6">
