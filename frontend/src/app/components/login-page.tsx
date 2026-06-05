@@ -21,6 +21,8 @@ interface LoginPageProps {
     email: string;
     role: string;
     displayRole: string;
+    company_id: number | null;
+    company_name: string | null;
   }) => void;
 }
 
@@ -64,10 +66,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       onLogin({
         id: data.user.id,
         name: data.user.name,
-        email: username.trim().toLowerCase(),
+        email: data.user.email,
         role: data.role,
         displayRole: data.displayRole,
+        company_id: data.user.company_id,
+        company_name: data.user.company_name,
       });
+
     } catch (err) {
       setError("Server not reachable");
     }

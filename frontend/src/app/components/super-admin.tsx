@@ -2,13 +2,44 @@ import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/app/components/ui/table";
 import { Badge } from "@/app/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 import { Switch } from "@/app/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
 import {
   Building2,
   Plus,
@@ -16,7 +47,7 @@ import {
   Shield,
   Settings,
   Users,
-  ToggleLeft
+  ToggleLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,47 +81,290 @@ interface RolePermission {
 
 export function SuperAdmin() {
   const [companies, setCompanies] = useState<Company[]>([
-    { id: "1", name: "Live Stream Operations", type: "Live Selling", employeeCount: 45, status: "Active", createdDate: "2025-01-01" },
-    { id: "2", name: "Tech Support Center", type: "BPO", employeeCount: 120, status: "Active", createdDate: "2025-02-15" },
-    { id: "3", name: "Retail Operations", type: "Retail", employeeCount: 30, status: "Inactive", createdDate: "2024-12-10" },
+    {
+      id: "1",
+      name: "Live Stream Operations",
+      type: "Live Selling",
+      employeeCount: 45,
+      status: "Active",
+      createdDate: "2025-01-01",
+    },
+    {
+      id: "2",
+      name: "Tech Support Center",
+      type: "BPO",
+      employeeCount: 120,
+      status: "Active",
+      createdDate: "2025-02-15",
+    },
+    {
+      id: "3",
+      name: "Retail Operations",
+      type: "Retail",
+      employeeCount: 30,
+      status: "Inactive",
+      createdDate: "2024-12-10",
+    },
   ]);
 
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   const [systemSettings, setSystemSettings] = useState<SystemSetting[]>([
-    { id: "1", companyId: "1", name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: true, category: "scheduling" },
-    { id: "2", companyId: "1", name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: true, category: "notifications" },
-    { id: "3", companyId: "1", name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: false, category: "notifications" },
-    { id: "4", companyId: "1", name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: true, category: "security" },
-    { id: "5", companyId: "1", name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: false, category: "scheduling" },
-    { id: "6", companyId: "1", name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: true, category: "general" },
-    { id: "7", companyId: "2", name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: false, category: "scheduling" },
-    { id: "8", companyId: "2", name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: true, category: "notifications" },
-    { id: "9", companyId: "2", name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: true, category: "notifications" },
-    { id: "10", companyId: "2", name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: false, category: "security" },
-    { id: "11", companyId: "2", name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: true, category: "scheduling" },
-    { id: "12", companyId: "2", name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: false, category: "general" },
-    { id: "13", companyId: "3", name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: true, category: "scheduling" },
-    { id: "14", companyId: "3", name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: false, category: "notifications" },
-    { id: "15", companyId: "3", name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: false, category: "notifications" },
-    { id: "16", companyId: "3", name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: false, category: "security" },
-    { id: "17", companyId: "3", name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: true, category: "scheduling" },
-    { id: "18", companyId: "3", name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: true, category: "general" },
+    {
+      id: "1",
+      companyId: "1",
+      name: "Auto-Schedule Generation",
+      description: "Automatically generate schedules based on availability",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "2",
+      companyId: "1",
+      name: "Email Notifications",
+      description: "Send email notifications for schedule changes",
+      enabled: true,
+      category: "notifications",
+    },
+    {
+      id: "3",
+      companyId: "1",
+      name: "SMS Alerts",
+      description: "Send SMS alerts for urgent updates",
+      enabled: false,
+      category: "notifications",
+    },
+    {
+      id: "4",
+      companyId: "1",
+      name: "Two-Factor Authentication",
+      description: "Require 2FA for admin users",
+      enabled: true,
+      category: "security",
+    },
+    {
+      id: "5",
+      companyId: "1",
+      name: "Absence Auto-Replacement",
+      description: "Automatically find replacements for absences",
+      enabled: false,
+      category: "scheduling",
+    },
+    {
+      id: "6",
+      companyId: "1",
+      name: "Public Holidays Sync",
+      description: "Automatically block public holidays",
+      enabled: true,
+      category: "general",
+    },
+    {
+      id: "7",
+      companyId: "2",
+      name: "Auto-Schedule Generation",
+      description: "Automatically generate schedules based on availability",
+      enabled: false,
+      category: "scheduling",
+    },
+    {
+      id: "8",
+      companyId: "2",
+      name: "Email Notifications",
+      description: "Send email notifications for schedule changes",
+      enabled: true,
+      category: "notifications",
+    },
+    {
+      id: "9",
+      companyId: "2",
+      name: "SMS Alerts",
+      description: "Send SMS alerts for urgent updates",
+      enabled: true,
+      category: "notifications",
+    },
+    {
+      id: "10",
+      companyId: "2",
+      name: "Two-Factor Authentication",
+      description: "Require 2FA for admin users",
+      enabled: false,
+      category: "security",
+    },
+    {
+      id: "11",
+      companyId: "2",
+      name: "Absence Auto-Replacement",
+      description: "Automatically find replacements for absences",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "12",
+      companyId: "2",
+      name: "Public Holidays Sync",
+      description: "Automatically block public holidays",
+      enabled: false,
+      category: "general",
+    },
+    {
+      id: "13",
+      companyId: "3",
+      name: "Auto-Schedule Generation",
+      description: "Automatically generate schedules based on availability",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "14",
+      companyId: "3",
+      name: "Email Notifications",
+      description: "Send email notifications for schedule changes",
+      enabled: false,
+      category: "notifications",
+    },
+    {
+      id: "15",
+      companyId: "3",
+      name: "SMS Alerts",
+      description: "Send SMS alerts for urgent updates",
+      enabled: false,
+      category: "notifications",
+    },
+    {
+      id: "16",
+      companyId: "3",
+      name: "Two-Factor Authentication",
+      description: "Require 2FA for admin users",
+      enabled: false,
+      category: "security",
+    },
+    {
+      id: "17",
+      companyId: "3",
+      name: "Absence Auto-Replacement",
+      description: "Automatically find replacements for absences",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "18",
+      companyId: "3",
+      name: "Public Holidays Sync",
+      description: "Automatically block public holidays",
+      enabled: true,
+      category: "general",
+    },
   ]);
 
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
-    { id: "1", companyId: "1", role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "2", companyId: "1", role: "Team Leader (Admin)", canEditCompanySettings: false, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "3", companyId: "1", role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "4", companyId: "1", role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "5", companyId: "2", role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "6", companyId: "2", role: "Team Leader (Admin)", canEditCompanySettings: true, canManageEmployees: false, canViewReports: true, canApproveRequests: true },
-    { id: "7", companyId: "2", role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "8", companyId: "2", role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: true, canApproveRequests: false },
-    { id: "9", companyId: "3", role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "10", companyId: "3", role: "Team Leader (Admin)", canEditCompanySettings: false, canManageEmployees: true, canViewReports: false, canApproveRequests: false },
-    { id: "11", companyId: "3", role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "12", companyId: "3", role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
+    {
+      id: "1",
+      companyId: "1",
+      role: "Admin",
+      canEditCompanySettings: true,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "2",
+      companyId: "1",
+      role: "Team Leader (Admin)",
+      canEditCompanySettings: false,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "3",
+      companyId: "1",
+      role: "Host",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "4",
+      companyId: "1",
+      role: "Operator",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "5",
+      companyId: "2",
+      role: "Admin",
+      canEditCompanySettings: true,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "6",
+      companyId: "2",
+      role: "Team Leader (Admin)",
+      canEditCompanySettings: true,
+      canManageEmployees: false,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "7",
+      companyId: "2",
+      role: "Host",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "8",
+      companyId: "2",
+      role: "Operator",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: true,
+      canApproveRequests: false,
+    },
+    {
+      id: "9",
+      companyId: "3",
+      role: "Admin",
+      canEditCompanySettings: true,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "10",
+      companyId: "3",
+      role: "Team Leader (Admin)",
+      canEditCompanySettings: false,
+      canManageEmployees: true,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "11",
+      companyId: "3",
+      role: "Host",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "12",
+      companyId: "3",
+      role: "Operator",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
   ]);
 
   // Company Management States
@@ -102,7 +376,9 @@ export function SuperAdmin() {
   const [isAddSettingOpen, setIsAddSettingOpen] = useState(false);
   const [newSettingName, setNewSettingName] = useState("");
   const [newSettingDescription, setNewSettingDescription] = useState("");
-  const [newSettingCategory, setNewSettingCategory] = useState<"scheduling" | "notifications" | "security" | "general">("general");
+  const [newSettingCategory, setNewSettingCategory] = useState<
+    "scheduling" | "notifications" | "security" | "general"
+  >("general");
 
   // Add Company
   const handleAddCompany = () => {
@@ -118,25 +394,99 @@ export function SuperAdmin() {
       type: newCompanyType,
       employeeCount: 0,
       status: "Active",
-      createdDate: new Date().toISOString().split('T')[0],
+      createdDate: new Date().toISOString().split("T")[0],
     };
 
     // Create default settings for the new company
     const defaultSettings: SystemSetting[] = [
-      { id: `${newCompanyId}-1`, companyId: newCompanyId, name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: true, category: "scheduling" },
-      { id: `${newCompanyId}-2`, companyId: newCompanyId, name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: true, category: "notifications" },
-      { id: `${newCompanyId}-3`, companyId: newCompanyId, name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: false, category: "notifications" },
-      { id: `${newCompanyId}-4`, companyId: newCompanyId, name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: true, category: "security" },
-      { id: `${newCompanyId}-5`, companyId: newCompanyId, name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: false, category: "scheduling" },
-      { id: `${newCompanyId}-6`, companyId: newCompanyId, name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: true, category: "general" },
+      {
+        id: `${newCompanyId}-1`,
+        companyId: newCompanyId,
+        name: "Auto-Schedule Generation",
+        description: "Automatically generate schedules based on availability",
+        enabled: true,
+        category: "scheduling",
+      },
+      {
+        id: `${newCompanyId}-2`,
+        companyId: newCompanyId,
+        name: "Email Notifications",
+        description: "Send email notifications for schedule changes",
+        enabled: true,
+        category: "notifications",
+      },
+      {
+        id: `${newCompanyId}-3`,
+        companyId: newCompanyId,
+        name: "SMS Alerts",
+        description: "Send SMS alerts for urgent updates",
+        enabled: false,
+        category: "notifications",
+      },
+      {
+        id: `${newCompanyId}-4`,
+        companyId: newCompanyId,
+        name: "Two-Factor Authentication",
+        description: "Require 2FA for admin users",
+        enabled: true,
+        category: "security",
+      },
+      {
+        id: `${newCompanyId}-5`,
+        companyId: newCompanyId,
+        name: "Absence Auto-Replacement",
+        description: "Automatically find replacements for absences",
+        enabled: false,
+        category: "scheduling",
+      },
+      {
+        id: `${newCompanyId}-6`,
+        companyId: newCompanyId,
+        name: "Public Holidays Sync",
+        description: "Automatically block public holidays",
+        enabled: true,
+        category: "general",
+      },
     ];
 
     // Create default role permissions for the new company
     const defaultPermissions: RolePermission[] = [
-      { id: `${newCompanyId}-1`, companyId: newCompanyId, role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-      { id: `${newCompanyId}-2`, companyId: newCompanyId, role: "Team Leader (Admin)", canEditCompanySettings: false, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-      { id: `${newCompanyId}-3`, companyId: newCompanyId, role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-      { id: `${newCompanyId}-4`, companyId: newCompanyId, role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
+      {
+        id: `${newCompanyId}-1`,
+        companyId: newCompanyId,
+        role: "Admin",
+        canEditCompanySettings: true,
+        canManageEmployees: true,
+        canViewReports: true,
+        canApproveRequests: true,
+      },
+      {
+        id: `${newCompanyId}-2`,
+        companyId: newCompanyId,
+        role: "Team Leader (Admin)",
+        canEditCompanySettings: false,
+        canManageEmployees: true,
+        canViewReports: true,
+        canApproveRequests: true,
+      },
+      {
+        id: `${newCompanyId}-3`,
+        companyId: newCompanyId,
+        role: "Host",
+        canEditCompanySettings: false,
+        canManageEmployees: false,
+        canViewReports: false,
+        canApproveRequests: false,
+      },
+      {
+        id: `${newCompanyId}-4`,
+        companyId: newCompanyId,
+        role: "Operator",
+        canEditCompanySettings: false,
+        canManageEmployees: false,
+        canViewReports: false,
+        canApproveRequests: false,
+      },
     ];
 
     setCompanies([...companies, newCompany]);
@@ -150,10 +500,18 @@ export function SuperAdmin() {
 
   // Remove Company
   const handleRemoveCompany = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to remove "${name}"? This action cannot be undone.`)) {
+    if (
+      confirm(
+        `Are you sure you want to remove "${name}"? This action cannot be undone.`,
+      )
+    ) {
       setCompanies(companies.filter((company) => company.id !== id));
-      setSystemSettings(systemSettings.filter((setting) => setting.companyId !== id));
-      setRolePermissions(rolePermissions.filter((permission) => permission.companyId !== id));
+      setSystemSettings(
+        systemSettings.filter((setting) => setting.companyId !== id),
+      );
+      setRolePermissions(
+        rolePermissions.filter((permission) => permission.companyId !== id),
+      );
       if (selectedCompany?.id === id) {
         setSelectedCompany(null);
       }
@@ -166,9 +524,12 @@ export function SuperAdmin() {
     setCompanies(
       companies.map((company) =>
         company.id === id
-          ? { ...company, status: company.status === "Active" ? "Inactive" : "Active" }
-          : company
-      )
+          ? {
+              ...company,
+              status: company.status === "Active" ? "Inactive" : "Active",
+            }
+          : company,
+      ),
     );
     toast.success("Company status updated");
   };
@@ -177,10 +538,8 @@ export function SuperAdmin() {
   const toggleSystemSetting = (id: string) => {
     setSystemSettings(
       systemSettings.map((setting) =>
-        setting.id === id
-          ? { ...setting, enabled: !setting.enabled }
-          : setting
-      )
+        setting.id === id ? { ...setting, enabled: !setting.enabled } : setting,
+      ),
     );
     toast.success("Setting updated");
   };
@@ -226,19 +585,21 @@ export function SuperAdmin() {
   const updateRolePermission = (
     id: string,
     permission: keyof Omit<RolePermission, "id" | "role">,
-    value: boolean
+    value: boolean,
   ) => {
     setRolePermissions(
       rolePermissions.map((rp) =>
-        rp.id === id ? { ...rp, [permission]: value } : rp
-      )
+        rp.id === id ? { ...rp, [permission]: value } : rp,
+      ),
     );
     toast.success("Permission updated");
   };
 
   const getSettingsByCategory = (category: string) => {
     if (!selectedCompany) return [];
-    return systemSettings.filter((s) => s.category === category && s.companyId === selectedCompany.id);
+    return systemSettings.filter(
+      (s) => s.category === category && s.companyId === selectedCompany.id,
+    );
   };
 
   const getCompanyRolePermissions = () => {
@@ -256,7 +617,9 @@ export function SuperAdmin() {
       {/* Header */}
       <div>
         <h2 className="text-3xl">Super Admin Panel</h2>
-        <p className="text-gray-600">Manage companies, system settings, and role permissions</p>
+        <p className="text-gray-600">
+          Manage companies, system settings, and role permissions
+        </p>
       </div>
 
       {/* Statistics Overview */}
@@ -278,7 +641,9 @@ export function SuperAdmin() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Companies</p>
-                <p className="text-2xl font-bold">{companies.filter((c) => c.status === "Active").length}</p>
+                <p className="text-2xl font-bold">
+                  {companies.filter((c) => c.status === "Active").length}
+                </p>
               </div>
               <Building2 className="size-8 text-green-600" />
             </div>
@@ -290,7 +655,9 @@ export function SuperAdmin() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Employees</p>
-                <p className="text-2xl font-bold">{companies.reduce((sum, c) => sum + c.employeeCount, 0)}</p>
+                <p className="text-2xl font-bold">
+                  {companies.reduce((sum, c) => sum + c.employeeCount, 0)}
+                </p>
               </div>
               <Users className="size-8 text-purple-600" />
             </div>
@@ -324,7 +691,9 @@ export function SuperAdmin() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="companies" className="space-y-6">
-        <TabsList className={`grid w-full ${selectedCompany ? "max-w-3xl grid-cols-3" : "max-w-xs grid-cols-1"}`}>
+        <TabsList
+          className={`grid w-full ${selectedCompany ? "max-w-3xl grid-cols-3" : "max-w-xs grid-cols-1"}`}
+        >
           <TabsTrigger value="companies" className="gap-2">
             <Building2 className="size-4" />
             Companies
@@ -350,9 +719,14 @@ export function SuperAdmin() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Company Management</CardTitle>
-                  <CardDescription>Add, remove, or manage companies in the system</CardDescription>
+                  <CardDescription>
+                    Add, remove, or manage companies in the system
+                  </CardDescription>
                 </div>
-                <Button onClick={() => setIsAddCompanyOpen(true)} className="gap-2">
+                <Button
+                  onClick={() => setIsAddCompanyOpen(true)}
+                  className="gap-2"
+                >
                   <Plus className="size-4" />
                   Add Company
                 </Button>
@@ -374,19 +748,27 @@ export function SuperAdmin() {
                   <TableBody>
                     {companies.map((company) => (
                       <TableRow key={company.id}>
-                        <TableCell className="font-medium">{company.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {company.name}
+                        </TableCell>
                         <TableCell>{company.type}</TableCell>
                         <TableCell>{company.employeeCount}</TableCell>
                         <TableCell>
                           <Badge
-                            variant={company.status === "Active" ? "default" : "secondary"}
+                            variant={
+                              company.status === "Active"
+                                ? "default"
+                                : "secondary"
+                            }
                             className="cursor-pointer"
                             onClick={() => toggleCompanyStatus(company.id)}
                           >
                             {company.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{new Date(company.createdDate).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {new Date(company.createdDate).toLocaleDateString()}
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button
@@ -401,7 +783,9 @@ export function SuperAdmin() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleRemoveCompany(company.id, company.name)}
+                              onClick={() =>
+                                handleRemoveCompany(company.id, company.name)
+                              }
                               className="gap-2"
                             >
                               <Trash2 className="size-4" />
@@ -425,7 +809,10 @@ export function SuperAdmin() {
               <CardContent className="pt-6">
                 <div className="text-center py-12 text-gray-500">
                   <Settings className="size-12 mx-auto mb-3 text-gray-400" />
-                  <p>Please select a company from the Companies tab to manage its settings</p>
+                  <p>
+                    Please select a company from the Companies tab to manage its
+                    settings
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -434,157 +821,212 @@ export function SuperAdmin() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>System Settings - {selectedCompany?.name}</CardTitle>
-                    <CardDescription>Configure system settings and features for this company</CardDescription>
+                    <CardTitle>
+                      System Settings - {selectedCompany?.name}
+                    </CardTitle>
+                    <CardDescription>
+                      Configure system settings and features for this company
+                    </CardDescription>
                   </div>
-                  <Button onClick={() => setIsAddSettingOpen(true)} className="gap-2">
+                  <Button
+                    onClick={() => setIsAddSettingOpen(true)}
+                    className="gap-2"
+                  >
                     <Plus className="size-4" />
                     Add Setting
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-              {/* Scheduling Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <ToggleLeft className="size-5 text-blue-600" />
-                  Scheduling
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("scheduling").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* Scheduling Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <ToggleLeft className="size-5 text-blue-600" />
+                    Scheduling
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("scheduling").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Notifications Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <ToggleLeft className="size-5 text-blue-600" />
-                  Notifications
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("notifications").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* Notifications Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <ToggleLeft className="size-5 text-blue-600" />
+                    Notifications
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("notifications").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Security Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <Shield className="size-5 text-blue-600" />
-                  Security
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("security").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* Security Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <Shield className="size-5 text-blue-600" />
+                    Security
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("security").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* General Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <Settings className="size-5 text-blue-600" />
-                  General
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("general").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* General Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <Settings className="size-5 text-blue-600" />
+                    General
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("general").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
@@ -593,7 +1035,10 @@ export function SuperAdmin() {
           <Card>
             <CardHeader>
               <CardTitle>Role Permissions - {selectedCompany?.name}</CardTitle>
-              <CardDescription>Configure what each role can access and modify within this company</CardDescription>
+              <CardDescription>
+                Configure what each role can access and modify within this
+                company
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -617,7 +1062,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canEditCompanySettings}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canEditCompanySettings", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canEditCompanySettings",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -625,7 +1074,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canManageEmployees}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canManageEmployees", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canManageEmployees",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -633,7 +1086,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canViewReports}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canViewReports", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canViewReports",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -641,7 +1098,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canApproveRequests}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canApproveRequests", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canApproveRequests",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -696,7 +1157,10 @@ export function SuperAdmin() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddCompanyOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddCompanyOpen(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleAddCompany}>Add Company</Button>
@@ -734,7 +1198,18 @@ export function SuperAdmin() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="settingCategory">Category</Label>
-              <Select value={newSettingCategory} onValueChange={(value) => setNewSettingCategory(value as "scheduling" | "notifications" | "security" | "general")}>
+              <Select
+                value={newSettingCategory}
+                onValueChange={(value) =>
+                  setNewSettingCategory(
+                    value as
+                      | "scheduling"
+                      | "notifications"
+                      | "security"
+                      | "general",
+                  )
+                }
+              >
                 <SelectTrigger id="settingCategory">
                   <SelectValue />
                 </SelectTrigger>
@@ -748,7 +1223,10 @@ export function SuperAdmin() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddSettingOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddSettingOpen(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleAddSetting}>Add Setting</Button>
