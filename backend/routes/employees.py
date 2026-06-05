@@ -28,41 +28,106 @@ def get_employees():
     try:
         cursor.execute("""
             SELECT
-                employee_id,
-                full_name,
-                email,
-                main_role,
-                employment_status,
-                joined_date,
-                can_be_host,
-                host_account,
-                can_be_operator,
-                operator_account,
-                contact_number
-            FROM employees
-            WHERE employment_status = 'Active'
-            ORDER BY employee_id
+                e.employee_id,
+                e.full_name,
+                e.email,
+                e.employment_status,
+                e.joined_date,
+                e.contact_number,
+                e.company_id
+            FROM employees e
+            WHERE e.employment_status = 'Active'
+            ORDER BY e.employee_id
         """)
-        rows = cursor.fetchall()
 
-        employees = [
-            {
-                "id": r[0],
-                "name": r[1],
-                "email": r[2],
-                "role": r[3],
-                "status": "Active",
+        employee_rows = cursor.fetchall()
+
+        employees = []
+
+        for row in employee_rows:
+            employee_id = row[0]
+            full_name = row[1]
+            email = row[2]
+            employment_status = row[3]
+            joined_date = row[4]
+            contact_number = row[5]
+            company_id = row[6]
+
+            cursor.execute("""
+                SELECT r.role_key, r.role_name
+                FROM employee_roles er
+                JOIN roles r
+                    ON er.role_id = r.role_id
+                    AND er.company_id = r.company_id
+                WHERE er.employee_id = %s
+                AND er.company_id = %s
+                AND r.is_active = TRUE
+                ORDER BY r.role_id
+            """, (employee_id, company_id))
+
+            role_rows = cursor.fetchall()
+
+            role_keys = [r[0] for r in role_rows]
+            role_names = [r[1] for r in role_rows]
+
+            if "team_leader" in role_keys or "hr_manager" in role_keys or "admin" in role_keys:
+                display_role = "Team Leader"
+            elif "host" in role_keys and "operator" in role_keys:
+                display_role = "Both"
+            elif "host" in role_keys:
+                display_role = "Host"
+            elif "operator" in role_keys:
+                display_role = "Operator"
+            else:
+                display_role = role_names[0] if role_names else "Employee"
+
+            cursor.execute("""
+                SELECT
+                    a.account_name,
+                    r.role_key
+                FROM employee_account_roles ear
+                JOIN accounts a
+                    ON ear.account_id = a.account_id
+                    AND ear.company_id = a.company_id
+                JOIN roles r
+                    ON ear.role_id = r.role_id
+                    AND ear.company_id = r.company_id
+                WHERE ear.employee_id = %s
+                AND ear.company_id = %s
+                AND a.is_active = TRUE
+                AND r.is_active = TRUE
+            """, (employee_id, company_id))
+
+            account_role_rows = cursor.fetchall()
+
+            host_accounts = [
+                account_name
+                for account_name, role_key in account_role_rows
+                if role_key == "host"
+            ]
+
+            operator_accounts = [
+                account_name
+                for account_name, role_key in account_role_rows
+                if role_key == "operator"
+            ]
+
+            employees.append({
+                "id": employee_id,
+                "name": full_name,
+                "email": email,
+                "role": display_role,
+                "status": employment_status,
                 "totalShifts": 0,
-                "joinedDate": str(r[5]) if r[5] else None,
+                "joinedDate": str(joined_date) if joined_date else None,
                 "accountType": "Employee",
-                "can_be_host": r[6],
-                "host_accounts": r[7],
-                "can_be_operator": r[8],
-                "operator_accounts": r[9],
-                "contactNumber": r[10]
-            }
-            for r in rows
-        ]
+                "can_be_host": len(host_accounts) > 0,
+                "host_accounts": ", ".join(host_accounts) if host_accounts else None,
+                "can_be_operator": len(operator_accounts) > 0,
+                "operator_accounts": ", ".join(operator_accounts) if operator_accounts else None,
+                "contactNumber": contact_number,
+                "company_id": company_id
+            })
 
         return employees
 
@@ -78,39 +143,63 @@ def get_employee(employee_id: int):
     try:
         cursor.execute("""
             SELECT
-                employee_id,
-                full_name,
-                email,
-                main_role,
-                contact_number,
-                can_be_host,
-                host_account,
-                can_be_operator,
-                operator_account
-            FROM employees
-            WHERE employee_id = %s
+                e.employee_id,
+                e.full_name,
+                e.email,
+                e.contact_number,
+                e.company_id
+            FROM employees e
+            WHERE e.employee_id = %s
         """, (employee_id,))
-        
+
         row = cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Employee not found")
 
+        company_id = row[4]
+
+        cursor.execute("""
+            SELECT r.role_key, r.role_name
+            FROM employee_roles er
+            JOIN roles r
+                ON er.role_id = r.role_id
+                AND er.company_id = r.company_id
+            WHERE er.employee_id = %s
+            AND er.company_id = %s
+            AND r.is_active = TRUE
+            ORDER BY r.role_id
+        """, (employee_id, company_id))
+
+        role_rows = cursor.fetchall()
+        role_keys = [r[0] for r in role_rows]
+        role_names = [r[1] for r in role_rows]
+
+        if "team_leader" in role_keys or "hr_manager" in role_keys or "admin" in role_keys:
+            display_role = "Team Leader"
+        elif "host" in role_keys and "operator" in role_keys:
+            display_role = "Both"
+        elif "host" in role_keys:
+            display_role = "Host"
+        elif "operator" in role_keys:
+            display_role = "Operator"
+        else:
+            display_role = role_names[0] if role_names else "Employee"
+
         return {
             "id": row[0],
             "name": row[1],
             "email": row[2],
-            "role": row[3],
-            "contactNumber": row[4],
-            "can_be_host": row[5],
-            "host_accounts": row[6],
-            "can_be_operator": row[7],
-            "operator_accounts": row[8]
+            "role": display_role,
+            "contactNumber": row[3],
+            "company_id": company_id
         }
 
     finally:
         cursor.close()
         conn.close()
+
+
 
 def normalize_accounts(value):
     if not value:
@@ -138,16 +227,29 @@ def update_employee_account_preferences(employee_id: int, data: dict):
     cursor = conn.cursor()
 
     try:
-        host_account = normalize_accounts(
-            data.get("host_accounts")
-        )
+        host_accounts = data.get("host_accounts") or []
+        operator_accounts = data.get("operator_accounts") or []
 
-        operator_account = normalize_accounts(
-            data.get("operator_accounts")
-        )
+        if not isinstance(host_accounts, list):
+            host_accounts = [host_accounts]
+
+        if not isinstance(operator_accounts, list):
+            operator_accounts = [operator_accounts]
+
+        host_accounts = [
+            str(account).strip()
+            for account in host_accounts
+            if str(account).strip() and str(account).strip().lower() != "none"
+        ]
+
+        operator_accounts = [
+            str(account).strip()
+            for account in operator_accounts
+            if str(account).strip() and str(account).strip().lower() != "none"
+        ]
 
         cursor.execute("""
-            SELECT main_role
+            SELECT company_id
             FROM employees
             WHERE employee_id = %s
             AND employment_status = 'Active'
@@ -156,62 +258,87 @@ def update_employee_account_preferences(employee_id: int, data: dict):
         employee = cursor.fetchone()
 
         if not employee:
-            raise HTTPException(
-                status_code=404,
-                detail="Employee not found"
-            )
+            raise HTTPException(status_code=404, detail="Employee not found")
 
-        role = employee[0]
-
-        if role == "Host" and not host_account:
-            raise HTTPException(
-                status_code=400,
-                detail="Host account required for Host role"
-            )
-
-        if role == "Operator" and not operator_account:
-            raise HTTPException(
-                status_code=400,
-                detail="Operator account required for Operator role"
-            )
-
-        if role == "Both":
-            if not host_account:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Host account required for Both role"
-                )
-
-            if not operator_account:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Operator account required for Both role"
-                )
-
-        can_be_host = host_account is not None
-        can_be_operator = operator_account is not None
+        company_id = employee[0]
 
         cursor.execute("""
-            UPDATE employees
-            SET
-                can_be_host = %s,
-                host_account = %s,
-                can_be_operator = %s,
-                operator_account = %s
+            SELECT role_id, role_key
+            FROM roles
+            WHERE company_id = %s
+            AND role_key IN ('host', 'operator')
+            AND is_active = TRUE
+        """, (company_id,))
+
+        role_rows = cursor.fetchall()
+        role_map = {role_key: role_id for role_id, role_key in role_rows}
+
+        host_role_id = role_map.get("host")
+        operator_role_id = role_map.get("operator")
+
+        if not host_role_id or not operator_role_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Host or operator role is missing"
+            )
+
+        cursor.execute("""
+            DELETE FROM employee_account_roles
             WHERE employee_id = %s
-        """, (
-            can_be_host,
-            host_account,
-            can_be_operator,
-            operator_account,
-            employee_id
-        ))
+            AND company_id = %s
+        """, (employee_id, company_id))
+
+        for account_name in host_accounts:
+            cursor.execute("""
+                SELECT account_id
+                FROM accounts
+                WHERE company_id = %s
+                AND LOWER(account_name) = LOWER(%s)
+                AND is_active = TRUE
+            """, (company_id, account_name))
+
+            account = cursor.fetchone()
+
+            if account:
+                cursor.execute("""
+                    INSERT INTO employee_account_roles (
+                        employee_id,
+                        account_id,
+                        role_id,
+                        company_id
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (employee_id, account_id, role_id)
+                    DO NOTHING
+                """, (employee_id, account[0], host_role_id, company_id))
+
+        for account_name in operator_accounts:
+            cursor.execute("""
+                SELECT account_id
+                FROM accounts
+                WHERE company_id = %s
+                AND LOWER(account_name) = LOWER(%s)
+                AND is_active = TRUE
+            """, (company_id, account_name))
+
+            account = cursor.fetchone()
+
+            if account:
+                cursor.execute("""
+                    INSERT INTO employee_account_roles (
+                        employee_id,
+                        account_id,
+                        role_id,
+                        company_id
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (employee_id, account_id, role_id)
+                    DO NOTHING
+                """, (employee_id, account[0], operator_role_id, company_id))
 
         conn.commit()
 
-        return {
-            "message": "Employee account preferences updated"
-        }
+        return {"message": "Employee account preferences updated"}
 
     except HTTPException:
         conn.rollback()
@@ -502,18 +629,87 @@ def delete_employee(employee_id: int):
         conn.close()
 
 @router.put("/employees/{employee_id}/role")
-def update_role(employee_id: int, data: dict):
+def update_employee_role(employee_id: int, data: dict):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        cursor.execute(
-            "UPDATE employees SET main_role = %s WHERE employee_id = %s",
-            (data["role"], employee_id)
-        )
+        role = data.get("role", "").strip()
+
+        role_key_map = {
+            "Host": ["host"],
+            "Operator": ["operator"],
+            "Both": ["host", "operator"],
+            "Team Leader": ["team_leader"],
+        }
+
+        role_keys = role_key_map.get(role)
+
+        if not role_keys:
+            raise HTTPException(status_code=400, detail="Invalid role")
+
+        cursor.execute("""
+            SELECT company_id
+            FROM employees
+            WHERE employee_id = %s
+            AND employment_status = 'Active'
+        """, (employee_id,))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+        company_id = employee[0]
+
+        cursor.execute("""
+            DELETE FROM employee_roles
+            WHERE employee_id = %s
+            AND company_id = %s
+        """, (employee_id, company_id))
+
+        for role_key in role_keys:
+            cursor.execute("""
+                SELECT role_id
+                FROM roles
+                WHERE company_id = %s
+                AND role_key = %s
+                AND is_active = TRUE
+            """, (company_id, role_key))
+
+            role_row = cursor.fetchone()
+
+            if not role_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Role not found: {role_key}"
+                )
+
+            role_id = role_row[0]
+
+            cursor.execute("""
+                INSERT INTO employee_roles (
+                    employee_id,
+                    role_id,
+                    company_id
+                )
+                VALUES (%s, %s, %s)
+                ON CONFLICT (employee_id, role_id)
+                DO NOTHING
+            """, (employee_id, role_id, company_id))
+
         conn.commit()
 
-        return {"message": "Role updated"}
+        return {"message": "Employee role updated"}
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("ERROR updating role:", e)
+        raise HTTPException(status_code=500, detail="Failed to update employee role")
 
     finally:
         cursor.close()

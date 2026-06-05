@@ -8,24 +8,20 @@ router = APIRouter()
 
 @router.get("/accounts")
 def get_accounts():
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-
         cursor.execute("""
             SELECT
-                account_setting_id,
+                account_id,
                 account_name,
                 priority_level,
-                require_host,
-                require_operator,
                 allow_partial_staffing,
                 operator_policy
-            FROM account_settings
-            WHERE pending_delete = FALSE
-            ORDER BY account_setting_id ASC
+            FROM accounts
+            WHERE is_active = TRUE
+            ORDER BY account_id ASC
         """)
 
         rows = cursor.fetchall()
@@ -35,10 +31,10 @@ def get_accounts():
                 "id": r[0],
                 "name": r[1],
                 "priority_level": r[2],
-                "require_host": r[3],
-                "require_operator": r[4],
-                "allow_partial_staffing": r[5],
-                "operator_policy": r[6]
+                "require_host": True,
+                "require_operator": True,
+                "allow_partial_staffing": r[3],
+                "operator_policy": r[4]
             }
             for r in rows
         ]
