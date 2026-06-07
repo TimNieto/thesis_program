@@ -150,10 +150,9 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
 
   const fetchSettings = async () => {
     try {
-        const res = await fetch(
-          `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
-        );
-
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
+      );
 
       const data = await res.json();
 
@@ -183,14 +182,15 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
   const fetchAccountSettings = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/account-settings",
+        "https://backend-production-6e75.up.railway.app/accounts",
       );
 
       const data = await res.json();
 
-      setAccountPolicies(data);
+      setAccountPolicies(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch account settings", err);
+      setAccountPolicies([]);
     }
   };
 
@@ -1689,7 +1689,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {accountPolicies.map((policy, index) => (
+          {Array.isArray(accountPolicies) && accountPolicies.map((policy, index) => (
             <div
               key={policy.account_setting_id}
               className="border rounded-lg p-4 space-y-4"
