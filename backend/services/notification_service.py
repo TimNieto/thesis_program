@@ -1,3 +1,4 @@
+#---------------------------------------------
 # backend/services/notification_service.py
 
 def notifications_enabled(cursor):

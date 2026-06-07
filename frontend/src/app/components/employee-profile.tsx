@@ -1,3 +1,4 @@
+// ---------------------------------------------------
 // src/app/components/employee-profile.tsx
 
 import { useState, useEffect } from "react";

@@ -1,3 +1,4 @@
+#---------------------------------------------
 # backend/routes/auth.py
 
 from fastapi import APIRouter, HTTPException

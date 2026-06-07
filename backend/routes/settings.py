@@ -1,3 +1,6 @@
+#---------------------------------------------
+# backend/routes/settings.py
+
 from fastapi import APIRouter, HTTPException
 from db.database import get_connection
 from services.notification_service import create_notification

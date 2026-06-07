@@ -1,3 +1,4 @@
+// ---------------------------------------------------
 // src/app/app.tsx
 
 import { useState } from "react";

@@ -1,3 +1,4 @@
+// ---------------------------------------------------
 // src/app/components/cover-application.tsx
 
 import { useState, useEffect } from "react";

@@ -1,3 +1,4 @@
+#---------------------------------------------
 # backend/routes/companies.py
 
 from fastapi import APIRouter, HTTPException

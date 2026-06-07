@@ -1,3 +1,4 @@
+// ---------------------------------------------------
 // src/app/components/admin-dashboard.tsx
 
 import { useState, useEffect } from "react";

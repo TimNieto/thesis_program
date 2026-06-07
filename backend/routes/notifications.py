@@ -1,3 +1,4 @@
+#---------------------------------------------
 # backend/routes/notifications.py
 
 from fastapi import APIRouter

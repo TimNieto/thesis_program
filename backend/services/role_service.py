@@ -1,3 +1,6 @@
+#---------------------------------------------
+# backend/services/role_service.py
+
 def get_company_admin_employee_ids(cursor, company_id: int, exclude_employee_id: int | None = None):
     query = """
         SELECT DISTINCT e.employee_id

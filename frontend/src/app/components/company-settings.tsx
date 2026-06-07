@@ -1,3 +1,4 @@
+// ---------------------------------------------------
 // src/app/components/company-settings.tsx
 
 import React, { useState, useEffect } from "react";
@@ -74,7 +75,6 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
   const [companyType, setCompanyType] = useState("Live Selling");
   const [companyName, setCompanyName] = useState("Live Stream Operations");
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [branchCount] = useState("0");
 
   // Scheduling Rules
   const [shiftsPerDay, setShiftsPerDay] = useState("4");
@@ -1207,6 +1207,16 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
+              <Label htmlFor="companyName">Company Name</Label>
+              <Input
+                id="companyName"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Enter company name"
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="companyType">Company Type</Label>
               <Select value={companyType} onValueChange={setCompanyType}>
                 <SelectTrigger id="companyType">
@@ -1221,80 +1231,7 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company Name</Label>
-              <Input
-                id="companyName"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Enter company name"
-              />
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="accountCount">Account Count</Label>
-
-                <Input
-                  id="accountCount"
-                  value={accounts.length}
-                  disabled
-                  className="bg-gray-50 cursor-not-allowed"
-                />
-
-                <p className="text-xs text-gray-500">
-                  Automatically based on existing accounts
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (deletingAccount) {
-                      toast.error("Finish remove operation first");
-
-                      return;
-                    }
-
-                    setCreatingAccount(true);
-                  }}
-                >
-                  + Add Account
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => {
-                    if (creatingAccount) {
-                      toast.error("Finish add operation first");
-
-                      return;
-                    }
-
-                    setDeletingAccount(true);
-                  }}
-                >
-                  Remove Account
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="branchCount">Branch / Department Count</Label>
-
-              <Input
-                id="branchCount"
-                value={branchCount}
-                disabled
-                className="bg-gray-50 cursor-not-allowed"
-              />
-
-              <p className="text-xs text-gray-500">Currently not applicable</p>
-            </div>
-          </div>
+          </div> 
         </CardContent>
       </Card>
 
@@ -1689,96 +1626,97 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {Array.isArray(accountPolicies) && accountPolicies.map((policy, index) => (
-            <div
-              key={policy.account_setting_id}
-              className="border rounded-lg p-4 space-y-4"
-            >
-              <div className="font-semibold">{policy.account_name}</div>
+          {Array.isArray(accountPolicies) &&
+            accountPolicies.map((policy, index) => (
+              <div
+                key={policy.account_setting_id}
+                className="border rounded-lg p-4 space-y-4"
+              >
+                <div className="font-semibold">{policy.account_name}</div>
 
-              {/* Priority */}
-              <div className="space-y-2">
-                <Label>Priority Level</Label>
+                {/* Priority */}
+                <div className="space-y-2">
+                  <Label>Priority Level</Label>
 
-                <Select
-                  value={String(policy.priority_level)}
-                  onValueChange={(value) => {
-                    const updated = [...accountPolicies];
+                  <Select
+                    value={String(policy.priority_level)}
+                    onValueChange={(value) => {
+                      const updated = [...accountPolicies];
 
-                    updated[index].priority_level = Number(value);
+                      updated[index].priority_level = Number(value);
 
-                    setAccountPolicies(updated);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                      setAccountPolicies(updated);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
 
-                  <SelectContent>
-                    <SelectItem value="1">High Priority</SelectItem>
+                    <SelectContent>
+                      <SelectItem value="1">High Priority</SelectItem>
 
-                    <SelectItem value="2">Medium Priority</SelectItem>
+                      <SelectItem value="2">Medium Priority</SelectItem>
 
-                    <SelectItem value="3">Low Priority</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                      <SelectItem value="3">Low Priority</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Operator Policy */}
-              <div className="space-y-2">
-                <Label>Operator Policy</Label>
+                {/* Operator Policy */}
+                <div className="space-y-2">
+                  <Label>Operator Policy</Label>
 
-                <Select
-                  value={policy.operator_policy}
-                  onValueChange={(value) => {
-                    const updated = [...accountPolicies];
+                  <Select
+                    value={policy.operator_policy}
+                    onValueChange={(value) => {
+                      const updated = [...accountPolicies];
 
-                    updated[index].operator_policy = value;
+                      updated[index].operator_policy = value;
 
-                    setAccountPolicies(updated);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                      setAccountPolicies(updated);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
 
-                  <SelectContent>
-                    <SelectItem value="required">Required</SelectItem>
+                    <SelectContent>
+                      <SelectItem value="required">Required</SelectItem>
 
-                    <SelectItem value="optional">Optional</SelectItem>
+                      <SelectItem value="optional">Optional</SelectItem>
 
-                    <SelectItem value="avoid">Avoid</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <p className="text-xs text-gray-500">
-                  Configure how strongly the scheduler should assign operators
-                </p>
-              </div>
-
-              {/* Partial Staffing */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Allow Partial Staffing</Label>
+                      <SelectItem value="avoid">Avoid</SelectItem>
+                    </SelectContent>
+                  </Select>
 
                   <p className="text-xs text-gray-500">
-                    Scheduler may leave some slots unfilled
+                    Configure how strongly the scheduler should assign operators
                   </p>
                 </div>
 
-                <Switch
-                  checked={policy.allow_partial_staffing}
-                  onCheckedChange={(checked) => {
-                    const updated = [...accountPolicies];
+                {/* Partial Staffing */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Allow Partial Staffing</Label>
 
-                    updated[index].allow_partial_staffing = checked;
+                    <p className="text-xs text-gray-500">
+                      Scheduler may leave some slots unfilled
+                    </p>
+                  </div>
 
-                    setAccountPolicies(updated);
-                  }}
-                />
+                  <Switch
+                    checked={policy.allow_partial_staffing}
+                    onCheckedChange={(checked) => {
+                      const updated = [...accountPolicies];
+
+                      updated[index].allow_partial_staffing = checked;
+
+                      setAccountPolicies(updated);
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
 
           <Button onClick={saveAccountPolicies}>Save Account Policies</Button>
         </CardContent>

@@ -1,3 +1,4 @@
+// ---------------------------------------------------
 // src/app/components/super-admin.tsx
 
 import React, { useState, useEffect } from "react";

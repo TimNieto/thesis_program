@@ -1,3 +1,4 @@
+// ---------------------------------------------------
 // src/app/components/notification-bell.tsx
 
 import { useEffect, useState } from "react";
