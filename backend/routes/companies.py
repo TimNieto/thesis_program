@@ -16,6 +16,7 @@ def get_companies():
             SELECT
                 c.company_id,
                 c.company_name,
+                c.company_type,
                 c.created_at,
                 c.is_active,
                 COUNT(e.employee_id) AS employee_count
@@ -26,6 +27,7 @@ def get_companies():
             GROUP BY
                 c.company_id,
                 c.company_name,
+                c.company_type,
                 c.created_at,
                 c.is_active
             ORDER BY c.company_id ASC
@@ -37,10 +39,10 @@ def get_companies():
             {
                 "company_id": r[0],
                 "company_name": r[1],
-                "company_type": "Live Selling",
-                "created_at": str(r[2]),
-                "is_active": r[3],
-                "employee_count": r[4],
+                "company_type": r[2],
+                "created_at": str(r[3]),
+                "is_active": r[4],
+                "employee_count": r[5],
             }
             for r in rows
         ]
@@ -57,18 +59,23 @@ def create_company(payload: dict):
 
     try:
         company_name = payload.get("company_name", "").strip()
+        company_type = payload.get("company_type", "").strip()
 
         if not company_name:
             raise HTTPException(status_code=400, detail="Company name required")
 
+        if not company_type:
+            raise HTTPException(status_code=400, detail="Company type required")
+
         cursor.execute("""
             INSERT INTO companies (
                 company_name,
+                company_type,
                 is_active
             )
-            VALUES (%s, TRUE)
+            VALUES (%s, %s, TRUE)
             RETURNING company_id
-        """, (company_name,))
+        """, (company_name, company_type))
 
         company_id = cursor.fetchone()[0]
 
