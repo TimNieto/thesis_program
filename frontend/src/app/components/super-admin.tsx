@@ -116,6 +116,8 @@ export function SuperAdmin() {
 
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
+  const [activeTab, setActiveTab] = useState("companies");
+
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
     {
       id: "1",
@@ -420,6 +422,7 @@ export function SuperAdmin() {
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
+    setActiveTab("settings");
     toast.success(`Selected ${company.name}`);
   };
 
@@ -492,7 +495,10 @@ export function SuperAdmin() {
               </div>
               <Button
                 variant="outline"
-                onClick={() => setSelectedCompany(null)}
+                onClick={() => {
+                  setSelectedCompany(null);
+                  setActiveTab("companies");
+                }}
                 className="gap-2"
               >
                 Back to Companies
@@ -503,7 +509,7 @@ export function SuperAdmin() {
       )}
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="companies" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList
           className={`grid w-full ${selectedCompany ? "max-w-4xl grid-cols-4" : "max-w-xs grid-cols-1"}`}
         >
