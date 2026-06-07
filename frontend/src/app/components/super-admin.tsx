@@ -50,7 +50,6 @@ import {
   Shield,
   Settings,
   Users,
-  ToggleLeft,
   Upload,
   FileSpreadsheet,
   UserSquare2,
@@ -61,6 +60,7 @@ import {
   Download,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CompanySettings } from "@/app/components/company-settings";
 
 interface Company {
   id: string;
@@ -69,15 +69,6 @@ interface Company {
   employeeCount: number;
   status: "Active" | "Inactive";
   createdDate: string;
-}
-
-interface SystemSetting {
-  id: string;
-  companyId: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  category: "scheduling" | "notifications" | "security" | "general";
 }
 
 interface RolePermission {
@@ -124,153 +115,6 @@ export function SuperAdmin() {
   }, []);
 
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-
-  const [systemSettings, setSystemSettings] = useState<SystemSetting[]>([
-    {
-      id: "1",
-      companyId: "1",
-      name: "Auto-Schedule Generation",
-      description: "Automatically generate schedules based on availability",
-      enabled: true,
-      category: "scheduling",
-    },
-    {
-      id: "2",
-      companyId: "1",
-      name: "Email Notifications",
-      description: "Send email notifications for schedule changes",
-      enabled: true,
-      category: "notifications",
-    },
-    {
-      id: "3",
-      companyId: "1",
-      name: "SMS Alerts",
-      description: "Send SMS alerts for urgent updates",
-      enabled: false,
-      category: "notifications",
-    },
-    {
-      id: "4",
-      companyId: "1",
-      name: "Two-Factor Authentication",
-      description: "Require 2FA for admin users",
-      enabled: true,
-      category: "security",
-    },
-    {
-      id: "5",
-      companyId: "1",
-      name: "Absence Auto-Replacement",
-      description: "Automatically find replacements for absences",
-      enabled: false,
-      category: "scheduling",
-    },
-    {
-      id: "6",
-      companyId: "1",
-      name: "Public Holidays Sync",
-      description: "Automatically block public holidays",
-      enabled: true,
-      category: "general",
-    },
-    {
-      id: "7",
-      companyId: "2",
-      name: "Auto-Schedule Generation",
-      description: "Automatically generate schedules based on availability",
-      enabled: false,
-      category: "scheduling",
-    },
-    {
-      id: "8",
-      companyId: "2",
-      name: "Email Notifications",
-      description: "Send email notifications for schedule changes",
-      enabled: true,
-      category: "notifications",
-    },
-    {
-      id: "9",
-      companyId: "2",
-      name: "SMS Alerts",
-      description: "Send SMS alerts for urgent updates",
-      enabled: true,
-      category: "notifications",
-    },
-    {
-      id: "10",
-      companyId: "2",
-      name: "Two-Factor Authentication",
-      description: "Require 2FA for admin users",
-      enabled: false,
-      category: "security",
-    },
-    {
-      id: "11",
-      companyId: "2",
-      name: "Absence Auto-Replacement",
-      description: "Automatically find replacements for absences",
-      enabled: true,
-      category: "scheduling",
-    },
-    {
-      id: "12",
-      companyId: "2",
-      name: "Public Holidays Sync",
-      description: "Automatically block public holidays",
-      enabled: false,
-      category: "general",
-    },
-    {
-      id: "13",
-      companyId: "3",
-      name: "Auto-Schedule Generation",
-      description: "Automatically generate schedules based on availability",
-      enabled: true,
-      category: "scheduling",
-    },
-    {
-      id: "14",
-      companyId: "3",
-      name: "Email Notifications",
-      description: "Send email notifications for schedule changes",
-      enabled: false,
-      category: "notifications",
-    },
-    {
-      id: "15",
-      companyId: "3",
-      name: "SMS Alerts",
-      description: "Send SMS alerts for urgent updates",
-      enabled: false,
-      category: "notifications",
-    },
-    {
-      id: "16",
-      companyId: "3",
-      name: "Two-Factor Authentication",
-      description: "Require 2FA for admin users",
-      enabled: false,
-      category: "security",
-    },
-    {
-      id: "17",
-      companyId: "3",
-      name: "Absence Auto-Replacement",
-      description: "Automatically find replacements for absences",
-      enabled: true,
-      category: "scheduling",
-    },
-    {
-      id: "18",
-      companyId: "3",
-      name: "Public Holidays Sync",
-      description: "Automatically block public holidays",
-      enabled: true,
-      category: "general",
-    },
-  ]);
 
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
     {
@@ -469,14 +313,6 @@ export function SuperAdmin() {
     setImportPreviews((prev) => ({ ...prev, [category]: [] }));
   };
 
-  // Setting Management States
-  const [isAddSettingOpen, setIsAddSettingOpen] = useState(false);
-  const [newSettingName, setNewSettingName] = useState("");
-  const [newSettingDescription, setNewSettingDescription] = useState("");
-  const [newSettingCategory, setNewSettingCategory] = useState<
-    "scheduling" | "notifications" | "security" | "general"
-  >("general");
-
   // Add Company
   const handleAddCompany = async () => {
     if (!newCompanyName.trim()) {
@@ -527,9 +363,7 @@ export function SuperAdmin() {
       )
     ) {
       setCompanies(companies.filter((company) => company.id !== id));
-      setSystemSettings(
-        systemSettings.filter((setting) => setting.companyId !== id),
-      );
+
       setRolePermissions(
         rolePermissions.filter((permission) => permission.companyId !== id),
       );
@@ -565,53 +399,6 @@ export function SuperAdmin() {
     }
   };
 
-  // Toggle System Setting
-  const toggleSystemSetting = (id: string) => {
-    setSystemSettings(
-      systemSettings.map((setting) =>
-        setting.id === id ? { ...setting, enabled: !setting.enabled } : setting,
-      ),
-    );
-    toast.success("Setting updated");
-  };
-
-  // Add Setting
-  const handleAddSetting = () => {
-    if (!selectedCompany) {
-      toast.error("Please select a company first");
-      return;
-    }
-
-    if (!newSettingName.trim() || !newSettingDescription.trim()) {
-      toast.error("Please enter a setting name and description");
-      return;
-    }
-
-    const newSetting: SystemSetting = {
-      id: Date.now().toString(),
-      companyId: selectedCompany.id,
-      name: newSettingName,
-      description: newSettingDescription,
-      enabled: false,
-      category: newSettingCategory,
-    };
-
-    setSystemSettings([...systemSettings, newSetting]);
-    setIsAddSettingOpen(false);
-    setNewSettingName("");
-    setNewSettingDescription("");
-    setNewSettingCategory("general");
-    toast.success(`Setting "${newSettingName}" added successfully`);
-  };
-
-  // Remove Setting
-  const handleRemoveSetting = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to remove "${name}"?`)) {
-      setSystemSettings(systemSettings.filter((setting) => setting.id !== id));
-      toast.success(`Setting "${name}" removed`);
-    }
-  };
-
   // Update Role Permission
   const updateRolePermission = (
     id: string,
@@ -624,13 +411,6 @@ export function SuperAdmin() {
       ),
     );
     toast.success("Permission updated");
-  };
-
-  const getSettingsByCategory = (category: string) => {
-    if (!selectedCompany) return [];
-    return systemSettings.filter(
-      (s) => s.category === category && s.companyId === selectedCompany.id,
-    );
   };
 
   const getCompanyRolePermissions = () => {
@@ -735,7 +515,7 @@ export function SuperAdmin() {
             <>
               <TabsTrigger value="settings" className="gap-2">
                 <Settings className="size-4" />
-                System Settings
+                Company Settings
               </TabsTrigger>
               <TabsTrigger value="permissions" className="gap-2">
                 <Shield className="size-4" />
@@ -854,216 +634,17 @@ export function SuperAdmin() {
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>
-                      System Settings - {selectedCompany?.name}
-                    </CardTitle>
-                    <CardDescription>
-                      Configure system settings and features for this company
-                    </CardDescription>
-                  </div>
-                  <Button
-                    onClick={() => setIsAddSettingOpen(true)}
-                    className="gap-2"
-                  >
-                    <Plus className="size-4" />
-                    Add Setting
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Scheduling Settings */}
-                <div>
-                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                    <ToggleLeft className="size-5 text-blue-600" />
-                    Scheduling
-                  </h3>
-                  <div className="space-y-3">
-                    {getSettingsByCategory("scheduling").map((setting) => (
-                      <div
-                        key={setting.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="space-y-1 flex-1">
-                          <Label
-                            htmlFor={`setting-${setting.id}`}
-                            className="font-medium"
-                          >
-                            {setting.name}
-                          </Label>
-                          <p className="text-sm text-gray-600">
-                            {setting.description}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            id={`setting-${setting.id}`}
-                            checked={setting.enabled}
-                            onCheckedChange={() =>
-                              toggleSystemSetting(setting.id)
-                            }
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleRemoveSetting(setting.id, setting.name)
-                            }
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Notifications Settings */}
-                <div>
-                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                    <ToggleLeft className="size-5 text-blue-600" />
-                    Notifications
-                  </h3>
-                  <div className="space-y-3">
-                    {getSettingsByCategory("notifications").map((setting) => (
-                      <div
-                        key={setting.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="space-y-1 flex-1">
-                          <Label
-                            htmlFor={`setting-${setting.id}`}
-                            className="font-medium"
-                          >
-                            {setting.name}
-                          </Label>
-                          <p className="text-sm text-gray-600">
-                            {setting.description}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            id={`setting-${setting.id}`}
-                            checked={setting.enabled}
-                            onCheckedChange={() =>
-                              toggleSystemSetting(setting.id)
-                            }
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleRemoveSetting(setting.id, setting.name)
-                            }
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Security Settings */}
-                <div>
-                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                    <Shield className="size-5 text-blue-600" />
-                    Security
-                  </h3>
-                  <div className="space-y-3">
-                    {getSettingsByCategory("security").map((setting) => (
-                      <div
-                        key={setting.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="space-y-1 flex-1">
-                          <Label
-                            htmlFor={`setting-${setting.id}`}
-                            className="font-medium"
-                          >
-                            {setting.name}
-                          </Label>
-                          <p className="text-sm text-gray-600">
-                            {setting.description}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            id={`setting-${setting.id}`}
-                            checked={setting.enabled}
-                            onCheckedChange={() =>
-                              toggleSystemSetting(setting.id)
-                            }
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleRemoveSetting(setting.id, setting.name)
-                            }
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* General Settings */}
-                <div>
-                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                    <Settings className="size-5 text-blue-600" />
-                    General
-                  </h3>
-                  <div className="space-y-3">
-                    {getSettingsByCategory("general").map((setting) => (
-                      <div
-                        key={setting.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="space-y-1 flex-1">
-                          <Label
-                            htmlFor={`setting-${setting.id}`}
-                            className="font-medium"
-                          >
-                            {setting.name}
-                          </Label>
-                          <p className="text-sm text-gray-600">
-                            {setting.description}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            id={`setting-${setting.id}`}
-                            checked={setting.enabled}
-                            onCheckedChange={() =>
-                              toggleSystemSetting(setting.id)
-                            }
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleRemoveSetting(setting.id, setting.name)
-                            }
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <CompanySettings
+              currentUser={{
+                id: 0,
+                name: "Super Admin",
+                email: "",
+                role: "super-admin",
+                displayRole: "Super Admin",
+                company_id: Number(selectedCompany.id),
+                company_name: selectedCompany.name,
+              }}
+            />
           )}
         </TabsContent>
 
@@ -1774,72 +1355,6 @@ export function SuperAdmin() {
               Cancel
             </Button>
             <Button onClick={handleAddCompany}>Add Company</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Setting Dialog */}
-      <Dialog open={isAddSettingOpen} onOpenChange={setIsAddSettingOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Setting</DialogTitle>
-            <DialogDescription>
-              Add a new system setting for {selectedCompany?.name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="settingName">Setting Name</Label>
-              <Input
-                id="settingName"
-                placeholder="Enter setting name"
-                value={newSettingName}
-                onChange={(e) => setNewSettingName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="settingDescription">Description</Label>
-              <Input
-                id="settingDescription"
-                placeholder="Enter setting description"
-                value={newSettingDescription}
-                onChange={(e) => setNewSettingDescription(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="settingCategory">Category</Label>
-              <Select
-                value={newSettingCategory}
-                onValueChange={(value) =>
-                  setNewSettingCategory(
-                    value as
-                      | "scheduling"
-                      | "notifications"
-                      | "security"
-                      | "general",
-                  )
-                }
-              >
-                <SelectTrigger id="settingCategory">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="scheduling">Scheduling</SelectItem>
-                  <SelectItem value="notifications">Notifications</SelectItem>
-                  <SelectItem value="security">Security</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsAddSettingOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleAddSetting}>Add Setting</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
