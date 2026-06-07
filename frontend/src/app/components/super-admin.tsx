@@ -1,14 +1,47 @@
-import React, { useState } from "react";
+// src/app/components/super-admin.tsx
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/app/components/ui/table";
 import { Badge } from "@/app/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 import { Switch } from "@/app/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
 import {
   Building2,
   Plus,
@@ -24,7 +57,7 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Download
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -57,48 +90,296 @@ interface RolePermission {
 }
 
 export function SuperAdmin() {
-  const [companies, setCompanies] = useState<Company[]>([
-    { id: "1", name: "Live Stream Operations", type: "Live Selling", employeeCount: 45, status: "Active", createdDate: "2025-01-01" },
-    { id: "2", name: "Tech Support Center", type: "BPO", employeeCount: 120, status: "Active", createdDate: "2025-02-15" },
-    { id: "3", name: "Retail Operations", type: "Retail", employeeCount: 30, status: "Inactive", createdDate: "2024-12-10" },
-  ]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/companies",
+      );
+
+      const data = await res.json();
+
+      setCompanies(
+        Array.isArray(data)
+          ? data.map((company: any) => ({
+              id: String(company.company_id),
+              name: company.company_name,
+              type: company.company_type || "Live Selling",
+              employeeCount: Number(company.employee_count || 0),
+              status: company.is_active ? "Active" : "Inactive",
+              createdDate: company.created_at,
+            }))
+          : [],
+      );
+    } catch (err) {
+      console.error("Failed to load companies", err);
+      setCompanies([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
 
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   const [systemSettings, setSystemSettings] = useState<SystemSetting[]>([
-    { id: "1", companyId: "1", name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: true, category: "scheduling" },
-    { id: "2", companyId: "1", name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: true, category: "notifications" },
-    { id: "3", companyId: "1", name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: false, category: "notifications" },
-    { id: "4", companyId: "1", name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: true, category: "security" },
-    { id: "5", companyId: "1", name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: false, category: "scheduling" },
-    { id: "6", companyId: "1", name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: true, category: "general" },
-    { id: "7", companyId: "2", name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: false, category: "scheduling" },
-    { id: "8", companyId: "2", name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: true, category: "notifications" },
-    { id: "9", companyId: "2", name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: true, category: "notifications" },
-    { id: "10", companyId: "2", name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: false, category: "security" },
-    { id: "11", companyId: "2", name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: true, category: "scheduling" },
-    { id: "12", companyId: "2", name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: false, category: "general" },
-    { id: "13", companyId: "3", name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: true, category: "scheduling" },
-    { id: "14", companyId: "3", name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: false, category: "notifications" },
-    { id: "15", companyId: "3", name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: false, category: "notifications" },
-    { id: "16", companyId: "3", name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: false, category: "security" },
-    { id: "17", companyId: "3", name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: true, category: "scheduling" },
-    { id: "18", companyId: "3", name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: true, category: "general" },
+    {
+      id: "1",
+      companyId: "1",
+      name: "Auto-Schedule Generation",
+      description: "Automatically generate schedules based on availability",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "2",
+      companyId: "1",
+      name: "Email Notifications",
+      description: "Send email notifications for schedule changes",
+      enabled: true,
+      category: "notifications",
+    },
+    {
+      id: "3",
+      companyId: "1",
+      name: "SMS Alerts",
+      description: "Send SMS alerts for urgent updates",
+      enabled: false,
+      category: "notifications",
+    },
+    {
+      id: "4",
+      companyId: "1",
+      name: "Two-Factor Authentication",
+      description: "Require 2FA for admin users",
+      enabled: true,
+      category: "security",
+    },
+    {
+      id: "5",
+      companyId: "1",
+      name: "Absence Auto-Replacement",
+      description: "Automatically find replacements for absences",
+      enabled: false,
+      category: "scheduling",
+    },
+    {
+      id: "6",
+      companyId: "1",
+      name: "Public Holidays Sync",
+      description: "Automatically block public holidays",
+      enabled: true,
+      category: "general",
+    },
+    {
+      id: "7",
+      companyId: "2",
+      name: "Auto-Schedule Generation",
+      description: "Automatically generate schedules based on availability",
+      enabled: false,
+      category: "scheduling",
+    },
+    {
+      id: "8",
+      companyId: "2",
+      name: "Email Notifications",
+      description: "Send email notifications for schedule changes",
+      enabled: true,
+      category: "notifications",
+    },
+    {
+      id: "9",
+      companyId: "2",
+      name: "SMS Alerts",
+      description: "Send SMS alerts for urgent updates",
+      enabled: true,
+      category: "notifications",
+    },
+    {
+      id: "10",
+      companyId: "2",
+      name: "Two-Factor Authentication",
+      description: "Require 2FA for admin users",
+      enabled: false,
+      category: "security",
+    },
+    {
+      id: "11",
+      companyId: "2",
+      name: "Absence Auto-Replacement",
+      description: "Automatically find replacements for absences",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "12",
+      companyId: "2",
+      name: "Public Holidays Sync",
+      description: "Automatically block public holidays",
+      enabled: false,
+      category: "general",
+    },
+    {
+      id: "13",
+      companyId: "3",
+      name: "Auto-Schedule Generation",
+      description: "Automatically generate schedules based on availability",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "14",
+      companyId: "3",
+      name: "Email Notifications",
+      description: "Send email notifications for schedule changes",
+      enabled: false,
+      category: "notifications",
+    },
+    {
+      id: "15",
+      companyId: "3",
+      name: "SMS Alerts",
+      description: "Send SMS alerts for urgent updates",
+      enabled: false,
+      category: "notifications",
+    },
+    {
+      id: "16",
+      companyId: "3",
+      name: "Two-Factor Authentication",
+      description: "Require 2FA for admin users",
+      enabled: false,
+      category: "security",
+    },
+    {
+      id: "17",
+      companyId: "3",
+      name: "Absence Auto-Replacement",
+      description: "Automatically find replacements for absences",
+      enabled: true,
+      category: "scheduling",
+    },
+    {
+      id: "18",
+      companyId: "3",
+      name: "Public Holidays Sync",
+      description: "Automatically block public holidays",
+      enabled: true,
+      category: "general",
+    },
   ]);
 
   const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
-    { id: "1", companyId: "1", role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "2", companyId: "1", role: "Team Leader (Admin)", canEditCompanySettings: false, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "3", companyId: "1", role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "4", companyId: "1", role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "5", companyId: "2", role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "6", companyId: "2", role: "Team Leader (Admin)", canEditCompanySettings: true, canManageEmployees: false, canViewReports: true, canApproveRequests: true },
-    { id: "7", companyId: "2", role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "8", companyId: "2", role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: true, canApproveRequests: false },
-    { id: "9", companyId: "3", role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-    { id: "10", companyId: "3", role: "Team Leader (Admin)", canEditCompanySettings: false, canManageEmployees: true, canViewReports: false, canApproveRequests: false },
-    { id: "11", companyId: "3", role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    { id: "12", companyId: "3", role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
+    {
+      id: "1",
+      companyId: "1",
+      role: "Admin",
+      canEditCompanySettings: true,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "2",
+      companyId: "1",
+      role: "Team Leader (Admin)",
+      canEditCompanySettings: false,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "3",
+      companyId: "1",
+      role: "Host",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "4",
+      companyId: "1",
+      role: "Operator",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "5",
+      companyId: "2",
+      role: "Admin",
+      canEditCompanySettings: true,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "6",
+      companyId: "2",
+      role: "Team Leader (Admin)",
+      canEditCompanySettings: true,
+      canManageEmployees: false,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "7",
+      companyId: "2",
+      role: "Host",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "8",
+      companyId: "2",
+      role: "Operator",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: true,
+      canApproveRequests: false,
+    },
+    {
+      id: "9",
+      companyId: "3",
+      role: "Admin",
+      canEditCompanySettings: true,
+      canManageEmployees: true,
+      canViewReports: true,
+      canApproveRequests: true,
+    },
+    {
+      id: "10",
+      companyId: "3",
+      role: "Team Leader (Admin)",
+      canEditCompanySettings: false,
+      canManageEmployees: true,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "11",
+      companyId: "3",
+      role: "Host",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
+    {
+      id: "12",
+      companyId: "3",
+      role: "Operator",
+      canEditCompanySettings: false,
+      canManageEmployees: false,
+      canViewReports: false,
+      canApproveRequests: false,
+    },
   ]);
 
   // Company Management States
@@ -119,13 +400,17 @@ export function SuperAdmin() {
     errors?: string[];
   }
   const [importRecords, setImportRecords] = useState<ImportRecord[]>([]);
-  const [importStatuses, setImportStatuses] = useState<Record<ImportCategory, ImportStatus>>({
+  const [importStatuses, setImportStatuses] = useState<
+    Record<ImportCategory, ImportStatus>
+  >({
     employees: "idle",
     departments: "idle",
     staffing: "idle",
     roles: "idle",
   });
-  const [importPreviews, setImportPreviews] = useState<Record<ImportCategory, string[][]>>({
+  const [importPreviews, setImportPreviews] = useState<
+    Record<ImportCategory, string[][]>
+  >({
     employees: [],
     departments: [],
     staffing: [],
@@ -139,9 +424,15 @@ export function SuperAdmin() {
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const rows = text.trim().split("\n").map((r) => r.split(",").map((c) => c.replace(/^"|"$/g, "").trim()));
+        const rows = text
+          .trim()
+          .split("\n")
+          .map((r) => r.split(",").map((c) => c.replace(/^"|"$/g, "").trim()));
         if (rows.length < 2) throw new Error("File has no data rows");
-        setImportPreviews((prev) => ({ ...prev, [category]: rows.slice(0, 6) }));
+        setImportPreviews((prev) => ({
+          ...prev,
+          [category]: rows.slice(0, 6),
+        }));
         setImportStatuses((prev) => ({ ...prev, [category]: "success" }));
         const record: ImportRecord = {
           id: Date.now().toString(),
@@ -181,58 +472,66 @@ export function SuperAdmin() {
   const [isAddSettingOpen, setIsAddSettingOpen] = useState(false);
   const [newSettingName, setNewSettingName] = useState("");
   const [newSettingDescription, setNewSettingDescription] = useState("");
-  const [newSettingCategory, setNewSettingCategory] = useState<"scheduling" | "notifications" | "security" | "general">("general");
+  const [newSettingCategory, setNewSettingCategory] = useState<
+    "scheduling" | "notifications" | "security" | "general"
+  >("general");
 
   // Add Company
-  const handleAddCompany = () => {
+  const handleAddCompany = async () => {
     if (!newCompanyName.trim()) {
       toast.error("Please enter a company name");
       return;
     }
 
-    const newCompanyId = Date.now().toString();
-    const newCompany: Company = {
-      id: newCompanyId,
-      name: newCompanyName,
-      type: newCompanyType,
-      employeeCount: 0,
-      status: "Active",
-      createdDate: new Date().toISOString().split('T')[0],
-    };
+    try {
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/companies",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_name: newCompanyName.trim(),
+            company_type: newCompanyType,
+          }),
+        },
+      );
 
-    // Create default settings for the new company
-    const defaultSettings: SystemSetting[] = [
-      { id: `${newCompanyId}-1`, companyId: newCompanyId, name: "Auto-Schedule Generation", description: "Automatically generate schedules based on availability", enabled: true, category: "scheduling" },
-      { id: `${newCompanyId}-2`, companyId: newCompanyId, name: "Email Notifications", description: "Send email notifications for schedule changes", enabled: true, category: "notifications" },
-      { id: `${newCompanyId}-3`, companyId: newCompanyId, name: "SMS Alerts", description: "Send SMS alerts for urgent updates", enabled: false, category: "notifications" },
-      { id: `${newCompanyId}-4`, companyId: newCompanyId, name: "Two-Factor Authentication", description: "Require 2FA for admin users", enabled: true, category: "security" },
-      { id: `${newCompanyId}-5`, companyId: newCompanyId, name: "Absence Auto-Replacement", description: "Automatically find replacements for absences", enabled: false, category: "scheduling" },
-      { id: `${newCompanyId}-6`, companyId: newCompanyId, name: "Public Holidays Sync", description: "Automatically block public holidays", enabled: true, category: "general" },
-    ];
+      const data = await res.json();
 
-    // Create default role permissions for the new company
-    const defaultPermissions: RolePermission[] = [
-      { id: `${newCompanyId}-1`, companyId: newCompanyId, role: "Admin", canEditCompanySettings: true, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-      { id: `${newCompanyId}-2`, companyId: newCompanyId, role: "Team Leader (Admin)", canEditCompanySettings: false, canManageEmployees: true, canViewReports: true, canApproveRequests: true },
-      { id: `${newCompanyId}-3`, companyId: newCompanyId, role: "Host", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-      { id: `${newCompanyId}-4`, companyId: newCompanyId, role: "Operator", canEditCompanySettings: false, canManageEmployees: false, canViewReports: false, canApproveRequests: false },
-    ];
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to create company");
+      }
 
-    setCompanies([...companies, newCompany]);
-    setSystemSettings([...systemSettings, ...defaultSettings]);
-    setRolePermissions([...rolePermissions, ...defaultPermissions]);
-    setIsAddCompanyOpen(false);
-    setNewCompanyName("");
-    setNewCompanyType("Live Selling");
-    toast.success(`Company "${newCompanyName}" added successfully`);
+      await fetchCompanies();
+
+      setIsAddCompanyOpen(false);
+      setNewCompanyName("");
+      setNewCompanyType("Live Selling");
+
+      toast.success(`Company "${newCompanyName}" added successfully`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create company",
+      );
+    }
   };
 
   // Remove Company
   const handleRemoveCompany = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to remove "${name}"? This action cannot be undone.`)) {
+    if (
+      confirm(
+        `Are you sure you want to remove "${name}"? This action cannot be undone.`,
+      )
+    ) {
       setCompanies(companies.filter((company) => company.id !== id));
-      setSystemSettings(systemSettings.filter((setting) => setting.companyId !== id));
-      setRolePermissions(rolePermissions.filter((permission) => permission.companyId !== id));
+      setSystemSettings(
+        systemSettings.filter((setting) => setting.companyId !== id),
+      );
+      setRolePermissions(
+        rolePermissions.filter((permission) => permission.companyId !== id),
+      );
       if (selectedCompany?.id === id) {
         setSelectedCompany(null);
       }
@@ -241,25 +540,36 @@ export function SuperAdmin() {
   };
 
   // Toggle Company Status
-  const toggleCompanyStatus = (id: string) => {
-    setCompanies(
-      companies.map((company) =>
-        company.id === id
-          ? { ...company, status: company.status === "Active" ? "Inactive" : "Active" }
-          : company
-      )
-    );
-    toast.success("Company status updated");
+  const toggleCompanyStatus = async (id: string) => {
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/companies/${id}/toggle-status`,
+        {
+          method: "PUT",
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to update company status");
+      }
+
+      await fetchCompanies();
+      toast.success("Company status updated");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update company status",
+      );
+    }
   };
 
   // Toggle System Setting
   const toggleSystemSetting = (id: string) => {
     setSystemSettings(
       systemSettings.map((setting) =>
-        setting.id === id
-          ? { ...setting, enabled: !setting.enabled }
-          : setting
-      )
+        setting.id === id ? { ...setting, enabled: !setting.enabled } : setting,
+      ),
     );
     toast.success("Setting updated");
   };
@@ -305,19 +615,21 @@ export function SuperAdmin() {
   const updateRolePermission = (
     id: string,
     permission: keyof Omit<RolePermission, "id" | "role">,
-    value: boolean
+    value: boolean,
   ) => {
     setRolePermissions(
       rolePermissions.map((rp) =>
-        rp.id === id ? { ...rp, [permission]: value } : rp
-      )
+        rp.id === id ? { ...rp, [permission]: value } : rp,
+      ),
     );
     toast.success("Permission updated");
   };
 
   const getSettingsByCategory = (category: string) => {
     if (!selectedCompany) return [];
-    return systemSettings.filter((s) => s.category === category && s.companyId === selectedCompany.id);
+    return systemSettings.filter(
+      (s) => s.category === category && s.companyId === selectedCompany.id,
+    );
   };
 
   const getCompanyRolePermissions = () => {
@@ -335,7 +647,9 @@ export function SuperAdmin() {
       {/* Header */}
       <div>
         <h2 className="text-3xl">Super Admin Panel</h2>
-        <p className="text-gray-600">Manage companies, system settings, and role permissions</p>
+        <p className="text-gray-600">
+          Manage companies, system settings, and role permissions
+        </p>
       </div>
 
       {/* Statistics Overview */}
@@ -357,7 +671,9 @@ export function SuperAdmin() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Companies</p>
-                <p className="text-2xl font-bold">{companies.filter((c) => c.status === "Active").length}</p>
+                <p className="text-2xl font-bold">
+                  {companies.filter((c) => c.status === "Active").length}
+                </p>
               </div>
               <Building2 className="size-8 text-green-600" />
             </div>
@@ -369,7 +685,11 @@ export function SuperAdmin() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Employees</p>
-                <p className="text-2xl font-bold">{companies.reduce((sum, c) => sum + c.employeeCount, 0)}</p>
+                <p className="text-2xl font-bold">
+                  {selectedCompany
+                    ? selectedCompany.employeeCount
+                    : companies.reduce((sum, c) => sum + c.employeeCount, 0)}
+                </p>
               </div>
               <Users className="size-8 text-purple-600" />
             </div>
@@ -403,7 +723,9 @@ export function SuperAdmin() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="companies" className="space-y-6">
-        <TabsList className={`grid w-full ${selectedCompany ? "max-w-4xl grid-cols-4" : "max-w-xs grid-cols-1"}`}>
+        <TabsList
+          className={`grid w-full ${selectedCompany ? "max-w-4xl grid-cols-4" : "max-w-xs grid-cols-1"}`}
+        >
           <TabsTrigger value="companies" className="gap-2">
             <Building2 className="size-4" />
             Companies
@@ -433,9 +755,14 @@ export function SuperAdmin() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Company Management</CardTitle>
-                  <CardDescription>Add, remove, or manage companies in the system</CardDescription>
+                  <CardDescription>
+                    Add, remove, or manage companies in the system
+                  </CardDescription>
                 </div>
-                <Button onClick={() => setIsAddCompanyOpen(true)} className="gap-2">
+                <Button
+                  onClick={() => setIsAddCompanyOpen(true)}
+                  className="gap-2"
+                >
                   <Plus className="size-4" />
                   Add Company
                 </Button>
@@ -457,19 +784,27 @@ export function SuperAdmin() {
                   <TableBody>
                     {companies.map((company) => (
                       <TableRow key={company.id}>
-                        <TableCell className="font-medium">{company.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {company.name}
+                        </TableCell>
                         <TableCell>{company.type}</TableCell>
                         <TableCell>{company.employeeCount}</TableCell>
                         <TableCell>
                           <Badge
-                            variant={company.status === "Active" ? "default" : "secondary"}
+                            variant={
+                              company.status === "Active"
+                                ? "default"
+                                : "secondary"
+                            }
                             className="cursor-pointer"
                             onClick={() => toggleCompanyStatus(company.id)}
                           >
                             {company.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{new Date(company.createdDate).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {new Date(company.createdDate).toLocaleDateString()}
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button
@@ -484,7 +819,9 @@ export function SuperAdmin() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleRemoveCompany(company.id, company.name)}
+                              onClick={() =>
+                                handleRemoveCompany(company.id, company.name)
+                              }
                               className="gap-2"
                             >
                               <Trash2 className="size-4" />
@@ -508,7 +845,10 @@ export function SuperAdmin() {
               <CardContent className="pt-6">
                 <div className="text-center py-12 text-gray-500">
                   <Settings className="size-12 mx-auto mb-3 text-gray-400" />
-                  <p>Please select a company from the Companies tab to manage its settings</p>
+                  <p>
+                    Please select a company from the Companies tab to manage its
+                    settings
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -517,157 +857,212 @@ export function SuperAdmin() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>System Settings - {selectedCompany?.name}</CardTitle>
-                    <CardDescription>Configure system settings and features for this company</CardDescription>
+                    <CardTitle>
+                      System Settings - {selectedCompany?.name}
+                    </CardTitle>
+                    <CardDescription>
+                      Configure system settings and features for this company
+                    </CardDescription>
                   </div>
-                  <Button onClick={() => setIsAddSettingOpen(true)} className="gap-2">
+                  <Button
+                    onClick={() => setIsAddSettingOpen(true)}
+                    className="gap-2"
+                  >
                     <Plus className="size-4" />
                     Add Setting
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-              {/* Scheduling Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <ToggleLeft className="size-5 text-blue-600" />
-                  Scheduling
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("scheduling").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* Scheduling Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <ToggleLeft className="size-5 text-blue-600" />
+                    Scheduling
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("scheduling").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Notifications Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <ToggleLeft className="size-5 text-blue-600" />
-                  Notifications
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("notifications").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* Notifications Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <ToggleLeft className="size-5 text-blue-600" />
+                    Notifications
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("notifications").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Security Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <Shield className="size-5 text-blue-600" />
-                  Security
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("security").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* Security Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <Shield className="size-5 text-blue-600" />
+                    Security
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("security").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* General Settings */}
-              <div>
-                <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
-                  <Settings className="size-5 text-blue-600" />
-                  General
-                </h3>
-                <div className="space-y-3">
-                  {getSettingsByCategory("general").map((setting) => (
-                    <div key={setting.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-1 flex-1">
-                        <Label htmlFor={`setting-${setting.id}`} className="font-medium">
-                          {setting.name}
-                        </Label>
-                        <p className="text-sm text-gray-600">{setting.description}</p>
+                {/* General Settings */}
+                <div>
+                  <h3 className="font-medium text-lg mb-3 flex items-center gap-2">
+                    <Settings className="size-5 text-blue-600" />
+                    General
+                  </h3>
+                  <div className="space-y-3">
+                    {getSettingsByCategory("general").map((setting) => (
+                      <div
+                        key={setting.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <Label
+                            htmlFor={`setting-${setting.id}`}
+                            className="font-medium"
+                          >
+                            {setting.name}
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            {setting.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            id={`setting-${setting.id}`}
+                            checked={setting.enabled}
+                            onCheckedChange={() =>
+                              toggleSystemSetting(setting.id)
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveSetting(setting.id, setting.name)
+                            }
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          id={`setting-${setting.id}`}
-                          checked={setting.enabled}
-                          onCheckedChange={() => toggleSystemSetting(setting.id)}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSetting(setting.id, setting.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
@@ -676,7 +1071,10 @@ export function SuperAdmin() {
           <Card>
             <CardHeader>
               <CardTitle>Role Permissions - {selectedCompany?.name}</CardTitle>
-              <CardDescription>Configure what each role can access and modify within this company</CardDescription>
+              <CardDescription>
+                Configure what each role can access and modify within this
+                company
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -700,7 +1098,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canEditCompanySettings}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canEditCompanySettings", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canEditCompanySettings",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -708,7 +1110,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canManageEmployees}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canManageEmployees", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canManageEmployees",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -716,7 +1122,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canViewReports}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canViewReports", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canViewReports",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -724,7 +1134,11 @@ export function SuperAdmin() {
                           <Switch
                             checked={rp.canApproveRequests}
                             onCheckedChange={(value) =>
-                              updateRolePermission(rp.id, "canApproveRequests", value)
+                              updateRolePermission(
+                                rp.id,
+                                "canApproveRequests",
+                                value,
+                              )
                             }
                           />
                         </TableCell>
@@ -744,7 +1158,10 @@ export function SuperAdmin() {
               <CardContent className="pt-6">
                 <div className="text-center py-12 text-gray-500">
                   <Upload className="size-12 mx-auto mb-3 text-gray-400" />
-                  <p>Please select a company from the Companies tab to manage its imports</p>
+                  <p>
+                    Please select a company from the Companies tab to manage its
+                    imports
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -757,31 +1174,47 @@ export function SuperAdmin() {
                       key: "employees" as ImportCategory,
                       label: "Employee Data",
                       icon: <Users className="size-5 text-blue-600" />,
-                      description: "Import employee profiles including names, IDs, contact info, and hire dates.",
-                      templateHeaders: "employee_id,first_name,last_name,email,phone,hire_date,position,department",
+                      description:
+                        "Import employee profiles including names, IDs, contact info, and hire dates.",
+                      templateHeaders:
+                        "employee_id,first_name,last_name,email,phone,hire_date,position,department",
                     },
                     {
                       key: "departments" as ImportCategory,
                       label: "Account / Department Data",
                       icon: <Briefcase className="size-5 text-purple-600" />,
-                      description: "Import account or department records such as department codes, names, and managers.",
-                      templateHeaders: "department_id,department_name,account_code,manager_name,head_count",
+                      description:
+                        "Import account or department records such as department codes, names, and managers.",
+                      templateHeaders:
+                        "department_id,department_name,account_code,manager_name,head_count",
                     },
                     {
                       key: "staffing" as ImportCategory,
                       label: "Staffing Requirements",
-                      icon: <FileSpreadsheet className="size-5 text-green-600" />,
-                      description: "Import shift staffing requirements per stream and time slot.",
-                      templateHeaders: "stream,shift_code,shift_start,shift_end,required_hosts,required_operators",
+                      icon: (
+                        <FileSpreadsheet className="size-5 text-green-600" />
+                      ),
+                      description:
+                        "Import shift staffing requirements per stream and time slot.",
+                      templateHeaders:
+                        "stream,shift_code,shift_start,shift_end,required_hosts,required_operators",
                     },
                     {
                       key: "roles" as ImportCategory,
                       label: "Roles",
                       icon: <UserSquare2 className="size-5 text-orange-600" />,
-                      description: "Import role definitions and access levels for this company.",
-                      templateHeaders: "role_id,role_name,role_level,can_manage_schedule,can_approve_requests",
+                      description:
+                        "Import role definitions and access levels for this company.",
+                      templateHeaders:
+                        "role_id,role_name,role_level,can_manage_schedule,can_approve_requests",
                     },
-                  ] as { key: ImportCategory; label: string; icon: React.ReactNode; description: string; templateHeaders: string }[]
+                  ] as {
+                    key: ImportCategory;
+                    label: string;
+                    icon: React.ReactNode;
+                    description: string;
+                    templateHeaders: string;
+                  }[]
                 ).map(({ key, label, icon, description, templateHeaders }) => {
                   const status = importStatuses[key];
                   const preview = importPreviews[key];
@@ -792,8 +1225,12 @@ export function SuperAdmin() {
                           <div className="flex items-center gap-3">
                             {icon}
                             <div>
-                              <CardTitle className="text-base">{label}</CardTitle>
-                              <CardDescription className="text-xs mt-0.5">{description}</CardDescription>
+                              <CardTitle className="text-base">
+                                {label}
+                              </CardTitle>
+                              <CardDescription className="text-xs mt-0.5">
+                                {description}
+                              </CardDescription>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -808,7 +1245,12 @@ export function SuperAdmin() {
                               </Badge>
                             )}
                             {status !== "idle" && (
-                              <Button variant="ghost" size="sm" onClick={() => clearImport(key)} className="gap-1 text-gray-500 h-7 px-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => clearImport(key)}
+                                className="gap-1 text-gray-500 h-7 px-2"
+                              >
                                 <X className="size-3" /> Clear
                               </Button>
                             )}
@@ -817,7 +1259,10 @@ export function SuperAdmin() {
                               size="sm"
                               className="gap-1 h-7 text-xs"
                               onClick={() => {
-                                const blob = new Blob([templateHeaders + "\n"], { type: "text/csv" });
+                                const blob = new Blob(
+                                  [templateHeaders + "\n"],
+                                  { type: "text/csv" },
+                                );
                                 const url = URL.createObjectURL(blob);
                                 const a = document.createElement("a");
                                 a.href = url;
@@ -834,33 +1279,65 @@ export function SuperAdmin() {
                       <CardContent className="space-y-4">
                         {/* Existing Data Section */}
                         <div>
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Existing Data</h4>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">
+                            Existing Data
+                          </h4>
                           <div className="overflow-x-auto rounded border bg-gray-50">
                             {key === "employees" ? (
                               <table className="w-full text-xs">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Employee ID</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Name</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Email</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Position</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Department</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Employee ID
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Name
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Email
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Position
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Department
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">EMP001</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">John Doe</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">john.doe@example.com</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Host</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Live Stream Ops</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      EMP001
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      John Doe
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      john.doe@example.com
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Host
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Live Stream Ops
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">EMP002</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Jane Smith</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">jane.smith@example.com</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Operator</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Live Stream Ops</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      EMP002
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Jane Smith
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      jane.smith@example.com
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Operator
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Live Stream Ops
+                                    </td>
                                   </tr>
                                 </tbody>
                               </table>
@@ -868,27 +1345,57 @@ export function SuperAdmin() {
                               <table className="w-full text-xs">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Department ID</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Department Name</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Account Code</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Manager</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Head Count</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Department ID
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Department Name
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Account Code
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Manager
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Head Count
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">DEPT001</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Live Stream Operations</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ACC-LS-001</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Admin Manager</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">45</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      DEPT001
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Live Stream Operations
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      ACC-LS-001
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Admin Manager
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      45
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">DEPT002</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Technical Support</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ACC-TS-002</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Support Lead</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">20</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      DEPT002
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Technical Support
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      ACC-TS-002
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Support Lead
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      20
+                                    </td>
                                   </tr>
                                 </tbody>
                               </table>
@@ -896,41 +1403,91 @@ export function SuperAdmin() {
                               <table className="w-full text-xs">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Stream</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Shift Code</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Shift Time</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Required Hosts</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Required Operators</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Stream
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Shift Code
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Shift Time
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Required Hosts
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Required Operators
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Mommypoko</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">GY</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">01:00 - 07:00</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Mommypoko
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      GY
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      01:00 - 07:00
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Mommypoko</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">AM</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">07:00 - 13:00</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Mommypoko
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      AM
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      07:00 - 13:00
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Sofy</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">GY</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">01:00 - 07:00</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Sofy
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      GY
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      01:00 - 07:00
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Sofy</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">AM</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">07:00 - 13:00</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">1</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Sofy
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      AM
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      07:00 - 13:00
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      1
+                                    </td>
                                   </tr>
                                 </tbody>
                               </table>
@@ -938,58 +1495,116 @@ export function SuperAdmin() {
                               <table className="w-full text-xs">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Role ID</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Role Name</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Level</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Manage Schedule</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">Approve Requests</th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Role ID
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Role Name
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Level
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Manage Schedule
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">
+                                      Approve Requests
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE001</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Admin</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">High</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      ROLE001
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Admin
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      High
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Yes
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Yes
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE002</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Team Leader (Admin)</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Medium</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Yes</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      ROLE002
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Team Leader (Admin)
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Medium
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Yes
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Yes
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE003</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Host</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Basic</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      ROLE003
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Host
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Basic
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      No
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      No
+                                    </td>
                                   </tr>
                                   <tr className="border-t">
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">ROLE004</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Operator</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">Basic</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
-                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">No</td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      ROLE004
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Operator
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      Basic
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      No
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                                      No
+                                    </td>
                                   </tr>
                                 </tbody>
                               </table>
                             ) : (
-                              <div className="px-3 py-8 text-center text-gray-400 text-xs">No existing data</div>
+                              <div className="px-3 py-8 text-center text-gray-400 text-xs">
+                                No existing data
+                              </div>
                             )}
                           </div>
                         </div>
 
                         {/* Upload Section */}
                         <div>
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Import New Data</h4>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">
+                            Import New Data
+                          </h4>
                           {status === "idle" || status === "error" ? (
                             <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-200 rounded-lg p-8 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
                               <Upload className="size-7 text-gray-400 mb-2" />
-                              <span className="text-sm font-medium text-gray-600">Click to upload CSV file</span>
-                              <span className="text-xs text-gray-400 mt-1">Only .csv files are supported</span>
+                              <span className="text-sm font-medium text-gray-600">
+                                Click to upload CSV file
+                              </span>
+                              <span className="text-xs text-gray-400 mt-1">
+                                Only .csv files are supported
+                              </span>
                               <input
                                 type="file"
                                 accept=".csv"
@@ -1013,7 +1628,12 @@ export function SuperAdmin() {
                                   <thead className="bg-gray-50">
                                     <tr>
                                       {preview[0].map((header, i) => (
-                                        <th key={i} className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap">{header}</th>
+                                        <th
+                                          key={i}
+                                          className="px-3 py-2 text-left font-medium text-gray-600 whitespace-nowrap"
+                                        >
+                                          {header}
+                                        </th>
                                       ))}
                                     </tr>
                                   </thead>
@@ -1021,13 +1641,20 @@ export function SuperAdmin() {
                                     {preview.slice(1).map((row, ri) => (
                                       <tr key={ri} className="border-t">
                                         {row.map((cell, ci) => (
-                                          <td key={ci} className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{cell}</td>
+                                          <td
+                                            key={ci}
+                                            className="px-3 py-1.5 text-gray-700 whitespace-nowrap"
+                                          >
+                                            {cell}
+                                          </td>
                                         ))}
                                       </tr>
                                     ))}
                                   </tbody>
                                 </table>
-                                <p className="text-xs text-gray-400 px-3 py-1.5 border-t">Showing up to 5 preview rows</p>
+                                <p className="text-xs text-gray-400 px-3 py-1.5 border-t">
+                                  Showing up to 5 preview rows
+                                </p>
                               </div>
                             )
                           )}
@@ -1043,7 +1670,9 @@ export function SuperAdmin() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Import History</CardTitle>
-                    <CardDescription>Recent import activity for {selectedCompany.name}</CardDescription>
+                    <CardDescription>
+                      Recent import activity for {selectedCompany.name}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto">
@@ -1060,9 +1689,15 @@ export function SuperAdmin() {
                         <TableBody>
                           {importRecords.map((r) => (
                             <TableRow key={r.id}>
-                              <TableCell className="capitalize font-medium">{r.category}</TableCell>
-                              <TableCell className="text-gray-600 text-xs">{r.fileName}</TableCell>
-                              <TableCell>{r.rowCount > 0 ? r.rowCount : "—"}</TableCell>
+                              <TableCell className="capitalize font-medium">
+                                {r.category}
+                              </TableCell>
+                              <TableCell className="text-gray-600 text-xs">
+                                {r.fileName}
+                              </TableCell>
+                              <TableCell>
+                                {r.rowCount > 0 ? r.rowCount : "—"}
+                              </TableCell>
                               <TableCell>
                                 {r.status === "success" ? (
                                   <Badge className="gap-1 bg-green-100 text-green-700 border-green-300 text-xs">
@@ -1074,7 +1709,9 @@ export function SuperAdmin() {
                                   </Badge>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs text-gray-500">{r.importedAt}</TableCell>
+                              <TableCell className="text-xs text-gray-500">
+                                {r.importedAt}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -1129,7 +1766,10 @@ export function SuperAdmin() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddCompanyOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddCompanyOpen(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleAddCompany}>Add Company</Button>
@@ -1167,7 +1807,18 @@ export function SuperAdmin() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="settingCategory">Category</Label>
-              <Select value={newSettingCategory} onValueChange={(value) => setNewSettingCategory(value as "scheduling" | "notifications" | "security" | "general")}>
+              <Select
+                value={newSettingCategory}
+                onValueChange={(value) =>
+                  setNewSettingCategory(
+                    value as
+                      | "scheduling"
+                      | "notifications"
+                      | "security"
+                      | "general",
+                  )
+                }
+              >
                 <SelectTrigger id="settingCategory">
                   <SelectValue />
                 </SelectTrigger>
@@ -1181,7 +1832,10 @@ export function SuperAdmin() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddSettingOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddSettingOpen(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleAddSetting}>Add Setting</Button>
