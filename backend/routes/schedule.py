@@ -1506,7 +1506,9 @@ def save_schedule(payload: dict = Body(...)):
                 employee[0],
                 "New Schedule Published",
                 "A new schedule has been published.",
-                "schedule"
+                "schedule",
+                company_id=company_id,
+                sender_employee_id=saved_by
             )
 
         conn.commit()

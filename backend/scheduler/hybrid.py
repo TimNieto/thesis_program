@@ -19,8 +19,8 @@ ELITE_COUNT = 5
 def assignment_key(a):
     return (
         a["shift_id"],
-        a["role"],
-        a["employee_id"]
+        a["role"].lower(),
+        a.get("slot_index", 0)
     )
 
 def calculate_unfilled_slots(assignments, shifts, account_settings):
@@ -123,9 +123,49 @@ def historical_score(assignment, history_scores):
 
     return score
 
+def remove_overfilled_assignments(assignments, shifts):
+    requirement_map = {}
+
+    for shift in shifts:
+        for req in shift.get("staffing_requirements", []):
+            key = (
+                shift["shift_id"],
+                req["role_key"].lower()
+            )
+
+            requirement_map[key] = req.get("required_count", 0) or 0
+
+    grouped = defaultdict(list)
+
+    for assignment in assignments:
+        key = (
+            assignment["shift_id"],
+            assignment["role"].lower()
+        )
+
+        grouped[key].append(assignment)
+
+    cleaned = []
+
+    for key, items in grouped.items():
+        required_count = requirement_map.get(key, len(items))
+
+        items = sorted(
+            items,
+            key=lambda a: a.get("slot_index", 0)
+        )
+
+        cleaned.extend(items[:required_count])
+
+    return cleaned
+
 
 def evaluate_schedule(individual, history_scores, shifts=None, account_settings=None):
     assignments = individual["assignments"]
+
+    if shifts is not None:
+        assignments = remove_overfilled_assignments(assignments, shifts)
+        individual["assignments"] = assignments
 
     if shifts is not None and account_settings is not None:
         unfilled_slots = calculate_unfilled_slots(
