@@ -24,7 +24,7 @@ def get_shift_templates(company_id: int = 1):
             FROM shift_templates
             WHERE company_id = %s
             AND is_active = TRUE
-            ORDER BY display_order, start_time
+            ORDER BY start_time
         """, (company_id,))
 
         rows = cursor.fetchall()

@@ -250,12 +250,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/shift-templates",
+        `https://backend-production-6e75.up.railway.app/shift-templates?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
 
-      setShiftTemplates(data);
+      const orderedShifts = (Array.isArray(data) ? data : []).sort((a, b) => {
+        const aTime = String(a.start_time || "00:00:00");
+        const bTime = String(b.start_time || "00:00:00");
+
+        return aTime.localeCompare(bTime);
+      });
+
+      setShiftTemplates(orderedShifts);
     } catch (err) {
       console.error("Failed to load shift templates", err);
     }
