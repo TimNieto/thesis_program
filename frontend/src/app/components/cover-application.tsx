@@ -319,12 +319,19 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const fetchEmployees = () => {
-    fetch("https://backend-production-6e75.up.railway.app/employees")
+    if (!currentUser.company_id) {
+      setEmployees([]);
+      return;
+    }
+
+    fetch(
+      `https://backend-production-6e75.up.railway.app/employees?company_id=${currentUser.company_id}`,
+    )
       .then((res) => res.json())
-      .then((data) => setEmployees(data))
+      .then((data) => setEmployees(Array.isArray(data) ? data : []))
       .catch(() => console.log("Failed to load employees"));
   };
-
+  
   const processAutomaticCoverRequests = async () => {
     try {
       const res = await fetch(
