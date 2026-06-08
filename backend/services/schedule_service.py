@@ -62,6 +62,7 @@ def fetch_staffing_requirements_map(cursor, company_id: int):
     cursor.execute("""
         SELECT
             ssr.shift_template_id,
+            ssr.account_id,
             r.role_id,
             r.role_name,
             r.role_key,
@@ -73,24 +74,27 @@ def fetch_staffing_requirements_map(cursor, company_id: int):
         WHERE ssr.company_id = %s
         AND ssr.is_active = TRUE
         AND r.is_active = TRUE
-        ORDER BY r.role_id
+        ORDER BY ssr.account_id, r.role_id
     """, (company_id,))
 
     rows = cursor.fetchall()
 
     requirements_map = {}
 
-    for r in rows:
-        shift_template_id = r[0]
+    for row in rows:
+        shift_template_id = row[0]
+        account_id = row[1]
 
-        if shift_template_id not in requirements_map:
-            requirements_map[shift_template_id] = []
+        key = (shift_template_id, account_id)
 
-        requirements_map[shift_template_id].append({
-            "staffing_role_id": r[1],
-            "role_name": r[2],
-            "role_key": r[3],
-            "required_count": r[4]
+        if key not in requirements_map:
+            requirements_map[key] = []
+
+        requirements_map[key].append({
+            "staffing_role_id": row[2],
+            "role_name": row[3],
+            "role_key": row[4],
+            "required_count": row[5]
         })
 
     return requirements_map
@@ -186,7 +190,8 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
             st.end_time,
             st.fatigue_penalty,
             st.difficulty_weight,
-            st.is_overnight
+            st.is_overnight,
+            a.account_id
         FROM shifts s
         JOIN accounts a
             ON s.account_id = a.account_id
@@ -226,7 +231,7 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
                 if str(r[4]).upper() == "GY"
                 else r[9]
             ),
-            "staffing_requirements": staffing_requirements_map.get(r[3], [])
+            "staffing_requirements": staffing_requirements_map.get((r[3], r[10]), [])
         }
         for r in rows
     ]
@@ -345,69 +350,74 @@ def fetch_account_settings(cursor, company_id: int):
 
 
 def fetch_history_scores(cursor, company_id: int):
-    cursor.execute("""
-        SELECT
-            COALESCE(cr.requested_by, gs.employee_id) AS employee_id,
-            a.account_name,
-            st.shift_name,
-            TRIM(TO_CHAR(s.shift_date, 'Day')) AS day_name,
-            r.role_key,
+    try:
+        cursor.execute("""
+            SELECT
+                COALESCE(cr.requested_by, gs.employee_id) AS employee_id,
+                a.account_name,
+                st.shift_name,
+                TRIM(TO_CHAR(s.shift_date, 'Day')) AS day_name,
+                r.role_key,
 
-            COUNT(cr.coverage_request_id) FILTER (
-                WHERE cr.coverage_request_id IS NOT NULL
-            ) AS cover_requests,
+                COUNT(cr.coverage_request_id) FILTER (
+                    WHERE cr.coverage_request_id IS NOT NULL
+                ) AS cover_requests,
 
-            COUNT(cr.coverage_request_id) FILTER (
-                WHERE cr.request_type = 'emergency'
-            ) AS emergency_requests,
+                COUNT(cr.coverage_request_id) FILTER (
+                    WHERE cr.request_type = 'emergency'
+                ) AS emergency_requests,
 
-            COUNT(sa.shift_application_id) FILTER (
-                WHERE sa.status = 'approved'
-            ) AS applications,
+                COUNT(sa.shift_application_id) FILTER (
+                    WHERE sa.status = 'approved'
+                ) AS applications,
 
-            COUNT(gs.schedule_id) FILTER (
-                WHERE cr.coverage_request_id IS NULL
-            ) AS successful_assignments
+                COUNT(gs.schedule_id) FILTER (
+                    WHERE cr.coverage_request_id IS NULL
+                ) AS successful_assignments
 
-        FROM generated_schedule gs
+            FROM generated_schedule gs
 
-        JOIN shifts s
-            ON gs.shift_id = s.shift_id
-            AND gs.company_id = s.company_id
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
 
-        JOIN accounts a
-            ON s.account_id = a.account_id
-            AND s.company_id = a.company_id
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
 
-        JOIN shift_templates st
-            ON s.shift_template_id = st.shift_template_id
-            AND s.company_id = st.company_id
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
 
-        JOIN roles r
-            ON gs.role_id = r.role_id
-            AND gs.company_id = r.company_id
+            JOIN roles r
+                ON gs.role_id = r.role_id
+                AND gs.company_id = r.company_id
 
-        LEFT JOIN coverage_requests cr
-            ON cr.schedule_id = gs.schedule_id
-            AND cr.company_id = gs.company_id
+            LEFT JOIN coverage_requests cr
+                ON cr.schedule_id = gs.schedule_id
+                AND cr.company_id = gs.company_id
 
-        LEFT JOIN shift_applications sa
-            ON sa.coverage_request_id = cr.coverage_request_id
-            AND sa.company_id = cr.company_id
-            AND sa.applicant_id = gs.employee_id
+            LEFT JOIN shift_applications sa
+                ON sa.coverage_request_id = cr.coverage_request_id
+                AND sa.company_id = cr.company_id
+                AND sa.applicant_id = gs.employee_id
 
-        WHERE gs.company_id = %s
-        AND gs.is_archived = TRUE
+            WHERE gs.company_id = %s
+            AND gs.is_archived = TRUE
 
-        GROUP BY
-            COALESCE(cr.requested_by, gs.employee_id),
-            a.account_name,
-            st.shift_name,
-            day_name,
-            r.role_key
-    """, (company_id,))
+            GROUP BY
+                COALESCE(cr.requested_by, gs.employee_id),
+                a.account_name,
+                st.shift_name,
+                day_name,
+                r.role_key
+        """, (company_id,))
 
-    rows = cursor.fetchall()
+        rows = cursor.fetchall()
+
+    except Exception as e:
+        print("FETCH HISTORY SCORES SKIPPED:", e)
+        return {}
 
     history = {}
 
