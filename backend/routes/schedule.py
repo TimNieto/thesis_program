@@ -1359,96 +1359,151 @@ def deny_application(id: int):
 def save_schedule(payload: dict = Body(...)):
     conn = get_connection()
     cursor = conn.cursor()
+
     assignments = payload.get("assignments", [])
     saved_by = payload.get("saved_by")
+    company_id = payload.get("company_id")
+
+    if not company_id:
+        raise HTTPException(
+            status_code=400,
+            detail="company_id is required"
+        )
 
     try:
-        cursor.execute("UPDATE emergency_cover_targets SET is_archived = TRUE")
-        cursor.execute("UPDATE shift_applications SET is_archived = TRUE")
-        cursor.execute("UPDATE coverage_requests SET is_archived = TRUE")
-        cursor.execute("UPDATE generated_schedule SET is_archived = TRUE")
+        # Archive only this company's current active schedule/requests.
+        cursor.execute("""
+            UPDATE emergency_cover_targets
+            SET is_archived = TRUE
+            WHERE company_id = %s
+        """, (company_id,))
 
+        cursor.execute("""
+            UPDATE shift_applications
+            SET is_archived = TRUE
+            WHERE company_id = %s
+        """, (company_id,))
+
+        cursor.execute("""
+            UPDATE coverage_requests
+            SET is_archived = TRUE
+            WHERE company_id = %s
+        """, (company_id,))
+
+        cursor.execute("""
+            UPDATE generated_schedule
+            SET is_archived = TRUE
+            WHERE company_id = %s
+        """, (company_id,))
+
+        # Allowed counts per actual shift + role_id.
         cursor.execute("""
             SELECT
                 s.shift_id,
-                sr.role_key,
+                r.role_key,
+                r.role_id,
                 ssr.required_count
             FROM shifts s
+
             JOIN shift_staffing_requirements ssr
                 ON s.shift_template_id = ssr.shift_template_id
-            JOIN staffing_roles sr
-                ON ssr.staffing_role_id = sr.staffing_role_id
-            WHERE ssr.is_active = TRUE
-            AND sr.is_active = TRUE
-        """)
+                AND s.account_id = ssr.account_id
+                AND s.company_id = ssr.company_id
 
-        allowed_counts = {
-            (r[0], r[1]): r[2]
-            for r in cursor.fetchall()
-        }
+            JOIN roles r
+                ON ssr.role_id = r.role_id
+                AND ssr.company_id = r.company_id
+
+            WHERE s.company_id = %s
+            AND ssr.company_id = %s
+            AND ssr.is_active = TRUE
+            AND r.is_active = TRUE
+        """, (company_id, company_id))
+
+        allowed_counts = {}
+        role_id_map = {}
+
+        for shift_id, role_key, role_id, required_count in cursor.fetchall():
+            normalized_role = role_key.lower().replace(" ", "_")
+
+            allowed_counts[(shift_id, normalized_role)] = required_count
+            role_id_map[(shift_id, normalized_role)] = role_id
 
         grouped = {}
 
-        for a in assignments:
-            shift_id = a["shift_id"]
-            role = a["role"].lower().replace(" ", "_")
+        for assignment in assignments:
+            shift_id = assignment.get("shift_id")
+            role = str(assignment.get("role", "")).lower().replace(" ", "_")
+
+            if not shift_id or not role:
+                continue
 
             key = (shift_id, role)
 
             if key not in grouped:
                 grouped[key] = []
 
-            grouped[key].append(a)
+            grouped[key].append(assignment)
 
         for key, items in grouped.items():
             shift_id, role = key
-            required_count = allowed_counts.get(key, 0)
 
-            if required_count <= 0:
+            required_count = allowed_counts.get(key, 0)
+            role_id = role_id_map.get(key)
+
+            if required_count <= 0 or not role_id:
                 continue
 
             items = sorted(
                 items,
-                key=lambda x: x.get("slot_index", 0)
+                key=lambda item: item.get("slot_index", 0)
             )
 
-            for slot_index, a in enumerate(items[:required_count]):
+            # Save only up to the required count.
+            for slot_index, assignment in enumerate(items[:required_count]):
+                employee_id = assignment.get("employee_id")
+
                 cursor.execute("""
                     INSERT INTO generated_schedule (
                         shift_id,
                         employee_id,
-                        role,
-                        slot_index
+                        role_id,
+                        slot_index,
+                        is_archived,
+                        company_id
                     )
-                    VALUES (%s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, FALSE, %s)
                 """, (
                     shift_id,
-                    a.get("employee_id"),
-                    role,
-                    a.get("slot_index", slot_index)
+                    employee_id,
+                    role_id,
+                    assignment.get("slot_index", slot_index),
+                    company_id
                 ))
 
+        # Notify only employees from this company.
         if saved_by:
             cursor.execute("""
                 SELECT employee_id
                 FROM employees
-                WHERE employment_status = 'Active'
+                WHERE company_id = %s
+                AND employment_status = 'Active'
                 AND employee_id != %s
-            """, (saved_by,))
+            """, (company_id, saved_by))
         else:
             cursor.execute("""
                 SELECT employee_id
                 FROM employees
-                WHERE employment_status = 'Active'
-            """)
+                WHERE company_id = %s
+                AND employment_status = 'Active'
+            """, (company_id,))
 
         employees = cursor.fetchall()
 
-        for emp in employees:
-
+        for employee in employees:
             create_notification(
                 cursor,
-                emp[0],
+                employee[0],
                 "New Schedule Published",
                 "A new schedule has been published.",
                 "schedule"
@@ -1456,12 +1511,21 @@ def save_schedule(payload: dict = Body(...)):
 
         conn.commit()
 
-        return {"message": "Schedule saved"}
+        return {
+            "message": "Schedule saved"
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
 
     except Exception as e:
         conn.rollback()
         print("SAVE SCHEDULE ERROR:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
     finally:
         cursor.close()

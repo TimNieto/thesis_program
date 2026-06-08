@@ -705,6 +705,7 @@ export function ScheduleGenerator({
           body: JSON.stringify({
             assignments: payload,
             saved_by: currentUserId,
+            company_id: companyId,
           }),
         },
       );
