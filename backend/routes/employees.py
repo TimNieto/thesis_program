@@ -881,8 +881,16 @@ def get_availability(company_id: int):
             WHERE a.company_id = %s
             ORDER BY
                 a.employee_id,
-                a.day_of_week,
-                st.display_order,
+                CASE INITCAP(TRIM(a.day_of_week))
+                    WHEN 'Monday' THEN 1
+                    WHEN 'Tuesday' THEN 2
+                    WHEN 'Wednesday' THEN 3
+                    WHEN 'Thursday' THEN 4
+                    WHEN 'Friday' THEN 5
+                    WHEN 'Saturday' THEN 6
+                    WHEN 'Sunday' THEN 7
+                    ELSE 8
+                END,
                 st.start_time
         """, (company_id,))
 
