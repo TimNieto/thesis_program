@@ -13,7 +13,6 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
-
 def verify_password(input_password: str, stored_password: str) -> bool:
     if not stored_password:
         return False
@@ -27,7 +26,6 @@ def verify_password(input_password: str, stored_password: str) -> bool:
         return bcrypt.verify(input_password, stored_password)
     except Exception:
         return False
-
 
 @router.post("/login")
 def login(data: LoginRequest):
@@ -122,31 +120,54 @@ def login(data: LoginRequest):
                 detail="Invalid credentials"
             )
 
-        # 3. If valid employee, check if employee is HR Manager
+        # 3. Get exact active database roles for display only
         cursor.execute(
             """
-            SELECT 1
+            SELECT r.role_name
             FROM employee_roles er
             JOIN roles r
                 ON er.role_id = r.role_id
                 AND er.company_id = r.company_id
             WHERE er.employee_id = %s
             AND er.company_id = %s
-            AND r.role_key = 'hr_manager'
             AND r.is_active = TRUE
+            ORDER BY r.role_name
+            """,
+            (employee_id, company_id),
+        )
+
+        role_rows = cursor.fetchall()
+
+        display_role = ", ".join([row[0] for row in role_rows])
+
+        if not display_role:
+            display_role = "General Employee"
+
+        # 4. Check if employee belongs to HR Department for admin access
+        cursor.execute(
+            """
+            SELECT 1
+            FROM employee_departments ed
+            JOIN departments d
+                ON ed.department_id = d.department_id
+                AND ed.company_id = d.company_id
+            WHERE ed.employee_id = %s
+            AND ed.company_id = %s
+            AND LOWER(d.department_name) = 'hr department'
+            AND d.is_active = TRUE
             LIMIT 1
             """,
             (employee_id, company_id),
         )
 
-        is_hr_manager = cursor.fetchone() is not None
+        is_hr_department = cursor.fetchone() is not None
 
-        # 4. HR Manager goes to admin dashboard
-        if is_hr_manager:
+        # 5. HR Department employees go to admin dashboard
+        if is_hr_department:
             return {
                 "message": "Login successful",
                 "role": "admin",
-                "displayRole": "HR Manager",
+                "displayRole": display_role,
                 "user": {
                     "id": employee_id,
                     "name": full_name,
@@ -156,11 +177,11 @@ def login(data: LoginRequest):
                 },
             }
 
-        # 5. All other valid employees go to regular employee dashboard
+        # 6. All other valid employees go to regular employee dashboard
         return {
             "message": "Login successful",
             "role": "employee",
-            "displayRole": "General Employee",
+            "displayRole": display_role,
             "user": {
                 "id": employee_id,
                 "name": full_name,
