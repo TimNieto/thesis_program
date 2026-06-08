@@ -81,6 +81,16 @@ interface Employee {
   accounts?: string[];
 }
 
+interface AccountDepartmentRow {
+  department_id: number;
+  department_name: string;
+  department_is_active: boolean;
+  account_id: number | null;
+  account_name: string | null;
+  account_is_active: boolean | null;
+  status: "Active" | "Inactive";
+}
+
 interface Request {
   id: string;
   type: "application" | "cover" | "leave";
@@ -123,6 +133,8 @@ interface AdminDashboardProps {
     email: string;
     role: string;
     displayRole: string;
+    company_id: number | null;
+    company_name: string | null;
   };
 }
 
@@ -201,6 +213,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newEmployeeNickname, setNewEmployeeNickname] = useState("");
 
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [accountDepartmentRows, setAccountDepartmentRows] = useState<
+    AccountDepartmentRow[]
+  >([]);
 
   // Override Dialog States
   const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
@@ -261,9 +276,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   const fetchAccounts = async () => {
+    if (!currentUser.company_id) {
+      setAccounts([]);
+      return;
+    }
+
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/accounts",
+        `https://backend-production-6e75.up.railway.app/accounts?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -274,14 +294,35 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const fetchAccountDepartmentData = async () => {
+    if (!currentUser.company_id) {
+      setAccountDepartmentRows([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/account-department-data?company_id=${currentUser.company_id}`,
+      );
+
+      const data = await res.json();
+
+      setAccountDepartmentRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load account/department data", err);
+      setAccountDepartmentRows([]);
+    }
+  };
+
   useEffect(() => {
     if (currentUser.role.toLowerCase() === "admin") {
       fetchEmployees();
       fetchShiftTemplates();
       fetchStaffingRequirements();
       fetchAccounts();
+      fetchAccountDepartmentData();
     }
-  }, [currentUser.role]);
+  }, [currentUser.role, currentUser.company_id]);
 
   const handleAddHoliday = () => {
     if (!newHolidayName.trim()) {
@@ -402,13 +443,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
 
     return "None";
-  };
-
-  const getAccountPriorityLabel = (priority: number) => {
-    if (priority === 1) return "High Priority";
-    if (priority === 2) return "Medium Priority";
-    if (priority === 3) return "Low Priority";
-    return "Not set";
   };
 
   // Add Employee
@@ -1243,7 +1277,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     onClick={() =>
                       downloadImportTemplate(
                         "departments",
-                        "department_name,account_name,priority_level,allow_partial_staffing,status",
+                        "department_name,account_name,status",
                       )
                     }
                   >
@@ -1300,18 +1334,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     <TableRow>
                       <TableHead>Department</TableHead>
                       <TableHead>Account Name</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Partial Staffing</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
-                    {accounts.length === 0 ? (
+                    {accountDepartmentRows.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={4}
                           className="text-center text-gray-500 py-6"
                         >
                           No account or department data found. Use Add or Import
@@ -1319,30 +1351,26 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      accounts.map((account) => (
-                        <TableRow key={`import-account-${account.id}`}>
-                          <TableCell>
-                            {account.department_name || "None"}
-                          </TableCell>
-
+                      accountDepartmentRows.map((row) => (
+                        <TableRow
+                          key={`account-department-${row.department_id}-${row.account_id ?? "department-only"}`}
+                        >
                           <TableCell className="font-medium">
-                            {account.name}
+                            {row.department_name}
                           </TableCell>
 
-                          <TableCell>
-                            {getAccountPriorityLabel(
-                              Number(account.priority_level),
-                            )}
-                          </TableCell>
+                          <TableCell>{row.account_name || "—"}</TableCell>
 
                           <TableCell>
-                            {account.allow_partial_staffing
-                              ? "Allowed"
-                              : "Not allowed"}
-                          </TableCell>
-
-                          <TableCell>
-                            <Badge>Active</Badge>
+                            <Badge
+                              variant={
+                                row.status === "Active"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {row.status}
+                            </Badge>
                           </TableCell>
 
                           <TableCell>
@@ -1351,7 +1379,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               size="sm"
                               onClick={() =>
                                 toast.info(
-                                  "Deactivate account is frontend-only for now",
+                                  row.account_id
+                                    ? "Deactivate account is frontend-only for now"
+                                    : "Deactivate department is frontend-only for now",
                                 )
                               }
                             >
