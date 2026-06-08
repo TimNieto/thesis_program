@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Checkbox } from "@/app/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -154,7 +153,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newHolidayName, setNewHolidayName] = useState("");
   const [newHolidayDate, setNewHolidayDate] = useState("");
 
-  type ImportCategory = "employees" | "departments" | "staffing" | "roles";
+  type ImportCategory =
+    | "departments"
+    | "roles"
+    | "employees"
+    | "employeeAssignments"
+    | "shifts"
+    | "staffing";
 
   interface ImportRecord {
     id: string;
@@ -170,10 +175,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [importPreviews, setImportPreviews] = useState<
     Record<ImportCategory, string[][]>
   >({
-    employees: [],
     departments: [],
-    staffing: [],
     roles: [],
+    employees: [],
+    employeeAssignments: [],
+    shifts: [],
+    staffing: [],
   });
 
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
@@ -191,13 +198,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newEmployeeName, setNewEmployeeName] = useState("");
   const [newEmployeeEmail, setNewEmployeeEmail] = useState("");
   const [newEmployeeContactNumber, setNewEmployeeContactNumber] = useState("");
-  const [newEmployeeRole, setNewEmployeeRole] = useState<
-    "Host" | "Operator" | "Both" | "Team Leader"
-  >("Host");
-
   const [newEmployeeNickname, setNewEmployeeNickname] = useState("");
-  const [hostAccounts, setHostAccounts] = useState<string[]>([]);
-  const [operatorAccounts, setOperatorAccounts] = useState<string[]>([]);
 
   const [accounts, setAccounts] = useState<any[]>([]);
 
@@ -281,26 +282,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       fetchAccounts();
     }
   }, [currentUser.role]);
-
-
-  const toggleAccountSelection = (
-    accountName: string,
-    selectedAccounts: string[],
-    setSelectedAccounts: React.Dispatch<React.SetStateAction<string[]>>,
-  ) => {
-    if (accountName === "none") {
-      setSelectedAccounts([]);
-      return;
-    }
-
-    setSelectedAccounts((prev) => {
-      if (prev.includes(accountName)) {
-        return prev.filter((item) => item !== accountName);
-      }
-
-      return [...prev, accountName];
-    });
-  };
 
   const handleAddHoliday = () => {
     if (!newHolidayName.trim()) {
@@ -452,24 +433,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       return;
     }
 
-    if (newEmployeeRole === "Host" && hostAccounts.length === 0) {
-      toast.error("Host account is required for Host role");
-      return;
-    }
-
-    if (newEmployeeRole === "Operator" && operatorAccounts.length === 0) {
-      toast.error("Operator account is required for Operator role");
-      return;
-    }
-
-    if (
-      newEmployeeRole === "Both" &&
-      (hostAccounts.length === 0 || operatorAccounts.length === 0)
-    ) {
-      toast.error("Both role requires host and operator accounts");
-      return;
-    }
-
     try {
       const res = await fetch(
         "https://backend-production-6e75.up.railway.app/employees",
@@ -481,10 +444,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             nickname: newEmployeeNickname,
             email: newEmployeeEmail,
             contactNumber: newEmployeeContactNumber,
-            role: newEmployeeRole,
-            host_accounts: hostAccounts.length > 0 ? hostAccounts : null,
-            operator_accounts:
-              operatorAccounts.length > 0 ? operatorAccounts : null,
             created_by: currentUser.id,
           }),
         },
@@ -504,9 +463,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       setNewEmployeeNickname("");
       setNewEmployeeEmail("");
       setNewEmployeeContactNumber("");
-      setNewEmployeeRole("Host");
-      setHostAccounts([]);
-      setOperatorAccounts([]);
 
       toast.success(result.message || "Employee saved");
     } catch (err) {
@@ -1259,22 +1215,347 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           <div>
             <h3 className="text-2xl">Imports</h3>
             <p className="text-gray-600">
-              Manage existing data, download CSV templates, import CSV files, or
-              add records manually.
+              Import company setup data in dependency order. Start from Account
+              / Department Data, then continue downward.
             </p>
           </div>
 
-          {/* Employee Data */}
+          {/* 1. Account / Department Data */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Briefcase className="size-5 text-purple-600" />
+                  <div>
+                    <CardTitle>1. Account / Department Data</CardTitle>
+                    <CardDescription>
+                      Creates departments first, then accounts under those
+                      departments.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      downloadImportTemplate(
+                        "departments",
+                        "department_name,account_name,priority_level,allow_partial_staffing,status",
+                      )
+                    }
+                  >
+                    <Download className="size-4" />
+                    Template
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => triggerImportInput("departments")}
+                  >
+                    <Upload className="size-4" />
+                    Import CSV
+                  </Button>
+
+                  <Input
+                    id="departments-csv-input"
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+
+                      if (file) {
+                        handleFileImport("departments", file);
+                      }
+
+                      e.currentTarget.value = "";
+                    }}
+                  />
+
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      toast.info(
+                        "Manual account/department add is frontend-only for now",
+                      )
+                    }
+                  >
+                    <Plus className="size-4" />
+                    Add Account/Department
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Partial Staffing</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {accounts.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center text-gray-500 py-6"
+                        >
+                          No account or department data found. Use Add or Import
+                          CSV to add records.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      accounts.map((account) => (
+                        <TableRow key={`import-account-${account.id}`}>
+                          <TableCell>
+                            {account.department_name || "None"}
+                          </TableCell>
+
+                          <TableCell className="font-medium">
+                            {account.name}
+                          </TableCell>
+
+                          <TableCell>
+                            {getAccountPriorityLabel(
+                              Number(account.priority_level),
+                            )}
+                          </TableCell>
+
+                          <TableCell>
+                            {account.allow_partial_staffing
+                              ? "Allowed"
+                              : "Not allowed"}
+                          </TableCell>
+
+                          <TableCell>
+                            <Badge>Active</Badge>
+                          </TableCell>
+
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                toast.info(
+                                  "Deactivate account is frontend-only for now",
+                                )
+                              }
+                            >
+                              Deactivate
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {importPreviews.departments.length > 0 && (
+                <div className="mt-4 overflow-x-auto rounded border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {importPreviews.departments[0].map((header, index) => (
+                          <TableHead key={index}>{header}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {importPreviews.departments
+                        .slice(1)
+                        .map((row, rowIndex) => (
+                          <TableRow key={rowIndex}>
+                            {row.map((cell, cellIndex) => (
+                              <TableCell key={cellIndex}>{cell}</TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 2. Roles */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <UserSquare2 className="size-5 text-orange-600" />
+                  <div>
+                    <CardTitle>2. Roles</CardTitle>
+                    <CardDescription>
+                      Creates role definitions used by employee assignments and
+                      staffing requirements.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      downloadImportTemplate(
+                        "roles",
+                        "role_name,role_key,status",
+                      )
+                    }
+                  >
+                    <Download className="size-4" />
+                    Template
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => triggerImportInput("roles")}
+                  >
+                    <Upload className="size-4" />
+                    Import CSV
+                  </Button>
+
+                  <Input
+                    id="roles-csv-input"
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+
+                      if (file) {
+                        handleFileImport("roles", file);
+                      }
+
+                      e.currentTarget.value = "";
+                    }}
+                  />
+
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      toast.info("Manual role add is frontend-only for now")
+                    }
+                  >
+                    <Plus className="size-4" />
+                    Add Role
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Role Name</TableHead>
+                      <TableHead>Role Key</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {staffingRoles.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-gray-500 py-6"
+                        >
+                          No roles found. Use Add Role or Import CSV to add
+                          records.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      staffingRoles.map((role) => (
+                        <TableRow key={`import-role-${role.staffing_role_id}`}>
+                          <TableCell className="font-medium">
+                            {role.role_name}
+                          </TableCell>
+
+                          <TableCell>{role.role_key}</TableCell>
+
+                          <TableCell>
+                            <Badge>Active</Badge>
+                          </TableCell>
+
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                toast.info(
+                                  "Deactivate role is frontend-only for now",
+                                )
+                              }
+                            >
+                              Deactivate
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {importPreviews.roles.length > 0 && (
+                <div className="mt-4 overflow-x-auto rounded border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {importPreviews.roles[0].map((header, index) => (
+                          <TableHead key={index}>{header}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {importPreviews.roles.slice(1).map((row, rowIndex) => (
+                        <TableRow key={rowIndex}>
+                          {row.map((cell, cellIndex) => (
+                            <TableCell key={cellIndex}>{cell}</TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 3. Employee Data */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Users className="size-5 text-blue-600" />
                   <div>
-                    <CardTitle>Employee Data</CardTitle>
+                    <CardTitle>3. Employee Data</CardTitle>
                     <CardDescription>
-                      Manage employee profiles, roles, departments, accounts,
-                      and status.
+                      Creates basic employee profiles only.
                     </CardDescription>
                   </div>
                 </div>
@@ -1287,7 +1568,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     onClick={() =>
                       downloadImportTemplate(
                         "employees",
-                        "employee_id,full_name,nickname,email,contact_number,role,department,account,joined_date,status",
+                        "full_name,nickname,email,contact_number,joined_date,status",
                       )
                     }
                   >
@@ -1339,9 +1620,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Account</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Contact Number</TableHead>
                       <TableHead>Joined Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Action</TableHead>
@@ -1352,7 +1632,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     {employees.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={7}
+                          colSpan={6}
                           className="text-center text-gray-500 py-6"
                         >
                           No employees found. Use Add Employee or Import CSV to
@@ -1366,11 +1646,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             {employee.name}
                           </TableCell>
 
-                          <TableCell>{employee.role || "Not set"}</TableCell>
+                          <TableCell>{employee.email}</TableCell>
 
-                          <TableCell>{employee.department_name || "None"}</TableCell>
-
-                          <TableCell>{getEmployeeAccounts(employee)}</TableCell>
+                          <TableCell>{employee.contactNumber || "-"}</TableCell>
 
                           <TableCell>
                             {employee.joinedDate
@@ -1441,17 +1719,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* Account / Department Data */}
+          {/* 4. Employee Assignments */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <Briefcase className="size-5 text-purple-600" />
+                  <CheckCircle2 className="size-5 text-green-600" />
                   <div>
-                    <CardTitle>Account / Department Data</CardTitle>
+                    <CardTitle>4. Employee Assignments</CardTitle>
                     <CardDescription>
-                      Manage accounts, departments, priorities, and operator
-                      policies.
+                      Connects existing employees to departments, roles, and
+                      accounts.
                     </CardDescription>
                   </div>
                 </div>
@@ -1463,8 +1741,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     className="gap-2"
                     onClick={() =>
                       downloadImportTemplate(
-                        "departments",
-                        "department_name,account_name,priority_level,operator_policy,allow_partial_staffing,status",
+                        "employeeAssignments",
+                        "employee_email,department_name,role_name,account_name,status",
                       )
                     }
                   >
@@ -1476,14 +1754,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() => triggerImportInput("departments")}
+                    onClick={() => triggerImportInput("employeeAssignments")}
                   >
                     <Upload className="size-4" />
                     Import CSV
                   </Button>
 
                   <Input
-                    id="departments-csv-input"
+                    id="employeeAssignments-csv-input"
                     type="file"
                     accept=".csv,text/csv"
                     className="hidden"
@@ -1491,7 +1769,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       const file = e.target.files?.[0];
 
                       if (file) {
-                        handleFileImport("departments", file);
+                        handleFileImport("employeeAssignments", file);
                       }
 
                       e.currentTarget.value = "";
@@ -1503,12 +1781,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     className="gap-2"
                     onClick={() =>
                       toast.info(
-                        "Manual account/department add is frontend-only for now",
+                        "Manual employee assignment add is frontend-only for now",
                       )
                     }
                   >
                     <Plus className="size-4" />
-                    Add Account/Department
+                    Add Assignment
                   </Button>
                 </div>
               </div>
@@ -1519,61 +1797,56 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Employee</TableHead>
                       <TableHead>Department</TableHead>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Operator Policy</TableHead>
-                      <TableHead>Partial Staffing</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Account</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
-                    {accounts.length === 0 ? (
+                    {employees.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={7}
+                          colSpan={6}
                           className="text-center text-gray-500 py-6"
                         >
-                          No accounts or departments found. Use Add or Import
-                          CSV to add records.
+                          No employee assignments found. Import employees,
+                          departments, accounts, and roles first.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      accounts.map((account) => (
-                        <TableRow key={`import-account-${account.id}`}>
-                          <TableCell>{account.department_name || "None"}</TableCell>
+                      employees.map((employee) => (
+                        <TableRow key={`assignment-${employee.id}`}>
                           <TableCell className="font-medium">
-                            {account.name}
+                            {employee.name}
                           </TableCell>
+
                           <TableCell>
-                            {getAccountPriorityLabel(
-                              Number(account.priority_level),
-                            )}
+                            {employee.department_name || "None"}
                           </TableCell>
-                          <TableCell>
-                            {account.operator_policy || "Not set"}
-                          </TableCell>
-                          <TableCell>
-                            {account.allow_partial_staffing
-                              ? "Allowed"
-                              : "Not allowed"}
-                          </TableCell>
+
+                          <TableCell>{employee.role || "None"}</TableCell>
+
+                          <TableCell>{getEmployeeAccounts(employee)}</TableCell>
+
                           <TableCell>
                             <Badge>Active</Badge>
                           </TableCell>
+
                           <TableCell>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() =>
                                 toast.info(
-                                  "Deactivate account is frontend-only for now",
+                                  "Remove employee assignment is frontend-only for now",
                                 )
                               }
                             >
-                              Deactivate
+                              Remove
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -1583,19 +1856,21 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 </Table>
               </div>
 
-              {importPreviews.departments.length > 0 && (
+              {importPreviews.employeeAssignments.length > 0 && (
                 <div className="mt-4 overflow-x-auto rounded border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {importPreviews.departments[0].map((header, index) => (
-                          <TableHead key={index}>{header}</TableHead>
-                        ))}
+                        {importPreviews.employeeAssignments[0].map(
+                          (header, index) => (
+                            <TableHead key={index}>{header}</TableHead>
+                          ),
+                        )}
                       </TableRow>
                     </TableHeader>
 
                     <TableBody>
-                      {importPreviews.departments
+                      {importPreviews.employeeAssignments
                         .slice(1)
                         .map((row, rowIndex) => (
                           <TableRow key={rowIndex}>
@@ -1611,16 +1886,183 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* Staffing Requirements */}
+          {/* 5. Shift Configuration */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Clock className="size-5 text-indigo-600" />
+                  <div>
+                    <CardTitle>5. Shift Configuration</CardTitle>
+                    <CardDescription>
+                      Creates shift templates used by staffing requirements and
+                      schedule generation.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      downloadImportTemplate(
+                        "shifts",
+                        "shift_name,start_time,end_time,display_order,fatigue_penalty,difficulty_weight,is_overnight,status",
+                      )
+                    }
+                  >
+                    <Download className="size-4" />
+                    Template
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => triggerImportInput("shifts")}
+                  >
+                    <Upload className="size-4" />
+                    Import CSV
+                  </Button>
+
+                  <Input
+                    id="shifts-csv-input"
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+
+                      if (file) {
+                        handleFileImport("shifts", file);
+                      }
+
+                      e.currentTarget.value = "";
+                    }}
+                  />
+
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      toast.info("Manual shift add is frontend-only for now")
+                    }
+                  >
+                    <Plus className="size-4" />
+                    Add Shift
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Shift Name</TableHead>
+                      <TableHead>Start Time</TableHead>
+                      <TableHead>End Time</TableHead>
+                      <TableHead>Overnight</TableHead>
+                      <TableHead>Display Order</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {shiftTemplates.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className="text-center text-gray-500 py-6"
+                        >
+                          No shift templates found. Use Add Shift or Import CSV
+                          to add records.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      shiftTemplates.map((shift, index) => (
+                        <TableRow key={`shift-${shift.shift_template_id}`}>
+                          <TableCell className="font-medium">
+                            {shift.shift_name}
+                          </TableCell>
+
+                          <TableCell>{shift.start_time || "-"}</TableCell>
+
+                          <TableCell>{shift.end_time || "-"}</TableCell>
+
+                          <TableCell>
+                            {shift.is_overnight ? "Yes" : "No"}
+                          </TableCell>
+
+                          <TableCell>
+                            {shift.display_order ?? index + 1}
+                          </TableCell>
+
+                          <TableCell>
+                            <Badge>Active</Badge>
+                          </TableCell>
+
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                toast.info(
+                                  "Deactivate shift is frontend-only for now",
+                                )
+                              }
+                            >
+                              Deactivate
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {importPreviews.shifts.length > 0 && (
+                <div className="mt-4 overflow-x-auto rounded border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {importPreviews.shifts[0].map((header, index) => (
+                          <TableHead key={index}>{header}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {importPreviews.shifts.slice(1).map((row, rowIndex) => (
+                        <TableRow key={rowIndex}>
+                          {row.map((cell, cellIndex) => (
+                            <TableCell key={cellIndex}>{cell}</TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 6. Staffing Requirements */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <FileSpreadsheet className="size-5 text-green-600" />
                   <div>
-                    <CardTitle>Staffing Requirements</CardTitle>
+                    <CardTitle>6. Staffing Requirements</CardTitle>
                     <CardDescription>
-                      Manage required staffing per account, shift, and role.
+                      Creates required staffing counts per account, shift, and
+                      role.
                     </CardDescription>
                   </div>
                 </div>
@@ -1706,8 +2148,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           colSpan={6}
                           className="text-center text-gray-500 py-6"
                         >
-                          No staffing requirements found. Use Add Requirement or
-                          Import CSV to add records.
+                          No staffing requirements found. Import accounts,
+                          roles, and shifts first.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -1720,14 +2162,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               <TableCell className="font-medium">
                                 {account.name}
                               </TableCell>
+
                               <TableCell>{shift.shift_name}</TableCell>
+
                               <TableCell>
                                 {role.role_name || role.role_key || "Role"}
                               </TableCell>
+
                               <TableCell>1</TableCell>
+
                               <TableCell>
                                 <Badge>Active</Badge>
                               </TableCell>
+
                               <TableCell>
                                 <Button
                                   variant="outline"
@@ -1776,161 +2223,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* Roles */}
+          {/* 7. Import History */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <UserSquare2 className="size-5 text-orange-600" />
-                  <div>
-                    <CardTitle>Roles</CardTitle>
-                    <CardDescription>
-                      Manage role definitions and access labels.
-                    </CardDescription>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() =>
-                      downloadImportTemplate(
-                        "roles",
-                        "role_name,role_key,department_name,status",
-                      )
-                    }
-                  >
-                    <Download className="size-4" />
-                    Template
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => triggerImportInput("roles")}
-                  >
-                    <Upload className="size-4" />
-                    Import CSV
-                  </Button>
-
-                  <Input
-                    id="roles-csv-input"
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-
-                      if (file) {
-                        handleFileImport("roles", file);
-                      }
-
-                      e.currentTarget.value = "";
-                    }}
-                  />
-
-                  <Button
-                    size="sm"
-                    className="gap-2"
-                    onClick={() =>
-                      toast.info("Manual role add is frontend-only for now")
-                    }
-                  >
-                    <Plus className="size-4" />
-                    Add Role
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Role Name</TableHead>
-                      <TableHead>Role Key</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {staffingRoles.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={5}
-                          className="text-center text-gray-500 py-6"
-                        >
-                          No roles found. Use Add Role or Import CSV to add
-                          records.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      staffingRoles.map((role) => (
-                        <TableRow key={`import-role-${role.staffing_role_id}`}>
-                          <TableCell className="font-medium">
-                            {role.role_name}
-                          </TableCell>
-                          <TableCell>{role.role_key}</TableCell>
-                          <TableCell>None</TableCell>
-                          <TableCell>
-                            <Badge>Active</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                toast.info(
-                                  "Deactivate role is frontend-only for now",
-                                )
-                              }
-                            >
-                              Deactivate
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {importPreviews.roles.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {importPreviews.roles[0].map((header, index) => (
-                          <TableHead key={index}>{header}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {importPreviews.roles.slice(1).map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <TableCell key={cellIndex}>{cell}</TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Import History */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Import History</CardTitle>
+              <CardTitle>7. Import History</CardTitle>
               <CardDescription>
                 Recently imported CSV files in this session
               </CardDescription>
@@ -1955,8 +2251,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         <TableCell className="capitalize">
                           {record.category}
                         </TableCell>
+
                         <TableCell>{record.fileName}</TableCell>
+
                         <TableCell>{record.rowCount}</TableCell>
+
                         <TableCell>
                           <Badge
                             variant={
@@ -1968,6 +2267,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             {record.status}
                           </Badge>
                         </TableCell>
+
                         <TableCell>{record.importedAt}</TableCell>
                       </TableRow>
                     ))}
@@ -2116,6 +2416,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 }}
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="employeeNickname">Nickname</Label>
               <Input
@@ -2145,6 +2446,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 }}
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="employeeContactNumber">Contact Number</Label>
               <Input
@@ -2158,112 +2460,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   }
                 }}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employeeRole">Main Role</Label>
-
-              <Select
-                value={newEmployeeRole}
-                onValueChange={(value) =>
-                  setNewEmployeeRole(
-                    value as "Host" | "Operator" | "Both" | "Team Leader",
-                  )
-                }
-              >
-                <SelectTrigger id="employeeRole">
-                  <SelectValue />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="Team Leader">Team Leader</SelectItem>
-
-                  <SelectItem value="Host">Host</SelectItem>
-
-                  <SelectItem value="Operator">Operator</SelectItem>
-
-                  <SelectItem value="Both">Both</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* HOST ACCOUNTS */}
-
-            <div className="space-y-2">
-              <Label>Host Accounts</Label>
-
-              <div className="border rounded-md p-3 space-y-2">
-                {accounts.map((account) => (
-                  <div key={account.id} className="flex items-center gap-2">
-                    <Checkbox
-                      checked={hostAccounts.includes(account.name)}
-                      onCheckedChange={() =>
-                        toggleAccountSelection(
-                          account.name,
-                          hostAccounts,
-                          setHostAccounts,
-                        )
-                      }
-                    />
-
-                    <span>{account.name}</span>
-                  </div>
-                ))}
-
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={hostAccounts.length === 0}
-                    onCheckedChange={() =>
-                      toggleAccountSelection(
-                        "none",
-                        hostAccounts,
-                        setHostAccounts,
-                      )
-                    }
-                  />
-
-                  <span>None</span>
-                </div>
-              </div>
-            </div>
-
-            {/* OPERATOR ACCOUNTS */}
-
-            <div className="space-y-2">
-              <Label>Operator Accounts</Label>
-
-              <div className="border rounded-md p-3 space-y-2">
-                {accounts.map((account) => (
-                  <div key={account.id} className="flex items-center gap-2">
-                    <Checkbox
-                      checked={operatorAccounts.includes(account.name)}
-                      onCheckedChange={() =>
-                        toggleAccountSelection(
-                          account.name,
-                          operatorAccounts,
-                          setOperatorAccounts,
-                        )
-                      }
-                    />
-
-                    <span>{account.name}</span>
-                  </div>
-                ))}
-
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={operatorAccounts.length === 0}
-                    onCheckedChange={() =>
-                      toggleAccountSelection(
-                        "none",
-                        operatorAccounts,
-                        setOperatorAccounts,
-                      )
-                    }
-                  />
-
-                  <span>None</span>
-                </div>
-              </div>
             </div>
           </div>
           <DialogFooter>
