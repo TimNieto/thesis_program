@@ -153,7 +153,7 @@ def login(data: LoginRequest):
                 AND ed.company_id = d.company_id
             WHERE ed.employee_id = %s
             AND ed.company_id = %s
-            AND LOWER(d.department_name) = 'hr department'
+            AND LOWER(TRIM(d.department_name)) IN ('hr department', 'human resource')
             AND d.is_active = TRUE
             LIMIT 1
             """,
