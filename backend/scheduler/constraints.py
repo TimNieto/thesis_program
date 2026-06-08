@@ -187,8 +187,8 @@ def assigned_count_same_week(employee_id, shift, context):
     if isinstance(shift_date, str):
         shift_date = datetime.strptime(shift_date, "%Y-%m-%d").date()
 
-    week_start = shift_date - datetime.timedelta(days=shift_date.weekday())
-    week_end = week_start + datetime.timedelta(days=6)
+    week_start = shift_date - timedelta(days=shift_date.weekday())
+    week_end = week_start + timedelta(days=6)
 
     count = 0
 
