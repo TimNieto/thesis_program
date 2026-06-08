@@ -179,29 +179,6 @@ def assigned_count_same_day(employee_id, shift, context):
 
     return count
 
-def assigned_count_same_week(employee_id, shift, context):
-    assignments = context["context_assignments_by_employee"].get(employee_id, [])
-
-    shift_date = shift["shift_date"]
-
-    if isinstance(shift_date, str):
-        shift_date = datetime.strptime(shift_date, "%Y-%m-%d").date()
-
-    week_start = shift_date - timedelta(days=shift_date.weekday())
-    week_end = week_start + timedelta(days=6)
-
-    count = 0
-
-    for a in assignments:
-        assigned_date = a["shift_date"]
-
-        if isinstance(assigned_date, str):
-            assigned_date = datetime.strptime(assigned_date, "%Y-%m-%d").date()
-
-        if week_start <= assigned_date <= week_end:
-            count += 1
-
-    return count
 
 # Main validation
 def is_valid_candidate(employee, shift, role, context):
@@ -240,11 +217,16 @@ def is_valid_candidate(employee, shift, role, context):
     max_shifts_per_week = context["settings"].get("max_shifts_per_week")
 
     if max_shifts_per_week is not None:
-        if assigned_count_same_week(employee_id, shift, context) >= int(max_shifts_per_week):
-            context["max_shift_week_failures"] = (
-                context.get("max_shift_week_failures", 0) + 1
-        )
-        return False
+        max_shifts_per_week = int(max_shifts_per_week)
+
+        if max_shifts_per_week > 0:
+            current_week_count = context["assignment_counts"].get(employee_id, 0)
+
+            if current_week_count >= max_shifts_per_week:
+                context["max_shift_week_failures"] = (
+                    context.get("max_shift_week_failures", 0) + 1
+                )
+                return False
 
     days = working_days(employee_id, context)
 
