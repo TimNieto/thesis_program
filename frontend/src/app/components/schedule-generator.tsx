@@ -119,41 +119,63 @@ export function ScheduleGenerator({
 
   const fetchShiftTemplates = async () => {
     try {
+      if (!companyId) return;
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/shift-templates",
+        `https://backend-production-6e75.up.railway.app/shift-templates?company_id=${companyId}`,
       );
 
       const data = await res.json();
 
-      setShiftTemplates(data);
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load shift templates");
+      }
+
+      setShiftTemplates(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to load shift templates", err);
     }
   };
 
-  const fetchStaffingRequirements = async () => {
-    try {
-      const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/staffing-requirements",
-      );
+const fetchStaffingRequirements = async () => {
+  try {
+    if (!companyId) return;
 
-      const data = await res.json();
+    const res = await fetch(
+      `https://backend-production-6e75.up.railway.app/staffing-requirements?company_id=${companyId}`,
+    );
 
-      setStaffingRequirements(data.requirements || []);
-    } catch (err) {
-      console.error("Failed to load staffing requirements", err);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to load staffing requirements");
     }
-  };
+
+    setStaffingRequirements(data.requirements || []);
+  } catch (err) {
+    console.error("Failed to load staffing requirements", err);
+  }
+};
 
   const fetchAccounts = async () => {
     try {
+      if (!companyId) return;
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/accounts",
+        `https://backend-production-6e75.up.railway.app/accounts?company_id=${companyId}`,
       );
 
       const data = await res.json();
 
-      setAccountOrder((data || []).map((account: any) => account.name));
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load accounts");
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid accounts response");
+      }
+
+      setAccountOrder(data.map((account: any) => account.name));
     } catch (err) {
       console.error("Failed to load accounts", err);
     }
@@ -161,11 +183,17 @@ export function ScheduleGenerator({
 
   const fetchEmployees = async () => {
     try {
+      if (!companyId) return;
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/employees",
+        `https://backend-production-6e75.up.railway.app/employees?company_id=${companyId}`,
       );
 
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load employees");
+      }
 
       setEmployees(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -282,11 +310,13 @@ export function ScheduleGenerator({
   }, [leaveWeekOffset]);
 
   useEffect(() => {
+    if (!companyId) return;
+
     fetchShiftTemplates();
     fetchStaffingRequirements();
     fetchAccounts();
     fetchEmployees();
-  }, []);
+  }, [companyId]);
 
   const loadSchedule = async () => {
     try {
@@ -344,16 +374,20 @@ export function ScheduleGenerator({
   }, [accountOrder]);
 
   useEffect(() => {
+    if (!companyId) return;
+
     fetchApprovedLeaves();
-  }, [weekDates]);
+  }, [weekDates, companyId]);
 
   const fetchApprovedLeaves = async () => {
     try {
       const start = weekDates[0];
       const end = weekDates[6];
 
+      if (!companyId) return;
+
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/leaves-approved?start=${formatDate(start)}&end=${formatDate(end)}`,
+        `https://backend-production-6e75.up.railway.app/leaves-approved?company_id=${companyId}&start=${formatDate(start)}&end=${formatDate(end)}`,
       );
 
       const data = await res.json();
@@ -800,6 +834,8 @@ export function ScheduleGenerator({
         .filter(
           (req) =>
             Number(req.shift_template_id) === shiftTemplateId &&
+            String(req.account_name || "").toLowerCase() ===
+              String(livestream || "").toLowerCase() &&
             Number(req.required_count) > 0,
         )
         .flatMap((req) =>
@@ -980,11 +1016,6 @@ export function ScheduleGenerator({
                           const roleRowsForShift = getRoleRowsForShift(
                             livestream,
                             shift.shift_name,
-                          );
-                          console.log(
-                            "SHIFT DEBUG:",
-                            shift.shift_name,
-                            roleRowsForShift.map((r) => r.roleKey),
                           );
                           if (roleRowsForShift.length === 0) {
                             return (

@@ -8,7 +8,7 @@ from datetime import datetime
 router = APIRouter()
 
 @router.get("/shift-templates")
-def get_shift_templates():
+def get_shift_templates(company_id: int = 1):
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -22,9 +22,10 @@ def get_shift_templates():
                 start_time,
                 end_time
             FROM shift_templates
-            WHERE is_active = TRUE
-            ORDER BY start_time
-        """)
+            WHERE company_id = %s
+            AND is_active = TRUE
+            ORDER BY display_order, start_time
+        """, (company_id,))
 
         rows = cursor.fetchall()
 
