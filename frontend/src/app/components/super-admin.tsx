@@ -56,14 +56,28 @@ interface Company {
   createdDate: string;
 }
 
-interface RolePermission {
-  id: string;
-  companyId: string;
-  role: "Admin" | "Team Leader (Admin)" | "Host" | "Operator";
-  canEditCompanySettings: boolean;
-  canManageEmployees: boolean;
-  canViewReports: boolean;
-  canApproveRequests: boolean;
+interface RolePermissionsState {
+  hrTabs: {
+    adminDashboard: boolean;
+    companySettings: boolean;
+    scheduleGenerator: boolean;
+    coverRequests: boolean;
+    reports: boolean;
+    profile: boolean;
+  };
+  generalTabs: {
+    scheduleGenerator: boolean;
+    coverRequests: boolean;
+    profile: boolean;
+  };
+  companySections: {
+    companyProfile: boolean;
+    schedulingRules: boolean;
+    schedulerScoring: boolean;
+    accountSchedulingPolicies: boolean;
+    schedulingBehavior: boolean;
+    notificationPreferences: boolean;
+  };
 }
 
 export function SuperAdmin() {
@@ -103,116 +117,29 @@ export function SuperAdmin() {
 
   const [activeTab, setActiveTab] = useState("companies");
 
-  const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([
-    {
-      id: "1",
-      companyId: "1",
-      role: "Admin",
-      canEditCompanySettings: true,
-      canManageEmployees: true,
-      canViewReports: true,
-      canApproveRequests: true,
+  const [rolePermissions, setRolePermissions] = useState<RolePermissionsState>({
+    hrTabs: {
+      adminDashboard: true,
+      companySettings: true,
+      scheduleGenerator: true,
+      coverRequests: true,
+      reports: true,
+      profile: true,
     },
-    {
-      id: "2",
-      companyId: "1",
-      role: "Team Leader (Admin)",
-      canEditCompanySettings: false,
-      canManageEmployees: true,
-      canViewReports: true,
-      canApproveRequests: true,
+    generalTabs: {
+      scheduleGenerator: true,
+      coverRequests: true,
+      profile: true,
     },
-    {
-      id: "3",
-      companyId: "1",
-      role: "Host",
-      canEditCompanySettings: false,
-      canManageEmployees: false,
-      canViewReports: false,
-      canApproveRequests: false,
+    companySections: {
+      companyProfile: true,
+      schedulingRules: true,
+      schedulerScoring: true,
+      accountSchedulingPolicies: true,
+      schedulingBehavior: true,
+      notificationPreferences: true,
     },
-    {
-      id: "4",
-      companyId: "1",
-      role: "Operator",
-      canEditCompanySettings: false,
-      canManageEmployees: false,
-      canViewReports: false,
-      canApproveRequests: false,
-    },
-    {
-      id: "5",
-      companyId: "2",
-      role: "Admin",
-      canEditCompanySettings: true,
-      canManageEmployees: true,
-      canViewReports: true,
-      canApproveRequests: true,
-    },
-    {
-      id: "6",
-      companyId: "2",
-      role: "Team Leader (Admin)",
-      canEditCompanySettings: true,
-      canManageEmployees: false,
-      canViewReports: true,
-      canApproveRequests: true,
-    },
-    {
-      id: "7",
-      companyId: "2",
-      role: "Host",
-      canEditCompanySettings: false,
-      canManageEmployees: false,
-      canViewReports: false,
-      canApproveRequests: false,
-    },
-    {
-      id: "8",
-      companyId: "2",
-      role: "Operator",
-      canEditCompanySettings: false,
-      canManageEmployees: false,
-      canViewReports: true,
-      canApproveRequests: false,
-    },
-    {
-      id: "9",
-      companyId: "3",
-      role: "Admin",
-      canEditCompanySettings: true,
-      canManageEmployees: true,
-      canViewReports: true,
-      canApproveRequests: true,
-    },
-    {
-      id: "10",
-      companyId: "3",
-      role: "Team Leader (Admin)",
-      canEditCompanySettings: false,
-      canManageEmployees: true,
-      canViewReports: false,
-      canApproveRequests: false,
-    },
-    {
-      id: "11",
-      companyId: "3",
-      role: "Host",
-      canEditCompanySettings: false,
-      canManageEmployees: false,
-      canViewReports: false,
-      canApproveRequests: false,
-    },
-    {
-      id: "12",
-      companyId: "3",
-      role: "Operator",
-      canEditCompanySettings: false,
-      canManageEmployees: false,
-      canViewReports: false,
-      canApproveRequests: false,
-    },
-  ]);
+  });
 
   // Company Management States
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
@@ -270,12 +197,11 @@ export function SuperAdmin() {
     ) {
       setCompanies(companies.filter((company) => company.id !== id));
 
-      setRolePermissions(
-        rolePermissions.filter((permission) => permission.companyId !== id),
-      );
       if (selectedCompany?.id === id) {
         setSelectedCompany(null);
+        setActiveTab("companies");
       }
+
       toast.success(`Company "${name}" removed`);
     }
   };
@@ -306,23 +232,45 @@ export function SuperAdmin() {
   };
 
   // Update Role Permission
-  const updateRolePermission = (
-    id: string,
-    permission: keyof Omit<RolePermission, "id" | "role">,
+  const updatePermission = (
+    group: keyof RolePermissionsState,
+    key: string,
     value: boolean,
   ) => {
-    setRolePermissions(
-      rolePermissions.map((rp) =>
-        rp.id === id ? { ...rp, [permission]: value } : rp,
-      ),
-    );
+    setRolePermissions((prev) => ({
+      ...prev,
+      [group]: {
+        ...prev[group],
+        [key]: value,
+      },
+    }));
+
     toast.success("Permission updated");
   };
 
-  const getCompanyRolePermissions = () => {
-    if (!selectedCompany) return [];
-    return rolePermissions.filter((rp) => rp.companyId === selectedCompany.id);
-  };
+  const permissionRows = {
+    hrTabs: [
+      ["adminDashboard", "Admin Dashboard"],
+      ["companySettings", "Company Settings"],
+      ["scheduleGenerator", "Schedule Generator"],
+      ["coverRequests", "Cover Requests"],
+      ["reports", "Reports"],
+      ["profile", "Profile"],
+    ],
+    generalTabs: [
+      ["scheduleGenerator", "Schedule Generator"],
+      ["coverRequests", "Cover Requests"],
+      ["profile", "Profile"],
+    ],
+    companySections: [
+      ["companyProfile", "Company Profile"],
+      ["schedulingRules", "Scheduling Rules"],
+      ["schedulerScoring", "Scheduler Scoring"],
+      ["accountSchedulingPolicies", "Account Scheduling Policies"],
+      ["schedulingBehavior", "Scheduling Behavior"],
+      ["notificationPreferences", "Notification Preferences"],
+    ],
+  } as const;
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
@@ -529,7 +477,7 @@ export function SuperAdmin() {
           </Card>
         </TabsContent>
 
-        {/* System Settings Tab */}
+        {/* Company Settings Tab */}
         <TabsContent value="settings" className="space-y-6">
           {!selectedCompany ? (
             <Card>
@@ -560,85 +508,92 @@ export function SuperAdmin() {
 
         {/* Role Permissions Tab */}
         <TabsContent value="permissions" className="space-y-6">
+          <div>
+            <h3 className="text-2xl">
+              Role Permissions - {selectedCompany?.name}
+            </h3>
+            <p className="text-gray-600">
+              Configure tab access and company settings section access for this
+              company
+            </p>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Role Permissions - {selectedCompany?.name}</CardTitle>
+              <CardTitle>HR Department Tab Permission</CardTitle>
               <CardDescription>
-                Configure what each role can access and modify within this
-                company
+                Control which admin tabs HR Department users can access
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Edit Company Settings</TableHead>
-                      <TableHead>Manage Employees</TableHead>
-                      <TableHead>View Reports</TableHead>
-                      <TableHead>Approve Requests</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {getCompanyRolePermissions().map((rp) => (
-                      <TableRow key={rp.id}>
-                        <TableCell className="font-medium">
-                          <Badge variant="outline">{rp.role}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={rp.canEditCompanySettings}
-                            onCheckedChange={(value) =>
-                              updateRolePermission(
-                                rp.id,
-                                "canEditCompanySettings",
-                                value,
-                              )
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={rp.canManageEmployees}
-                            onCheckedChange={(value) =>
-                              updateRolePermission(
-                                rp.id,
-                                "canManageEmployees",
-                                value,
-                              )
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={rp.canViewReports}
-                            onCheckedChange={(value) =>
-                              updateRolePermission(
-                                rp.id,
-                                "canViewReports",
-                                value,
-                              )
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={rp.canApproveRequests}
-                            onCheckedChange={(value) =>
-                              updateRolePermission(
-                                rp.id,
-                                "canApproveRequests",
-                                value,
-                              )
-                            }
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+
+            <CardContent className="space-y-4">
+              {permissionRows.hrTabs.map(([key, label]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
+                  <Label>{label}</Label>
+                  <Switch
+                    checked={rolePermissions.hrTabs[key]}
+                    onCheckedChange={(value) =>
+                      updatePermission("hrTabs", key, value)
+                    }
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>General Employee Tab Permission</CardTitle>
+              <CardDescription>
+                Control which employee tabs General Employee users can access
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {permissionRows.generalTabs.map(([key, label]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
+                  <Label>{label}</Label>
+                  <Switch
+                    checked={rolePermissions.generalTabs[key]}
+                    onCheckedChange={(value) =>
+                      updatePermission("generalTabs", key, value)
+                    }
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Settings Section Permission</CardTitle>
+              <CardDescription>
+                Control which Company Settings sections HR Department users can
+                access
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {permissionRows.companySections.map(([key, label]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
+                  <Label>{label}</Label>
+                  <Switch
+                    checked={rolePermissions.companySections[key]}
+                    onCheckedChange={(value) =>
+                      updatePermission("companySections", key, value)
+                    }
+                  />
+                </div>
+              ))}
             </CardContent>
           </Card>
         </TabsContent>
