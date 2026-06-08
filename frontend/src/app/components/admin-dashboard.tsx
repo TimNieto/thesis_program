@@ -315,6 +315,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   useEffect(() => {
+  if (!currentUser.company_id) return;
+  if (shiftTemplates.length === 0) return;
+
+  fetchAvailability();
+}, [currentUser.company_id, shiftTemplates]);
+
+  useEffect(() => {
     if (currentUser.role.toLowerCase() === "admin") {
       fetchEmployees();
       fetchShiftTemplates();
@@ -618,7 +625,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     // ❗ No day → UNAVAILABLE
     if (!dayData) return true;
 
-    const shiftData = dayData[shift.toLowerCase()];
+    const shiftData = dayData[String(shift).toLowerCase()];
 
     // ❗ No shift → UNAVAILABLE
     if (shiftData === undefined) return true;
@@ -646,10 +653,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           },
           body: JSON.stringify({
             employee_id: employeeId,
-            account: "default",
+            company_id: currentUser.company_id,
             day_of_week: day.toLowerCase(),
             preferred_shift: shift.toLowerCase(),
-            is_available: isCurrentlyUnavailable, // invert
+            shift_template_id:
+              shiftTemplates.find((s) => s.shift_name === shift)?.shift_template_id ||
+              null,
+            is_available: isCurrentlyUnavailable,
           }),
         },
       );
@@ -663,19 +673,43 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const fetchAvailability = async () => {
     try {
+      const companyId = currentUser.company_id;
+
+      if (!companyId) return;
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/availability",
+        `https://backend-production-6e75.up.railway.app/availability?company_id=${companyId}`,
       );
+
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load availability");
+      }
 
       const transformed: any = {};
 
       data.forEach((row: any) => {
-        if (!row.day_of_week || !row.preferred_shift) return;
+        if (!row.day_of_week) return;
 
         const empId = Number(row.employee_id);
-        const day = row.day_of_week.toLowerCase();
-        const shift = row.preferred_shift.toLowerCase();
+        const day = String(row.day_of_week).toLowerCase();
+
+        const matchedShift =
+          shiftTemplates.find(
+            (shift) =>
+              Number(shift.shift_template_id) ===
+              Number(row.shift_template_id),
+          ) ||
+          shiftTemplates.find(
+            (shift) =>
+              String(shift.shift_name).toLowerCase() ===
+              String(row.preferred_shift || "").toLowerCase(),
+          );
+
+        if (!matchedShift) return;
+
+        const shiftKey = String(matchedShift.shift_name).toLowerCase();
 
         if (!transformed[empId]) {
           transformed[empId] = {};
@@ -685,7 +719,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           transformed[empId][day] = {};
         }
 
-        transformed[empId][day][shift] = row.is_available;
+        transformed[empId][day][shiftKey] = row.is_available;
       });
 
       console.log("STRICT AVAILABILITY MAP:", transformed);
