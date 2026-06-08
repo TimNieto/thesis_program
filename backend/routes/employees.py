@@ -861,55 +861,52 @@ def change_password(employee_id: int, data: dict):
 
 
 @router.get("/availability")
-def get_availability(company_id: int | None = None):
+def get_availability(company_id: int):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        if company_id:
-            cursor.execute("""
-                SELECT
-                    av.employee_id,
-                    av.day_of_week,
-                    av.is_available,
-                    st.shift_name
-                FROM availability av
-                JOIN shift_templates st
-                    ON av.shift_template_id = st.shift_template_id
-                    AND av.company_id = st.company_id
-                WHERE av.company_id = %s
-                ORDER BY av.employee_id, av.day_of_week, st.display_order
-            """, (company_id,))
-        else:
-            cursor.execute("""
-                SELECT
-                    av.employee_id,
-                    av.day_of_week,
-                    av.is_available,
-                    st.shift_name
-                FROM availability av
-                JOIN shift_templates st
-                    ON av.shift_template_id = st.shift_template_id
-                    AND av.company_id = st.company_id
-                ORDER BY av.employee_id, av.day_of_week, st.display_order
-            """)
+        cursor.execute("""
+            SELECT
+                a.employee_id,
+                a.day_of_week,
+                a.is_available,
+                a.shift_template_id,
+                st.shift_name,
+                a.company_id
+            FROM availability a
+            JOIN shift_templates st
+                ON a.shift_template_id = st.shift_template_id
+                AND a.company_id = st.company_id
+            WHERE a.company_id = %s
+            ORDER BY
+                a.employee_id,
+                a.day_of_week,
+                st.display_order,
+                st.start_time
+        """, (company_id,))
 
         rows = cursor.fetchall()
 
         return [
             {
                 "employee_id": r[0],
-                "account": "default",
                 "day_of_week": r[1],
                 "is_available": r[2],
-                "preferred_shift": r[3]
+                "shift_template_id": r[3],
+                "preferred_shift": r[4],
+                "shift_name": r[4],
+                "company_id": r[5],
             }
             for r in rows
         ]
 
     except Exception as e:
         print("ERROR fetching availability:", e)
-        raise HTTPException(status_code=500, detail="Failed to fetch availability")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch availability"
+        )
 
     finally:
         cursor.close()
@@ -922,84 +919,60 @@ def update_availability(data: dict):
     cursor = conn.cursor()
 
     try:
-        employee_id = data["employee_id"]
-        day_of_week = data["day_of_week"]
-        preferred_shift = data["preferred_shift"]
-        is_available = data["is_available"]
+        employee_id = int(data["employee_id"])
+        company_id = int(data["company_id"])
+        day_of_week = str(data["day_of_week"]).strip().capitalize()
+        is_available = bool(data["is_available"])
+
+        shift_template_id = data.get("shift_template_id")
+
+        if not shift_template_id:
+            preferred_shift = str(data.get("preferred_shift", "")).strip().upper()
+
+            cursor.execute("""
+                SELECT shift_template_id
+                FROM shift_templates
+                WHERE company_id = %s
+                AND UPPER(shift_name) = %s
+                AND is_active = TRUE
+                LIMIT 1
+            """, (company_id, preferred_shift))
+
+            row = cursor.fetchone()
+
+            if not row:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid shift template"
+                )
+
+            shift_template_id = row[0]
 
         cursor.execute("""
-            SELECT company_id
-            FROM employees
-            WHERE employee_id = %s
-            AND employment_status = 'Active'
-        """, (employee_id,))
-
-        employee = cursor.fetchone()
-
-        if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
-
-        company_id = employee[0]
-
-        cursor.execute("""
-            SELECT shift_template_id
-            FROM shift_templates
-            WHERE company_id = %s
-            AND LOWER(shift_name) = LOWER(%s)
-            AND is_active = TRUE
-            LIMIT 1
-        """, (company_id, preferred_shift))
-
-        shift_template = cursor.fetchone()
-
-        if not shift_template:
-            raise HTTPException(status_code=404, detail="Shift template not found")
-
-        shift_template_id = shift_template[0]
-
-        cursor.execute("""
-            SELECT availability_id
-            FROM availability
-            WHERE employee_id = %s
-            AND company_id = %s
-            AND day_of_week = %s
-            AND shift_template_id = %s
+            INSERT INTO availability (
+                employee_id,
+                company_id,
+                day_of_week,
+                shift_template_id,
+                is_available
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (
+                company_id,
+                employee_id,
+                INITCAP(TRIM(day_of_week)),
+                shift_template_id
+            )
+            DO UPDATE SET
+                day_of_week = EXCLUDED.day_of_week,
+                is_available = EXCLUDED.is_available
         """, (
             employee_id,
             company_id,
             day_of_week,
-            shift_template_id
+            shift_template_id,
+            is_available
         ))
-
-        existing = cursor.fetchone()
-
-        if existing:
-            cursor.execute("""
-                UPDATE availability
-                SET is_available = %s
-                WHERE availability_id = %s
-            """, (
-                is_available,
-                existing[0]
-            ))
-
-        else:
-            cursor.execute("""
-                INSERT INTO availability (
-                    employee_id,
-                    day_of_week,
-                    is_available,
-                    shift_template_id,
-                    company_id
-                )
-                VALUES (%s, %s, %s, %s, %s)
-            """, (
-                employee_id,
-                day_of_week,
-                is_available,
-                shift_template_id,
-                company_id
-            ))
 
         conn.commit()
 
@@ -1012,7 +985,10 @@ def update_availability(data: dict):
     except Exception as e:
         conn.rollback()
         print("ERROR updating availability:", e)
-        raise HTTPException(status_code=500, detail="Failed to update availability")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update availability"
+        )
 
     finally:
         cursor.close()
