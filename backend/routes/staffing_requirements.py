@@ -75,7 +75,6 @@ def get_staffing_requirements(company_id: int = 1):
 
             ORDER BY
                 a.account_id,
-                st.display_order,
                 st.start_time,
                 r.role_id
         """, (company_id,))
