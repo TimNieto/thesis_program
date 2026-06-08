@@ -15,14 +15,18 @@ def get_accounts():
     try:
         cursor.execute("""
             SELECT
-                account_id,
-                account_name,
-                priority_level,
-                allow_partial_staffing,
-                operator_policy
-            FROM accounts
-            WHERE is_active = TRUE
-            ORDER BY account_id ASC
+                a.account_id,
+                a.account_name,
+                a.priority_level,
+                a.allow_partial_staffing,
+                d.department_name
+            FROM accounts a
+            LEFT JOIN departments d
+                ON a.department_id = d.department_id
+                AND a.company_id = d.company_id
+                AND d.is_active = TRUE
+            WHERE a.is_active = TRUE
+            ORDER BY a.account_id ASC
         """)
 
         rows = cursor.fetchall()
@@ -32,10 +36,8 @@ def get_accounts():
                 "id": r[0],
                 "name": r[1],
                 "priority_level": r[2],
-                "require_host": True,
-                "require_operator": True,
                 "allow_partial_staffing": r[3],
-                "operator_policy": r[4]
+                "department_name": r[4] or "None",
             }
             for r in rows
         ]

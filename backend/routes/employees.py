@@ -71,16 +71,28 @@ def get_employees():
             role_keys = [r[0] for r in role_rows]
             role_names = [r[1] for r in role_rows]
 
-            if "team_leader" in role_keys or "hr_manager" in role_keys or "admin" in role_keys:
-                display_role = "Team Leader"
-            elif "host" in role_keys and "operator" in role_keys:
-                display_role = "Both"
-            elif "host" in role_keys:
-                display_role = "Host"
-            elif "operator" in role_keys:
-                display_role = "Operator"
-            else:
-                display_role = role_names[0] if role_names else "Employee"
+            display_role = ", ".join(role_names) if role_names else "Employee"
+
+            cursor.execute("""
+                SELECT d.department_name
+                FROM employee_departments ed
+                JOIN departments d
+                    ON ed.department_id = d.department_id
+                    AND ed.company_id = d.company_id
+                WHERE ed.employee_id = %s
+                AND ed.company_id = %s
+                AND d.is_active = TRUE
+                ORDER BY d.department_name
+            """, (employee_id, company_id))
+
+            department_rows = cursor.fetchall()
+
+            department_names = [
+                department_name
+                for department_name, in department_rows
+            ]
+
+            department_name = ", ".join(department_names) if department_names else "None"
 
             cursor.execute("""
                 SELECT
@@ -101,17 +113,10 @@ def get_employees():
 
             account_role_rows = cursor.fetchall()
 
-            host_accounts = [
+            account_names = sorted({
                 account_name
                 for account_name, role_key in account_role_rows
-                if role_key == "host"
-            ]
-
-            operator_accounts = [
-                account_name
-                for account_name, role_key in account_role_rows
-                if role_key == "operator"
-            ]
+            })
 
             employees.append({
                 "id": employee_id,
@@ -121,12 +126,11 @@ def get_employees():
                 "status": employment_status,
                 "totalShifts": 0,
                 "joinedDate": str(joined_date) if joined_date else None,
-                "accountType": "Employee",
-                "can_be_host": len(host_accounts) > 0,
-                "host_accounts": ", ".join(host_accounts) if host_accounts else None,
-                "can_be_operator": len(operator_accounts) > 0,
-                "operator_accounts": ", ".join(operator_accounts) if operator_accounts else None,
+                "account_names": ", ".join(account_names) if account_names else None,
+                "accounts": account_names,
                 "contactNumber": contact_number,
+                "department_name": department_name,
+                "departments": department_names,
                 "company_id": company_id
             })
 
@@ -176,16 +180,7 @@ def get_employee(employee_id: int):
         role_keys = [r[0] for r in role_rows]
         role_names = [r[1] for r in role_rows]
 
-        if "team_leader" in role_keys or "hr_manager" in role_keys or "admin" in role_keys:
-            display_role = "Team Leader"
-        elif "host" in role_keys and "operator" in role_keys:
-            display_role = "Both"
-        elif "host" in role_keys:
-            display_role = "Host"
-        elif "operator" in role_keys:
-            display_role = "Operator"
-        else:
-            display_role = role_names[0] if role_names else "Employee"
+        display_role = ", ".join(role_names) if role_names else "Employee"
 
         return {
             "id": row[0],
