@@ -948,35 +948,65 @@ def update_availability(data: dict):
 
             shift_template_id = row[0]
 
+        shift_template_id = int(shift_template_id)
+
         cursor.execute("""
-            INSERT INTO availability (
+            SELECT availability_id
+            FROM availability
+            WHERE company_id = %s
+            AND employee_id = %s
+            AND LOWER(TRIM(day_of_week)) = LOWER(TRIM(%s))
+            AND shift_template_id = %s
+            LIMIT 1
+        """, (
+            company_id,
+            employee_id,
+            day_of_week,
+            shift_template_id
+        ))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute("""
+                UPDATE availability
+                SET
+                    day_of_week = %s,
+                    is_available = %s
+                WHERE availability_id = %s
+            """, (
+                day_of_week,
+                is_available,
+                existing[0]
+            ))
+        else:
+            cursor.execute("""
+                INSERT INTO availability (
+                    employee_id,
+                    company_id,
+                    day_of_week,
+                    shift_template_id,
+                    is_available
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
                 employee_id,
                 company_id,
                 day_of_week,
                 shift_template_id,
                 is_available
-            )
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (
-                company_id,
-                employee_id,
-                INITCAP(TRIM(day_of_week)),
-                shift_template_id
-            )
-            DO UPDATE SET
-                day_of_week = EXCLUDED.day_of_week,
-                is_available = EXCLUDED.is_available
-        """, (
-            employee_id,
-            company_id,
-            day_of_week,
-            shift_template_id,
-            is_available
-        ))
+            ))
 
         conn.commit()
 
-        return {"message": "Availability saved"}
+        return {
+            "message": "Availability saved",
+            "employee_id": employee_id,
+            "company_id": company_id,
+            "day_of_week": day_of_week,
+            "shift_template_id": shift_template_id,
+            "is_available": is_available,
+        }
 
     except HTTPException:
         conn.rollback()
@@ -987,7 +1017,7 @@ def update_availability(data: dict):
         print("ERROR updating availability:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to update availability"
+            detail=str(e)
         )
 
     finally:
