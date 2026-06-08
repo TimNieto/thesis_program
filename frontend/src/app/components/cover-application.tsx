@@ -110,6 +110,7 @@ interface CoverApplicationProps {
   currentUser: {
     employee_id: number;
     name: string;
+    company_id: number | null;
   };
   role: string;
 }
@@ -213,7 +214,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     try {
       const endpoint =
         role === "admin"
-          ? "https://backend-production-6e75.up.railway.app/coverage-requests-admin"
+          ? `https://backend-production-6e75.up.railway.app/coverage-requests-admin?company_id=${currentUser.company_id}`
           : `https://backend-production-6e75.up.railway.app/coverage-requests/${currentUser.employee_id}`;
 
       const res = await fetch(endpoint);
@@ -261,8 +262,10 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
   const fetchShiftTemplates = async () => {
     try {
+      if (!currentUser.company_id) return;
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/shift-templates",
+        `https://backend-production-6e75.up.railway.app/shift-templates?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -276,7 +279,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchApplications = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/shift-applications",
+        `https://backend-production-6e75.up.railway.app/shift-applications?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -325,7 +328,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const processAutomaticCoverRequests = async () => {
     try {
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic",
+         `https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic?company_id=${currentUser.company_id}`,
         {
           method: "POST",
         },
@@ -747,28 +750,42 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
   const fetchMyShifts = async () => {
     try {
+      if (!currentUser.company_id) {
+        setMyShifts([]);
+        return;
+      }
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/generated-schedule",
+        `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${currentUser.company_id}`,
       );
+
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load my shifts");
+      }
 
       console.log("SCHEDULE DATA:", data.assignments);
 
       setMyShifts(
         (data.assignments || [])
-          .filter((s: any) => s.employee_id === currentUser.employee_id)
+          .filter(
+            (s: any) =>
+              Number(s.employee_id) === Number(currentUser.employee_id),
+          )
           .map((s: any) => ({
-            schedule_id: s.schedule_id, // 🔥 THIS FIXES EVERYTHING
-            livestream: s.account,
+            schedule_id: s.schedule_id,
+            livestream: s.account || s.livestream || s.account_name,
             day: new Date(s.shift_date).toLocaleDateString("en-US", {
               weekday: "long",
             }),
-            shift: s.shift_type,
-            role: String(s.role || "").replace(/_/g, " "),
+            shift: s.shift_type || s.shift || s.shift_name,
+            role: String(s.role || s.role_key || "").replace(/_/g, " "),
           })),
       );
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load my shifts", err);
+      setMyShifts([]);
     }
   };
 

@@ -214,6 +214,7 @@ export default function App() {
               currentUser={{
                 employee_id: user.id,
                 name: user.name,
+                company_id: user.company_id,
               }}
               role={user.role}
             />
