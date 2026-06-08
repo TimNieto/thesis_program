@@ -111,28 +111,38 @@ def is_unavailable(employee_id, shift, context):
 
 # Role check
 def has_role(employee, role, context=None):
-
     role = role.lower()
 
-    # RELAX ROLE MODE
+    # Relax role mode: allow any employee with at least one scheduling permission
     if (
         context and
         context["context_flags"].get("relax_role")
     ):
-        return (
-            employee.get("can_be_host", False)
-            or
-            employee.get("can_be_operator", False)
+        account_permissions = employee.get("account_role_permissions", {})
+
+        return any(
+            len(role_keys) > 0
+            for role_keys in account_permissions.values()
         )
 
-    # CURRENT EMPLOYEE TABLE SUPPORTS ONLY THESE CAPABILITIES
+    # Account-specific role check
+    if context:
+        shift = context.get("current_shift")
+
+        if shift:
+            account_name = str(shift.get("account", "")).strip().lower()
+            account_permissions = employee.get("account_role_permissions", {})
+            allowed_roles = account_permissions.get(account_name, [])
+
+            return role in allowed_roles
+
+    # Fallback for old behavior
     if role == "host":
         return employee.get("can_be_host", False)
 
     if role == "operator":
         return employee.get("can_be_operator", False)
 
-    # Custom roles are database-based, but employee capability for custom roles does not exist yet.
     return False
 
 
@@ -179,6 +189,8 @@ def is_valid_candidate(employee, shift, role, context):
     shift_id = shift["shift_id"]
 
     # Role check
+    context["current_shift"] = shift
+
     if not has_role(employee, role, context):
         return False
 
