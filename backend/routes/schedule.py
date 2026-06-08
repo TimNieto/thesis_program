@@ -17,9 +17,11 @@ def get_week_bounds_for_shift(cursor, coverage_request_id: int):
         FROM coverage_requests cr
         JOIN generated_schedule gs
             ON cr.schedule_id = gs.schedule_id
+            AND cr.company_id = gs.company_id
         JOIN shifts s
             ON gs.shift_id = s.shift_id
-        WHERE cr.id = %s
+            AND gs.company_id = s.company_id
+        WHERE cr.coverage_request_id = %s
     """, (coverage_request_id,))
 
     row = cursor.fetchone()
@@ -28,11 +30,11 @@ def get_week_bounds_for_shift(cursor, coverage_request_id: int):
         return None, None
 
     shift_date = row[0]
-
     week_start = shift_date - timedelta(days=shift_date.weekday())
     week_end = week_start + timedelta(days=6)
 
     return week_start, week_end
+
 
 def select_best_weekly_cover_applicant(cursor, coverage_request_id: int):
     week_start, week_end = get_week_bounds_for_shift(
@@ -45,19 +47,23 @@ def select_best_weekly_cover_applicant(cursor, coverage_request_id: int):
 
     cursor.execute("""
         SELECT
-            sa.id,
+            sa.shift_application_id,
             sa.applicant_id,
             sa.applied_at,
             (
                 SELECT COUNT(*)
                 FROM shift_applications past_sa
                 JOIN coverage_requests past_cr
-                    ON past_sa.coverage_request_id = past_cr.id
+                    ON past_sa.coverage_request_id = past_cr.coverage_request_id
+                    AND past_sa.company_id = past_cr.company_id
                 JOIN generated_schedule past_gs
                     ON past_cr.schedule_id = past_gs.schedule_id
+                    AND past_cr.company_id = past_gs.company_id
                 JOIN shifts past_s
                     ON past_gs.shift_id = past_s.shift_id
+                    AND past_gs.company_id = past_s.company_id
                 WHERE past_sa.applicant_id = sa.applicant_id
+                AND past_sa.company_id = sa.company_id
                 AND past_sa.status = 'approved'
                 AND past_sa.is_archived = FALSE
                 AND past_cr.is_archived = FALSE
@@ -79,17 +85,20 @@ def select_best_weekly_cover_applicant(cursor, coverage_request_id: int):
 
     return cursor.fetchone()
 
+
 def auto_approve_cover_application(cursor, application_id: int):
     cursor.execute("""
         SELECT
             sa.applicant_id,
             cr.schedule_id,
-            cr.id,
-            cr.requested_by
+            cr.coverage_request_id,
+            cr.requested_by,
+            cr.company_id
         FROM shift_applications sa
         JOIN coverage_requests cr
-            ON sa.coverage_request_id = cr.id
-        WHERE sa.id = %s
+            ON sa.coverage_request_id = cr.coverage_request_id
+            AND sa.company_id = cr.company_id
+        WHERE sa.shift_application_id = %s
         AND sa.status = 'pending'
         AND cr.status = 'pending'
         AND sa.is_archived = FALSE
@@ -105,15 +114,18 @@ def auto_approve_cover_application(cursor, application_id: int):
     schedule_id = row[1]
     coverage_request_id = row[2]
     requester_id = row[3]
+    company_id = row[4]
 
     cursor.execute("""
         UPDATE generated_schedule
         SET employee_id = %s
         WHERE schedule_id = %s
+        AND company_id = %s
         AND is_archived = FALSE
     """, (
         applicant_id,
-        schedule_id
+        schedule_id,
+        company_id
     ))
 
     cursor.execute("""
@@ -121,28 +133,41 @@ def auto_approve_cover_application(cursor, application_id: int):
         SET
             status = 'approved',
             accepted_by = %s,
-            approved_at = NOW()
-        WHERE id = %s
+            approved_at = NOW(),
+            updated_at = NOW()
+        WHERE coverage_request_id = %s
+        AND company_id = %s
     """, (
         applicant_id,
-        coverage_request_id
+        coverage_request_id,
+        company_id
     ))
 
     cursor.execute("""
         UPDATE shift_applications
-        SET status = 'approved'
-        WHERE id = %s
-    """, (application_id,))
+        SET
+            status = 'approved',
+            updated_at = NOW()
+        WHERE shift_application_id = %s
+        AND company_id = %s
+    """, (
+        application_id,
+        company_id
+    ))
 
     cursor.execute("""
         UPDATE shift_applications
-        SET status = 'denied'
+        SET
+            status = 'denied',
+            updated_at = NOW()
         WHERE coverage_request_id = %s
-        AND id != %s
+        AND company_id = %s
+        AND shift_application_id != %s
         AND status = 'pending'
         AND is_archived = FALSE
     """, (
         coverage_request_id,
+        company_id,
         application_id
     ))
 
@@ -151,7 +176,9 @@ def auto_approve_cover_application(cursor, application_id: int):
         requester_id,
         "Cover Request Automatically Approved",
         "Your cover request was automatically assigned.",
-        "cover"
+        "cover",
+        company_id=company_id,
+        related_id=coverage_request_id
     )
 
     create_notification(
@@ -159,7 +186,9 @@ def auto_approve_cover_application(cursor, application_id: int):
         applicant_id,
         "Cover Application Approved",
         "You were selected to cover a shift.",
-        "cover"
+        "cover",
+        company_id=company_id,
+        related_id=coverage_request_id
     )
 
     return True
@@ -200,21 +229,19 @@ def get_schedule(company_id: int):
     
 @router.post("/request-cover/{schedule_id}")
 def request_cover(schedule_id: int, payload: dict):
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-
         user_id = payload.get("user_id")
-        reason = payload.get("reason")
+        reason = payload.get("reason", "")
 
         if not user_id:
             raise HTTPException(
                 status_code=400,
                 detail="user_id required"
             )
-        
+
         cursor.execute("""
             SELECT company_id
             FROM employees
@@ -232,22 +259,26 @@ def request_cover(schedule_id: int, payload: dict):
 
         company_id = employee_row[0]
 
-        # GET SHIFT INFO
         cursor.execute("""
             SELECT
+                gs.schedule_id,
+                gs.employee_id,
                 s.shift_date,
                 st.start_time
-
             FROM generated_schedule gs
-
             JOIN shifts s
                 ON gs.shift_id = s.shift_id
-
+                AND gs.company_id = s.company_id
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
-
+                AND s.company_id = st.company_id
             WHERE gs.schedule_id = %s
-        """, (schedule_id,))
+            AND gs.company_id = %s
+            AND gs.is_archived = FALSE
+        """, (
+            schedule_id,
+            company_id
+        ))
 
         schedule = cursor.fetchone()
 
@@ -257,10 +288,15 @@ def request_cover(schedule_id: int, payload: dict):
                 detail="Schedule not found"
             )
 
-        shift_date = schedule[0]
+        assigned_employee_id = schedule[1]
+        shift_date = schedule[2]
+        shift_start = schedule[3]
 
-        # DETERMINE SHIFT START
-        shift_start = schedule[1]
+        if int(assigned_employee_id) != int(user_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only request cover for your own assigned shift"
+            )
 
         shift_datetime = datetime.combine(
             shift_date,
@@ -272,90 +308,89 @@ def request_cover(schedule_id: int, payload: dict):
         diff_hours = (
             shift_datetime - now
         ).total_seconds() / 3600
-        print("SHIFT DATETIME:", shift_datetime)
-        print("NOW:", now)
-        print("DIFF HOURS:", diff_hours)
 
-        # DETERMINE REQUEST TYPE
         request_type = (
             "emergency"
             if diff_hours <= 12
             else "normal"
         )
 
-        # PREVENT DUPLICATES
         cursor.execute("""
-            SELECT id
+            SELECT coverage_request_id
             FROM coverage_requests
             WHERE schedule_id = %s
             AND requested_by = %s
+            AND company_id = %s
             AND status = 'pending'
             AND is_archived = FALSE
         """, (
             schedule_id,
-            user_id
+            user_id,
+            company_id
         ))
 
         existing = cursor.fetchone()
 
         if existing:
             return {
-                "message": "Already requested"
+                "message": "Already requested",
+                "coverage_request_id": existing[0]
             }
 
-        # CREATE REQUEST
         cursor.execute("""
             INSERT INTO coverage_requests (
                 schedule_id,
                 requested_by,
                 reason,
-                request_type
+                request_type,
+                status,
+                company_id
             )
-            VALUES (%s, %s, %s, %s)
-            RETURNING id
+            VALUES (%s, %s, %s, %s, 'pending', %s)
+            RETURNING coverage_request_id
         """, (
             schedule_id,
             user_id,
             reason,
-            request_type
+            request_type,
+            company_id
         ))
 
         request_id = cursor.fetchone()[0]
 
-        # EMERGENCY LOGIC
         if request_type == "emergency":
-
-            # FIND EMPLOYEES WORKING SAME DAY
             cursor.execute("""
                 SELECT DISTINCT gs.employee_id
-
                 FROM generated_schedule gs
-
                 JOIN shifts s
                     ON gs.shift_id = s.shift_id
-
+                    AND gs.company_id = s.company_id
                 WHERE s.shift_date = %s
+                AND gs.company_id = %s
+                AND gs.employee_id IS NOT NULL
                 AND gs.employee_id != %s
                 AND gs.is_archived = FALSE
             """, (
                 shift_date,
+                company_id,
                 user_id
             ))
 
             employees = cursor.fetchall()
 
-            # SAVE TARGETS
             for emp in employees:
-
                 cursor.execute("""
                     INSERT INTO emergency_cover_targets (
                         coverage_request_id,
-                        employee_id
+                        employee_id,
+                        status,
+                        company_id
                     )
-                    VALUES (%s, %s)
+                    VALUES (%s, %s, 'pending', %s)
                 """, (
                     request_id,
-                    emp[0]
+                    emp[0],
+                    company_id
                 ))
 
         admin_ids = get_company_admin_employee_ids(
@@ -369,13 +404,17 @@ def request_cover(schedule_id: int, payload: dict):
                 admin_id,
                 "New Cover Request",
                 "An employee submitted a cover request.",
-                "cover"
+                "cover",
+                company_id=company_id,
+                sender_employee_id=user_id,
+                related_id=request_id
             )
 
         conn.commit()
 
         return {
             "message": "Cover request submitted",
+            "coverage_request_id": request_id,
             "request_type": request_type
         }
 
@@ -383,11 +422,12 @@ def request_cover(schedule_id: int, payload: dict):
         conn.rollback()
         raise
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        print("REQUEST COVER ERROR:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to request cover"
+            detail=str(e)
         )
 
     finally:
@@ -396,107 +436,91 @@ def request_cover(schedule_id: int, payload: dict):
 
 @router.get("/coverage-requests/{employee_id}")
 def get_requests(employee_id: int):
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
+        cursor.execute("""
+            SELECT company_id
+            FROM employees
+            WHERE employee_id = %s
+            AND employment_status = 'Active'
+        """, (employee_id,))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+
+        company_id = employee[0]
 
         cursor.execute("""
-
-            SELECT  
-
-                cr.id,
-                       
+            SELECT
+                cr.coverage_request_id,
                 cr.schedule_id,
-                       
                 cr.requested_by,
-
-                e.full_name,
-
-                s.account,
-                       
+                requester.full_name,
+                a.account_name,
                 s.shift_date,
-                       
                 st.shift_name,
-
-                gs.role,
-
+                r.role_key,
                 cr.reason,
-
                 cr.status,
-
                 cr.request_type,
-                       
                 cr.created_at,
-
                 CASE
                     WHEN ect.employee_id IS NOT NULL
                     THEN TRUE
                     ELSE FALSE
                 END AS is_targeted
-
             FROM coverage_requests cr
-
-            JOIN employees e
-                ON cr.requested_by = e.employee_id
-
+            JOIN employees requester
+                ON cr.requested_by = requester.employee_id
+                AND cr.company_id = requester.company_id
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
-
+                AND cr.company_id = gs.company_id
             JOIN shifts s
                 ON gs.shift_id = s.shift_id
-
+                AND gs.company_id = s.company_id
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
-
+                AND s.company_id = st.company_id
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+            JOIN roles r
+                ON gs.role_id = r.role_id
+                AND gs.company_id = r.company_id
             LEFT JOIN emergency_cover_targets ect
-                ON ect.coverage_request_id = cr.id
+                ON ect.coverage_request_id = cr.coverage_request_id
+                AND ect.company_id = cr.company_id
                 AND ect.employee_id = %s
-
-            WHERE
-
-            cr.is_archived = FALSE
-                       
+                AND ect.is_archived = FALSE
+            WHERE cr.company_id = %s
+            AND cr.is_archived = FALSE
             AND gs.is_archived = FALSE
-
             AND (
-
-                -- employee always sees own requests
                 cr.requested_by = %s
-
-                OR
-
-                -- all normal requests visible
-                (
-                    cr.request_type = 'normal'
-                )
-
-                OR
-
-                -- emergency requests only visible to targets
-                (
+                OR cr.request_type = 'normal'
+                OR (
                     cr.request_type = 'emergency'
                     AND ect.employee_id IS NOT NULL
                 )
-
             )
-                       
-                ORDER BY cr.created_at DESC
-
+            ORDER BY cr.created_at DESC
         """, (
             employee_id,
+            company_id,
             employee_id
         ))
 
         rows = cursor.fetchall()
 
-        result = []
-
-        for r in rows:
-
-            result.append({
+        return [
+            {
                 "id": r[0],
+                "coverage_request_id": r[0],
                 "schedule_id": r[1],
                 "requested_by": r[2],
                 "requester": r[3],
@@ -508,80 +532,73 @@ def get_requests(employee_id: int):
                 "status": r[9],
                 "request_type": r[10],
                 "created_at": str(r[11]),
-                "is_targeted": r[12]
-            })
-        return result
+                "is_targeted": r[12],
+            }
+            for r in rows
+        ]
 
     finally:
         cursor.close()
         conn.close()
 
 @router.get("/coverage-requests-admin")
-def get_all_requests():
-
+def get_all_requests(company_id: int | None = None):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
+        params = []
 
-        cursor.execute("""
+        where_company = ""
+        if company_id:
+            where_company = "AND cr.company_id = %s"
+            params.append(company_id)
 
+        cursor.execute(f"""
             SELECT
-
-                cr.id,
-                       
+                cr.coverage_request_id,
                 cr.schedule_id,
-                       
                 cr.requested_by,
-
-                e.full_name,
-
-                s.account,
-                       
+                requester.full_name,
+                a.account_name,
                 s.shift_date,
-                       
                 st.shift_name,
-
-                gs.role,
-
+                r.role_key,
                 cr.reason,
-
                 cr.status,
-
                 cr.request_type,
-
                 cr.created_at
-
             FROM coverage_requests cr
-
-            JOIN employees e
-                ON cr.requested_by = e.employee_id
-
+            JOIN employees requester
+                ON cr.requested_by = requester.employee_id
+                AND cr.company_id = requester.company_id
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
-
+                AND cr.company_id = gs.company_id
             JOIN shifts s
                 ON gs.shift_id = s.shift_id
-
+                AND gs.company_id = s.company_id
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
-
+                AND s.company_id = st.company_id
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+            JOIN roles r
+                ON gs.role_id = r.role_id
+                AND gs.company_id = r.company_id
             WHERE cr.is_archived = FALSE
-                       
             AND gs.is_archived = FALSE
-
+            {where_company}
             ORDER BY cr.created_at DESC
-
-        """)
+        """, tuple(params))
 
         rows = cursor.fetchall()
 
-        result = []
-
-        for r in rows:
-
-            result.append({
+        return [
+            {
                 "id": r[0],
+                "coverage_request_id": r[0],
                 "schedule_id": r[1],
                 "requested_by": r[2],
                 "requester": r[3],
@@ -592,10 +609,11 @@ def get_all_requests():
                 "reason": r[8],
                 "status": r[9],
                 "request_type": r[10],
-                "created_at": str(r[11])
-            })
-
-        return result
+                "created_at": str(r[11]),
+                "is_targeted": False,
+            }
+            for r in rows
+        ]
 
     finally:
         cursor.close()
@@ -603,17 +621,15 @@ def get_all_requests():
 
 @router.post("/coverage-requests/{id}/approve")
 def approve_request(id: int):
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-
-        # GET REQUESTER
         cursor.execute("""
-            SELECT requested_by
+            SELECT requested_by, company_id
             FROM coverage_requests
-            WHERE id = %s
+            WHERE coverage_request_id = %s
+            AND is_archived = FALSE
         """, (id,))
 
         request = cursor.fetchone()
@@ -625,22 +641,29 @@ def approve_request(id: int):
             )
 
         requester_id = request[0]
+        company_id = request[1]
 
-        # APPROVE REQUEST
         cursor.execute("""
             UPDATE coverage_requests
-            SET status = 'approved',
-                approved_at = NOW()
-            WHERE id = %s
-        """, (id,))
+            SET
+                status = 'approved',
+                approved_at = NOW(),
+                updated_at = NOW()
+            WHERE coverage_request_id = %s
+            AND company_id = %s
+        """, (
+            id,
+            company_id
+        ))
 
-        # SEND NOTIFICATION
         create_notification(
             cursor,
             requester_id,
             "Cover Request Approved",
             "Your cover request was approved.",
-            "cover"
+            "cover",
+            company_id=company_id,
+            related_id=id
         )
 
         conn.commit()
@@ -653,11 +676,12 @@ def approve_request(id: int):
         conn.rollback()
         raise
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        print("APPROVE COVER REQUEST ERROR:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to approve request"
+            detail=str(e)
         )
 
     finally:
@@ -666,17 +690,15 @@ def approve_request(id: int):
 
 @router.post("/coverage-requests/{id}/deny")
 def deny_request(id: int):
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-
-        # GET REQUESTER
         cursor.execute("""
-            SELECT requested_by
+            SELECT requested_by, company_id
             FROM coverage_requests
-            WHERE id = %s
+            WHERE coverage_request_id = %s
+            AND is_archived = FALSE
         """, (id,))
 
         request = cursor.fetchone()
@@ -688,21 +710,28 @@ def deny_request(id: int):
             )
 
         requester_id = request[0]
+        company_id = request[1]
 
-        # DENY REQUEST
         cursor.execute("""
             UPDATE coverage_requests
-            SET status = 'denied'
-            WHERE id = %s
-        """, (id,))
+            SET
+                status = 'denied',
+                updated_at = NOW()
+            WHERE coverage_request_id = %s
+            AND company_id = %s
+        """, (
+            id,
+            company_id
+        ))
 
-        # SEND NOTIFICATION
         create_notification(
             cursor,
             requester_id,
             "Cover Request Denied",
             "Your cover request was denied.",
-            "cover"
+            "cover",
+            company_id=company_id,
+            related_id=id
         )
 
         conn.commit()
@@ -715,11 +744,12 @@ def deny_request(id: int):
         conn.rollback()
         raise
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        print("DENY COVER REQUEST ERROR:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to deny request"
+            detail=str(e)
         )
 
     finally:
@@ -729,12 +759,10 @@ def deny_request(id: int):
 
 @router.post("/coverage-requests/{id}/apply")
 def apply_for_cover(id: int, payload: dict):
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-
         employee_id = payload.get("employee_id")
         reason = payload.get("reason", "")
 
@@ -744,13 +772,29 @@ def apply_for_cover(id: int, payload: dict):
                 detail="employee_id required"
             )
 
-        # CHECK REQUEST EXISTS
         cursor.execute("""
-            SELECT id, requested_by
-            FROM coverage_requests
-            WHERE id = %s
-            AND status = 'pending'
-            AND is_archived = FALSE
+            SELECT
+                cr.coverage_request_id,
+                cr.schedule_id,
+                cr.requested_by,
+                cr.request_type,
+                cr.company_id,
+                s.shift_date,
+                st.start_time
+            FROM coverage_requests cr
+            JOIN generated_schedule gs
+                ON cr.schedule_id = gs.schedule_id
+                AND cr.company_id = gs.company_id
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+            WHERE cr.coverage_request_id = %s
+            AND cr.status = 'pending'
+            AND cr.is_archived = FALSE
+            AND gs.is_archived = FALSE
         """, (id,))
 
         request = cursor.fetchone()
@@ -761,238 +805,191 @@ def apply_for_cover(id: int, payload: dict):
                 detail="Cover request not found"
             )
 
-        # PREVENT SELF APPLICATION
-        if request[1] == employee_id:
+        coverage_request_id = request[0]
+        schedule_id = request[1]
+        requested_by = request[2]
+        request_type = request[3]
+        company_id = request[4]
+        shift_date = request[5]
+        shift_start = request[6]
+
+        if int(employee_id) == int(requested_by):
             raise HTTPException(
                 status_code=400,
-                detail="Cannot apply to own request"
+                detail="You cannot cover your own shift"
             )
 
-        # PREVENT DUPLICATES
         cursor.execute("""
-            SELECT id
+            SELECT employee_id
+            FROM employees
+            WHERE employee_id = %s
+            AND company_id = %s
+            AND employment_status = 'Active'
+        """, (
+            employee_id,
+            company_id
+        ))
+
+        applicant = cursor.fetchone()
+
+        if not applicant:
+            raise HTTPException(
+                status_code=404,
+                detail="Applicant not found"
+            )
+
+        cursor.execute("""
+            SELECT shift_application_id
             FROM shift_applications
             WHERE coverage_request_id = %s
             AND applicant_id = %s
+            AND company_id = %s
             AND is_archived = FALSE
         """, (
-            id,
-            employee_id
+            coverage_request_id,
+            employee_id,
+            company_id
         ))
 
         existing = cursor.fetchone()
 
         if existing:
-            raise HTTPException(
-                status_code=400,
-                detail="Already applied"
-            )
+            return {
+                "message": "Already applied",
+                "shift_application_id": existing[0]
+            }
 
-        # GET REQUEST TYPE + SCHEDULE
-        cursor.execute("""
-            SELECT
-                cr.request_type,
-                cr.schedule_id
-            FROM coverage_requests cr
-            WHERE cr.id = %s
-        """, (id,))
-
-        request_data = cursor.fetchone()
-
-        if not request_data:
-            raise HTTPException(
-                status_code=404,
-                detail="Cover request not found"
-            )
-
-        request_type = request_data[0]
-        schedule_id = request_data[1]
-
-        # GET ABSENT REPLACEMENT MODE
-        cursor.execute("""
-            SELECT absence_replacement_mode
-            FROM company_settings
-            LIMIT 1
-        """)
-
-        mode_row = cursor.fetchone()
-
-        replacement_mode = (
-            mode_row[0].lower()
-            if mode_row and mode_row[0]
-            else "manual"
+        shift_datetime = datetime.combine(
+            shift_date,
+            shift_start
         )
 
-        # DETERMINE IF ADMIN APPROVAL IS NEEDED
-        requires_admin = False
+        diff_hours = (
+            shift_datetime - datetime.now()
+        ).total_seconds() / 3600
 
-        # MANUAL MODE
-        if replacement_mode == "manual":
-            requires_admin = True
-
-        # HYBRID MODE
-        elif replacement_mode == "hybrid":
-
-            if request_type != "emergency":
-                requires_admin = True
-
-        # AUTOMATIC MODE
-        elif replacement_mode == "automatic":
-            requires_admin = False
-
-        # MANUAL APPROVAL FLOW
-        if requires_admin:
-
+        if request_type == "normal" and diff_hours > 12:
             cursor.execute("""
                 INSERT INTO shift_applications (
                     coverage_request_id,
                     applicant_id,
                     reason,
-                    status
+                    status,
+                    company_id
                 )
-                VALUES (%s, %s, %s, 'pending')
+                VALUES (%s, %s, %s, 'pending', %s)
+                RETURNING shift_application_id
             """, (
-                id,
+                coverage_request_id,
                 employee_id,
-                reason
+                reason,
+                company_id
             ))
 
-            # NOTIFY REQUESTER
-            cursor.execute("""
-                SELECT requested_by
-                FROM coverage_requests
-                WHERE id = %s
-            """, (id,))
+            application_id = cursor.fetchone()[0]
 
-            requester = cursor.fetchone()
-
-            if requester:
-
-                create_notification(
-                    cursor,
-                    requester[0],
-                    "New Cover Applicant",
-                    "Someone applied to cover your shift.",
-                    "cover"
-                )
+            create_notification(
+                cursor,
+                requested_by,
+                "New Cover Applicant",
+                "Someone applied to cover your shift.",
+                "cover",
+                company_id=company_id,
+                sender_employee_id=employee_id,
+                related_id=coverage_request_id
+            )
 
             conn.commit()
 
             return {
-                "message": "Application submitted for admin approval"
-            }
-        
-        if replacement_mode == "automatic" and request_type == "normal":
-
-            cursor.execute("""
-                INSERT INTO shift_applications (
-                    coverage_request_id,
-                    applicant_id,
-                    reason,
-                    status
-                )
-                VALUES (%s, %s, %s, 'pending')
-            """, (
-                id,
-                employee_id,
-                reason
-            ))
-
-            cursor.execute("""
-                SELECT requested_by
-                FROM coverage_requests
-                WHERE id = %s
-            """, (id,))
-
-            requester = cursor.fetchone()
-
-            if requester:
-                create_notification(
-                    cursor,
-                    requester[0],
-                    "New Cover Applicant",
-                    "Someone applied to cover your shift.",
-                    "cover"
-                )
-
-            conn.commit()
-
-            return {
-                "message": "Application submitted. Automatic weekly-fair selection will happen 12 hours before the shift."
+                "message": "Application submitted",
+                "shift_application_id": application_id
             }
 
-        # TRANSFER SHIFT
         cursor.execute("""
             UPDATE generated_schedule
             SET employee_id = %s
             WHERE schedule_id = %s
+            AND company_id = %s
+            AND is_archived = FALSE
         """, (
             employee_id,
-            schedule_id
+            schedule_id,
+            company_id
         ))
 
-        # APPROVE COVER REQUEST
         cursor.execute("""
             UPDATE coverage_requests
             SET
                 status = 'approved',
                 accepted_by = %s,
-                approved_at = NOW()
-            WHERE id = %s
+                approved_at = NOW(),
+                updated_at = NOW()
+            WHERE coverage_request_id = %s
+            AND company_id = %s
         """, (
             employee_id,
-            id
+            coverage_request_id,
+            company_id
         ))
 
-        # SAVE APPROVED APPLICATION
         cursor.execute("""
             INSERT INTO shift_applications (
                 coverage_request_id,
                 applicant_id,
                 reason,
-                status
+                status,
+                company_id
             )
-            VALUES (%s, %s, %s, 'approved')
+            VALUES (%s, %s, %s, 'approved', %s)
+            RETURNING shift_application_id
         """, (
-            id,
+            coverage_request_id,
             employee_id,
-            reason
+            reason,
+            company_id
         ))
 
-        # NOTIFY REQUESTER
-        cursor.execute("""
-            SELECT requested_by
-            FROM coverage_requests
-            WHERE id = %s
-        """, (id,))
+        application_id = cursor.fetchone()[0]
 
-        requester = cursor.fetchone()
+        create_notification(
+            cursor,
+            requested_by,
+            "Cover Request Filled",
+            "Someone accepted your cover request.",
+            "cover",
+            company_id=company_id,
+            sender_employee_id=employee_id,
+            related_id=coverage_request_id
+        )
 
-        if requester:
-
-            create_notification(
-                cursor,
-                requester[0],
-                "New Cover Applicant",
-                "Someone applied to cover your shift.",
-                "cover"
-            )
+        create_notification(
+            cursor,
+            employee_id,
+            "Cover Shift Assigned",
+            "You are now assigned to cover the shift.",
+            "cover",
+            company_id=company_id,
+            related_id=coverage_request_id
+        )
 
         conn.commit()
 
         return {
-            "message": "Shift automatically transferred"
+            "message": "Shift automatically transferred",
+            "shift_application_id": application_id
         }
 
     except HTTPException:
         conn.rollback()
         raise
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        print("APPLY FOR COVER ERROR:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to apply for cover"
+            detail=str(e)
         )
 
     finally:
@@ -1000,16 +997,24 @@ def apply_for_cover(id: int, payload: dict):
         conn.close()
 
 @router.post("/coverage-requests/process-automatic")
-def process_automatic_cover_requests():
+def process_automatic_cover_requests(company_id: int | None = None):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        cursor.execute("""
-            SELECT absence_replacement_mode
-            FROM company_settings
-            LIMIT 1
-        """)
+        if company_id:
+            cursor.execute("""
+                SELECT absence_replacement_mode
+                FROM company_settings
+                WHERE company_id = %s
+                LIMIT 1
+            """, (company_id,))
+        else:
+            cursor.execute("""
+                SELECT absence_replacement_mode
+                FROM company_settings
+                LIMIT 1
+            """)
 
         mode_row = cursor.fetchone()
 
@@ -1025,24 +1030,35 @@ def process_automatic_cover_requests():
                 "processed": 0
             }
 
-        cursor.execute("""
+        params = []
+        company_filter = ""
+
+        if company_id:
+            company_filter = "AND cr.company_id = %s"
+            params.append(company_id)
+
+        cursor.execute(f"""
             SELECT
-                cr.id
+                cr.coverage_request_id
             FROM coverage_requests cr
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
+                AND cr.company_id = gs.company_id
             JOIN shifts s
                 ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
             WHERE cr.status = 'pending'
             AND cr.is_archived = FALSE
             AND gs.is_archived = FALSE
             AND cr.request_type = 'normal'
+            {company_filter}
             AND (
                 s.shift_date + st.start_time
             ) <= NOW() + INTERVAL '12 hours'
-        """)
+        """, tuple(params))
 
         requests = cursor.fetchall()
 
@@ -1089,88 +1105,80 @@ def process_automatic_cover_requests():
         conn.close()
 
 @router.get("/shift-applications")
-def get_shift_applications():
-
+def get_shift_applications(company_id: int | None = None):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
+        params = []
+        company_filter = ""
 
-        cursor.execute("""
+        if company_id:
+            company_filter = "AND sa.company_id = %s"
+            params.append(company_id)
 
+        cursor.execute(f"""
             SELECT
-
-                sa.id,
-
-                e.full_name,
-                       
+                sa.shift_application_id,
+                applicant.full_name,
                 cr.requested_by,
-
-                s.account,
-                       
+                a.account_name,
                 s.shift_date,
-                       
                 st.shift_name,
-
-                gs.role,
-
+                r.role_key,
                 sa.reason,
-
                 sa.status,
-
-                cr.id AS coverage_request_id,
-
+                cr.coverage_request_id,
                 gs.schedule_id,
-
-                e.employee_id
-
+                applicant.employee_id
             FROM shift_applications sa
-
-            JOIN employees e
-                ON sa.applicant_id = e.employee_id
-
+            JOIN employees applicant
+                ON sa.applicant_id = applicant.employee_id
+                AND sa.company_id = applicant.company_id
             JOIN coverage_requests cr
-                ON sa.coverage_request_id = cr.id
-
+                ON sa.coverage_request_id = cr.coverage_request_id
+                AND sa.company_id = cr.company_id
             JOIN generated_schedule gs
                 ON cr.schedule_id = gs.schedule_id
-
+                AND cr.company_id = gs.company_id
             JOIN shifts s
                 ON gs.shift_id = s.shift_id
-
+                AND gs.company_id = s.company_id
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
-
+                AND s.company_id = st.company_id
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+            JOIN roles r
+                ON gs.role_id = r.role_id
+                AND gs.company_id = r.company_id
             WHERE sa.is_archived = FALSE
-            
             AND gs.is_archived = FALSE
-
+            {company_filter}
             ORDER BY sa.applied_at DESC
-
-        """)
+        """, tuple(params))
 
         rows = cursor.fetchall()
 
-        result = []
-
-        for r in rows:
-
-            result.append({
-            "id": r[0],
-            "applicant": r[1],
-            "requested_by": r[2],
-            "livestream": r[3],
-            "day": str(r[4]),
-            "shift": r[5],
-            "role": r[6],
-            "reason": r[7],
-            "status": r[8],
-            "coverage_request_id": r[9],
-            "schedule_id": r[10],
-            "employee_id": r[11]
-        })
-
-        return result
+        return [
+            {
+                "id": r[0],
+                "shift_application_id": r[0],
+                "applicant": r[1],
+                "requested_by": r[2],
+                "livestream": r[3],
+                "day": str(r[4]),
+                "shift": r[5],
+                "role": r[6],
+                "reason": r[7],
+                "status": r[8],
+                "coverage_request_id": r[9],
+                "schedule_id": r[10],
+                "employee_id": r[11],
+            }
+            for r in rows
+        ]
 
     finally:
         cursor.close()
@@ -1178,27 +1186,24 @@ def get_shift_applications():
 
 @router.post("/shift-applications/{id}/approve")
 def approve_application(id: int):
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-
-        # GET APPLICATION INFO
         cursor.execute("""
-
             SELECT
                 sa.applicant_id,
                 cr.schedule_id,
-                cr.id
-
+                cr.coverage_request_id,
+                cr.requested_by,
+                cr.company_id
             FROM shift_applications sa
-
             JOIN coverage_requests cr
-                ON sa.coverage_request_id = cr.id
-
-            WHERE sa.id = %s
-
+                ON sa.coverage_request_id = cr.coverage_request_id
+                AND sa.company_id = cr.company_id
+            WHERE sa.shift_application_id = %s
+            AND sa.is_archived = FALSE
+            AND cr.is_archived = FALSE
         """, (id,))
 
         app = cursor.fetchone()
@@ -1212,65 +1217,83 @@ def approve_application(id: int):
         applicant_id = app[0]
         schedule_id = app[1]
         coverage_request_id = app[2]
+        requester_id = app[3]
+        company_id = app[4]
 
-        # TRANSFER SHIFT
         cursor.execute("""
             UPDATE generated_schedule
             SET employee_id = %s
             WHERE schedule_id = %s
+            AND company_id = %s
+            AND is_archived = FALSE
         """, (
             applicant_id,
-            schedule_id
+            schedule_id,
+            company_id
         ))
 
-        # APPROVE COVER REQUEST
         cursor.execute("""
             UPDATE coverage_requests
             SET
                 status = 'approved',
                 accepted_by = %s,
-                approved_at = NOW()
-            WHERE id = %s
+                approved_at = NOW(),
+                updated_at = NOW()
+            WHERE coverage_request_id = %s
+            AND company_id = %s
         """, (
             applicant_id,
-            coverage_request_id
+            coverage_request_id,
+            company_id
         ))
 
-        # APPROVE APPLICATION
         cursor.execute("""
             UPDATE shift_applications
-            SET status = 'approved'
-            WHERE id = %s
-        """, (id,))
+            SET
+                status = 'approved',
+                updated_at = NOW()
+            WHERE shift_application_id = %s
+            AND company_id = %s
+        """, (
+            id,
+            company_id
+        ))
 
-        # DENY OTHER APPLICATIONS
         cursor.execute("""
             UPDATE shift_applications
-            SET status = 'denied'
+            SET
+                status = 'denied',
+                updated_at = NOW()
             WHERE coverage_request_id = %s
-            AND id != %s
+            AND company_id = %s
+            AND shift_application_id != %s
+            AND status = 'pending'
+            AND is_archived = FALSE
         """, (
             coverage_request_id,
+            company_id,
             id
         ))
 
-        cursor.execute("""
-            SELECT requested_by
-            FROM coverage_requests
-            WHERE id = %s
-        """, (coverage_request_id,))
+        create_notification(
+            cursor,
+            requester_id,
+            "Cover Request Approved",
+            "Your cover request has been filled.",
+            "cover",
+            company_id=company_id,
+            related_id=coverage_request_id
+        )
 
-        requester = cursor.fetchone()
-
-        if requester:
-
-            create_notification(
-                cursor,
-                requester[0],
-                "Cover Request Approved",
-                "Your cover request was approved.",
-                "cover"
-            )
+        create_notification(
+            cursor,
+            applicant_id,
+            "Cover Application Approved",
+            "You were approved to cover a shift.",
+            "cover",
+            company_id=company_id,
+            related_id=coverage_request_id
+        )
 
         conn.commit()
 
@@ -1282,11 +1305,12 @@ def approve_application(id: int):
         conn.rollback()
         raise
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        print("APPROVE APPLICATION ERROR:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to approve application"
+            detail=str(e)
         )
 
     finally:
@@ -1295,43 +1319,52 @@ def approve_application(id: int):
 
 @router.post("/shift-applications/{id}/deny")
 def deny_application(id: int):
-
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-
-        # GET APPLICANT
         cursor.execute("""
-            SELECT applicant_id
+            SELECT
+                applicant_id,
+                coverage_request_id,
+                company_id
             FROM shift_applications
-            WHERE id = %s
+            WHERE shift_application_id = %s
+            AND is_archived = FALSE
         """, (id,))
 
-        app = cursor.fetchone()
+        application = cursor.fetchone()
 
-        if not app:
+        if not application:
             raise HTTPException(
                 status_code=404,
                 detail="Application not found"
             )
 
-        applicant_id = app[0]
+        applicant_id = application[0]
+        coverage_request_id = application[1]
+        company_id = application[2]
 
-        # DENY APPLICATION
         cursor.execute("""
             UPDATE shift_applications
-            SET status = 'denied'
-            WHERE id = %s
-        """, (id,))
+            SET
+                status = 'denied',
+                updated_at = NOW()
+            WHERE shift_application_id = %s
+            AND company_id = %s
+        """, (
+            id,
+            company_id
+        ))
 
-        # SEND NOTIFICATION
         create_notification(
             cursor,
             applicant_id,
             "Cover Application Denied",
-            "Your application to cover a shift was denied.",
-            "cover"
+            "Your cover application was denied.",
+            "cover",
+            company_id=company_id,
+            related_id=coverage_request_id
         )
 
         conn.commit()
@@ -1344,11 +1377,12 @@ def deny_application(id: int):
         conn.rollback()
         raise
 
-    except Exception:
+    except Exception as e:
         conn.rollback()
+        print("DENY APPLICATION ERROR:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to deny application"
+            detail=str(e)
         )
 
     finally:
