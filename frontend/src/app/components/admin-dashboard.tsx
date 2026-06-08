@@ -1220,14 +1220,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </p>
           </div>
 
-          {/* 1. Account / Department Data */}
+          {/* Account / Department Data */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Briefcase className="size-5 text-purple-600" />
                   <div>
-                    <CardTitle>1. Account / Department Data</CardTitle>
+                    <CardTitle>Account / Department Data</CardTitle>
                     <CardDescription>
                       Creates departments first, then accounts under those
                       departments.
@@ -1393,14 +1393,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* 2. Roles */}
+          {/* Roles */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <UserSquare2 className="size-5 text-orange-600" />
                   <div>
-                    <CardTitle>2. Roles</CardTitle>
+                    <CardTitle>Roles</CardTitle>
                     <CardDescription>
                       Creates role definitions used by employee assignments and
                       staffing requirements.
@@ -1546,14 +1546,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* 3. Employee Data */}
+          {/* Employee Data */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Users className="size-5 text-blue-600" />
                   <div>
-                    <CardTitle>3. Employee Data</CardTitle>
+                    <CardTitle>Employee Data</CardTitle>
                     <CardDescription>
                       Creates basic employee profiles only.
                     </CardDescription>
@@ -1719,14 +1719,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* 4. Employee Assignments */}
+          {/* Employee Assignments */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="size-5 text-green-600" />
                   <div>
-                    <CardTitle>4. Employee Assignments</CardTitle>
+                    <CardTitle>Employee Assignments</CardTitle>
                     <CardDescription>
                       Connects existing employees to departments, roles, and
                       accounts.
@@ -1886,14 +1886,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* 5. Shift Configuration */}
+          {/* Shift Configuration */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Clock className="size-5 text-indigo-600" />
                   <div>
-                    <CardTitle>5. Shift Configuration</CardTitle>
+                    <CardTitle>Shift Configuration</CardTitle>
                     <CardDescription>
                       Creates shift templates used by staffing requirements and
                       schedule generation.
@@ -2052,14 +2052,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* 6. Staffing Requirements */}
+          {/* Staffing Requirements */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <FileSpreadsheet className="size-5 text-green-600" />
                   <div>
-                    <CardTitle>6. Staffing Requirements</CardTitle>
+                    <CardTitle>Staffing Requirements</CardTitle>
                     <CardDescription>
                       Creates required staffing counts per account, shift, and
                       role.
@@ -2223,10 +2223,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
-          {/* 7. Import History */}
+          {/* Import History */}
           <Card>
             <CardHeader>
-              <CardTitle>7. Import History</CardTitle>
+              <CardTitle>Import History</CardTitle>
               <CardDescription>
                 Recently imported CSV files in this session
               </CardDescription>
