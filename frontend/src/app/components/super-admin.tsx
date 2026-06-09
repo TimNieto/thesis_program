@@ -417,7 +417,7 @@ export function SuperAdmin() {
                       <TableHead>Employees</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created Date</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -444,8 +444,8 @@ export function SuperAdmin() {
                         <TableCell>
                           {new Date(company.createdDate).toLocaleDateString()}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
+                        <TableCell className="w-full">
+                          <div className="flex w-full justify-end gap-2">
                             <Button
                               variant="outline"
                               size="sm"
@@ -455,6 +455,7 @@ export function SuperAdmin() {
                               <Settings className="size-4" />
                               Manage
                             </Button>
+
                             <Button
                               variant="destructive"
                               size="sm"
