@@ -679,8 +679,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           errorMessage = JSON.stringify(data.detail);
         }
 
-        toast.error("Unable to apply for cover", {
-          description: errorMessage,
+        toast.error("Unable to apply for cover, maximum shifts reached", {
         });
 
         return;
