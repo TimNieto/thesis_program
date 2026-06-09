@@ -189,13 +189,30 @@ export function SuperAdmin() {
   };
 
   // Remove Company
-  const handleRemoveCompany = (id: string, name: string) => {
-    if (
-      confirm(
-        `Are you sure you want to remove "${name}"? This action cannot be undone.`,
-      )
-    ) {
-      setCompanies(companies.filter((company) => company.id !== id));
+  const handleRemoveCompany = async (id: string, name: string) => {
+    const confirmed = confirm(
+      `Are you sure you want to remove "${name}"? This will deactivate the company but keep its records.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/companies/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to remove company");
+      }
+
+      await fetchCompanies();
 
       if (selectedCompany?.id === id) {
         setSelectedCompany(null);
@@ -203,6 +220,10 @@ export function SuperAdmin() {
       }
 
       toast.success(`Company "${name}" removed`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to remove company",
+      );
     }
   };
 

@@ -150,3 +150,44 @@ def toggle_company_status(company_id: int):
     finally:
         cursor.close()
         conn.close()
+
+
+@router.delete("/companies/{company_id}")
+def soft_delete_company(company_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE companies
+            SET
+                is_active = FALSE,
+                updated_at = NOW()
+            WHERE company_id = %s
+            RETURNING company_id, company_name
+        """, (company_id,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        conn.commit()
+
+        return {
+            "message": "Company removed",
+            "company_id": row[0],
+            "company_name": row[1],
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        cursor.close()
+        conn.close()
