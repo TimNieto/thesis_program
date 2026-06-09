@@ -904,12 +904,6 @@ def apply_for_cover(id: int, payload: dict):
             company_id
         ))
 
-        record_absence_from_filled_cover(
-            cursor,
-            requested_by,
-            schedule_id,
-            company_id
-        )
 
         existing = cursor.fetchone()
 
@@ -977,6 +971,13 @@ def apply_for_cover(id: int, payload: dict):
             schedule_id,
             company_id
         ))
+
+        record_absence_from_filled_cover(
+            cursor,
+            requested_by,
+            schedule_id,
+            company_id
+        )
 
         cursor.execute("""
             UPDATE coverage_requests
