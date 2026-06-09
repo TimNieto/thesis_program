@@ -642,10 +642,18 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
   };
 
-  const applyForCover = async (request: CoverRequest) => {
+  const applyForCover = async (
+    requestId: string,
+    requestType: "normal" | "emergency",
+  ) => {
     try {
+      if (!requestId) {
+        toast.error("Invalid cover request");
+        return;
+      }
+
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/coverage-requests/${request.id}/apply`,
+        `https://backend-production-6e75.up.railway.app/coverage-requests/${requestId}/apply`,
         {
           method: "POST",
           headers: {
@@ -661,11 +669,20 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       const data = await res.json();
 
       if (!res.ok) {
+        let errorMessage = "You are not allowed to apply for this cover request.";
+
+        if (typeof data.detail === "string") {
+          errorMessage = data.detail;
+        } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+          errorMessage = data.detail[0]?.msg || errorMessage;
+        } else if (data.detail) {
+          errorMessage = JSON.stringify(data.detail);
+        }
+
         toast.error("Unable to apply for cover", {
-          description:
-            data.detail ||
-            "You are not allowed to apply for this cover request.",
+          description: errorMessage,
         });
+
         return;
       }
 
@@ -673,6 +690,11 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
         toast.success("Emergency cover accepted", {
           description:
             "You are now assigned to this shift immediately because this request needs urgent coverage.",
+        });
+      } else if (requestType === "emergency") {
+        toast.success("Emergency cover application submitted", {
+          description:
+            "This is an emergency cover request. Workload limits are bypassed so the shift can be covered urgently.",
         });
       } else if (absenceReplacementMode.toLowerCase() === "automatic") {
         toast.success("Cover application submitted", {
