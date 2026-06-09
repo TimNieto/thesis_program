@@ -56,6 +56,93 @@ def record_absence_from_filled_cover(
         company_id
     ))
 
+
+
+def cover_shift_weekly_limit_error(
+    cursor,
+    employee_id: int,
+    schedule_id: int,
+    company_id: int,
+    request_type: str | None = None
+):
+    if request_type == "emergency":
+        return None
+
+    cursor.execute("""
+        SELECT
+            s.shift_date
+        FROM generated_schedule gs
+        JOIN shifts s
+            ON gs.shift_id = s.shift_id
+            AND gs.company_id = s.company_id
+        WHERE gs.schedule_id = %s
+        AND gs.company_id = %s
+        AND gs.is_archived = FALSE
+        LIMIT 1
+    """, (
+        schedule_id,
+        company_id
+    ))
+
+    shift_row = cursor.fetchone()
+
+    if not shift_row:
+        return "Schedule not found"
+
+    shift_date = shift_row[0]
+
+    week_start = shift_date - timedelta(days=shift_date.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    cursor.execute("""
+        SELECT max_shifts_per_week
+        FROM company_settings
+        WHERE company_id = %s
+        LIMIT 1
+    """, (company_id,))
+
+    settings_row = cursor.fetchone()
+
+    if not settings_row:
+        return None
+
+    max_shifts_per_week = settings_row[0]
+
+    if max_shifts_per_week is None:
+        return None
+
+    max_shifts_per_week = int(max_shifts_per_week)
+
+    if max_shifts_per_week <= 0:
+        return None
+
+    cursor.execute("""
+        SELECT COUNT(gs.schedule_id)
+        FROM generated_schedule gs
+        JOIN shifts s
+            ON gs.shift_id = s.shift_id
+            AND gs.company_id = s.company_id
+        WHERE gs.employee_id = %s
+        AND gs.company_id = %s
+        AND gs.is_archived = FALSE
+        AND s.shift_date BETWEEN %s AND %s
+    """, (
+        employee_id,
+        company_id,
+        week_start,
+        week_end
+    ))
+
+    current_weekly_shifts = cursor.fetchone()[0]
+
+    if current_weekly_shifts >= max_shifts_per_week:
+        return (
+            f"You already have {current_weekly_shifts} shifts this week. "
+            f"The maximum allowed is {max_shifts_per_week}."
+        )
+
+    return None
+
 def get_week_bounds_for_shift(cursor, coverage_request_id: int):
     cursor.execute("""
         SELECT
@@ -139,7 +226,8 @@ def auto_approve_cover_application(cursor, application_id: int):
             cr.schedule_id,
             cr.coverage_request_id,
             cr.requested_by,
-            cr.company_id
+            cr.company_id,
+            cr.request_type
         FROM shift_applications sa
         JOIN coverage_requests cr
             ON sa.coverage_request_id = cr.coverage_request_id
@@ -161,6 +249,18 @@ def auto_approve_cover_application(cursor, application_id: int):
     coverage_request_id = row[2]
     requester_id = row[3]
     company_id = row[4]
+    request_type = row[5]
+
+    limit_error = cover_shift_weekly_limit_error(
+        cursor,
+        applicant_id,
+        schedule_id,
+        company_id,
+        request_type
+    )
+
+    if limit_error:
+        return False
 
     cursor.execute("""
         UPDATE generated_schedule
@@ -411,7 +511,7 @@ def request_cover(schedule_id: int, payload: dict):
 
         request_id = cursor.fetchone()[0]
 
-        if request_type == "emergency":
+        if request_type and request_type.lower() == "emergency":
             cursor.execute("""
                 SELECT DISTINCT gs.employee_id
                 FROM generated_schedule gs
@@ -912,6 +1012,20 @@ def apply_for_cover(id: int, payload: dict):
                 "message": "Already applied",
                 "shift_application_id": existing[0]
             }
+        
+        limit_error = cover_shift_weekly_limit_error(
+            cursor,
+            employee_id,
+            schedule_id,
+            company_id,
+            request_type
+        )
+
+        if limit_error:
+            raise HTTPException(
+                status_code=400,
+                detail=limit_error
+            )
 
         shift_datetime = datetime.combine(
             shift_date,
@@ -1257,7 +1371,8 @@ def approve_application(id: int):
                 cr.schedule_id,
                 cr.coverage_request_id,
                 cr.requested_by,
-                cr.company_id
+                cr.company_id,
+                cr.request_type
             FROM shift_applications sa
             JOIN coverage_requests cr
                 ON sa.coverage_request_id = cr.coverage_request_id
@@ -1280,6 +1395,22 @@ def approve_application(id: int):
         coverage_request_id = app[2]
         requester_id = app[3]
         company_id = app[4]
+        request_type = app[5]
+
+
+        limit_error = cover_shift_weekly_limit_error(
+            cursor,
+            applicant_id,
+            schedule_id,
+            company_id,
+            request_type
+        )
+
+        if limit_error:
+            raise HTTPException(
+                status_code=400,
+                detail=limit_error
+            )
 
         cursor.execute("""
             UPDATE generated_schedule
