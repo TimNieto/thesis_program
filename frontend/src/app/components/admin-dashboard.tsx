@@ -476,6 +476,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     return "None";
   };
 
+  const tableClass = "table-fixed w-full";
+
+  const actionCellClass = "w-[140px] text-right";
+
+  const dangerSmallButtonClass =
+    "bg-red-600 text-white hover:bg-red-700 border-red-600";
+
+  const renderStatusBadge = (status: string = "Active") => (
+    <Badge variant={status === "Active" ? "default" : "secondary"}>
+      {status}
+    </Badge>
+  );
+
   // Add Employee
   const handleAddEmployee = async () => {
     if (!newEmployeeName.trim()) {
@@ -1387,13 +1400,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Account Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead className="w-[34%]">Department</TableHead>
+                      <TableHead className="w-[34%]">Account Name</TableHead>
+                      <TableHead className="w-[14%]">Status</TableHead>
+                      <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -1412,29 +1425,22 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       accountDepartmentRows.map((row) => (
                         <TableRow
                           key={`account-department-${row.department_id}-${row.account_id ?? "department-only"}`}
+                          className="h-12"
                         >
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium truncate">
                             {row.department_name}
                           </TableCell>
 
-                          <TableCell>{row.account_name || "—"}</TableCell>
-
-                          <TableCell>
-                            <Badge
-                              variant={
-                                row.status === "Active"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {row.status}
-                            </Badge>
+                          <TableCell className="truncate">
+                            {row.account_name || "—"}
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell>{renderStatusBadge(row.status)}</TableCell>
+
+                          <TableCell className={actionCellClass}>
                             <Button
-                              variant="outline"
                               size="sm"
+                              className={dangerSmallButtonClass}
                               onClick={() =>
                                 toast.info(
                                   row.account_id
@@ -1554,13 +1560,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Role Name</TableHead>
-                      <TableHead>Role Key</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead className="w-[25%]">Department</TableHead>
+                      <TableHead className="w-[25%]">Role Name</TableHead>
+                      <TableHead className="w-[22%]">Role Key</TableHead>
+                      <TableHead className="w-[12%]">Status</TableHead>
+                      <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -1568,7 +1575,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     {staffingRoles.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={4}
+                          colSpan={5}
                           className="text-center text-gray-500 py-6"
                         >
                           No roles found. Use Add Role or Import CSV to add
@@ -1577,21 +1584,28 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       </TableRow>
                     ) : (
                       staffingRoles.map((role) => (
-                        <TableRow key={`import-role-${role.staffing_role_id}`}>
-                          <TableCell className="font-medium">
+                        <TableRow
+                          key={`import-role-${role.staffing_role_id}`}
+                          className="h-12"
+                        >
+                          <TableCell className="truncate">
+                            {role.department_name || "None"}
+                          </TableCell>
+
+                          <TableCell className="font-medium truncate">
                             {role.role_name}
                           </TableCell>
 
-                          <TableCell>{role.role_key}</TableCell>
-
-                          <TableCell>
-                            <Badge>Active</Badge>
+                          <TableCell className="truncate">
+                            {role.role_key}
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell>{renderStatusBadge("Active")}</TableCell>
+
+                          <TableCell className={actionCellClass}>
                             <Button
-                              variant="outline"
                               size="sm"
+                              className={dangerSmallButtonClass}
                               onClick={() =>
                                 toast.info(
                                   "Deactivate role is frontend-only for now",
@@ -1704,15 +1718,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Contact Number</TableHead>
-                      <TableHead>Joined Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead className="w-[22%]">Name</TableHead>
+                      <TableHead className="w-[26%]">Email</TableHead>
+                      <TableHead className="w-[18%]">Contact Number</TableHead>
+                      <TableHead className="w-[14%]">Joined Date</TableHead>
+                      <TableHead className="w-[10%]">Status</TableHead>
+                      <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -1729,46 +1743,43 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       </TableRow>
                     ) : (
                       employees.map((employee) => (
-                        <TableRow key={`import-employee-${employee.id}`}>
-                          <TableCell className="font-medium">
+                        <TableRow
+                          key={`employee-data-${employee.id}`}
+                          className="h-12"
+                        >
+                          <TableCell className="font-medium truncate">
                             {employee.name}
                           </TableCell>
 
-                          <TableCell>{employee.email}</TableCell>
+                          <TableCell className="truncate">
+                            {employee.email}
+                          </TableCell>
 
-                          <TableCell>{employee.contactNumber || "-"}</TableCell>
+                          <TableCell className="truncate">
+                            {employee.contactNumber || "—"}
+                          </TableCell>
 
                           <TableCell>
                             {employee.joinedDate
                               ? new Date(
                                   employee.joinedDate,
                                 ).toLocaleDateString()
-                              : "-"}
+                              : "—"}
                           </TableCell>
 
                           <TableCell>
-                            <Badge
-                              variant={
-                                employee.status === "Active"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {employee.status}
-                            </Badge>
+                            {renderStatusBadge(employee.status)}
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell className={actionCellClass}>
                             <Button
-                              variant="destructive"
                               size="sm"
+                              className={dangerSmallButtonClass}
                               onClick={() => {
                                 setEmployeeToDelete(employee.id);
                                 setIsConfirmDeleteOpen(true);
                               }}
-                              className="gap-2"
                             >
-                              <UserMinus className="size-4" />
                               Deactivate
                             </Button>
                           </TableCell>
@@ -1882,15 +1893,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Account</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead className="w-[22%]">Employee</TableHead>
+                      <TableHead className="w-[22%]">Department</TableHead>
+                      <TableHead className="w-[18%]">Role</TableHead>
+                      <TableHead className="w-[22%]">Account</TableHead>
+                      <TableHead className="w-[10%]">Status</TableHead>
+                      <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -1907,27 +1918,34 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       </TableRow>
                     ) : (
                       employees.map((employee) => (
-                        <TableRow key={`assignment-${employee.id}`}>
-                          <TableCell className="font-medium">
+                        <TableRow
+                          key={`assignment-${employee.id}`}
+                          className="h-12"
+                        >
+                          <TableCell className="font-medium truncate">
                             {employee.name}
                           </TableCell>
 
-                          <TableCell>
+                          <TableCell className="truncate">
                             {employee.department_name || "None"}
                           </TableCell>
 
-                          <TableCell>{employee.role || "None"}</TableCell>
+                          <TableCell className="truncate">
+                            {employee.role || "None"}
+                          </TableCell>
 
-                          <TableCell>{getEmployeeAccounts(employee)}</TableCell>
-
-                          <TableCell>
-                            <Badge>Active</Badge>
+                          <TableCell className="truncate">
+                            {getEmployeeAccounts(employee)}
                           </TableCell>
 
                           <TableCell>
+                            {renderStatusBadge(employee.status)}
+                          </TableCell>
+
+                          <TableCell className={actionCellClass}>
                             <Button
-                              variant="outline"
                               size="sm"
+                              className={dangerSmallButtonClass}
                               onClick={() =>
                                 toast.info(
                                   "Remove employee assignment is frontend-only for now",

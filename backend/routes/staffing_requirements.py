@@ -24,11 +24,18 @@ def get_staffing_requirements(company_id: int = 1):
                 r.role_name,
                 r.role_key,
                 r.is_active,
-                r.is_admin
+                r.is_admin,
+                d.department_name
             FROM roles r
+            LEFT JOIN departments d
+                ON r.department_id = d.department_id
+                AND r.company_id = d.company_id
+                AND d.is_active = TRUE
             WHERE r.company_id = %s
             AND r.is_active = TRUE
-            ORDER BY r.role_id
+            ORDER BY
+                COALESCE(d.department_name, ''),
+                r.role_id
         """, (company_id,))
 
         roles = [
@@ -38,7 +45,8 @@ def get_staffing_requirements(company_id: int = 1):
                 "role_name": r[1],
                 "role_key": r[2],
                 "is_active": r[3],
-                "is_admin": r[4]
+                "is_admin": r[4],
+                "department_name": r[5] or "None"
             }
             for r in cursor.fetchall()
         ]

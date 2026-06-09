@@ -126,38 +126,48 @@ def get_employees(company_id: int | None = None):
             cursor.execute("""
                 SELECT
                     a.account_name,
+                    d.department_name,
                     r.role_key
                 FROM account_preferences ap
                 JOIN accounts a
                     ON ap.account_id = a.account_id
                     AND ap.company_id = a.company_id
+                JOIN departments d
+                    ON a.department_id = d.department_id
+                    AND a.company_id = d.company_id
                 JOIN roles r
                     ON ap.role_id = r.role_id
                     AND ap.company_id = r.company_id
                 WHERE ap.employee_id = %s
                 AND ap.company_id = %s
                 AND a.is_active = TRUE
+                AND d.is_active = TRUE
                 AND r.is_active = TRUE
-                ORDER BY a.account_name, r.role_key
+                ORDER BY d.department_name, a.account_name, r.role_key
             """, (employee_id, emp_company_id))
 
             account_role_rows = cursor.fetchall()
 
             host_accounts = sorted({
                 account_name
-                for account_name, role_key in account_role_rows
+                for account_name, department_name, role_key in account_role_rows
                 if role_key == "host"
             })
 
             operator_accounts = sorted({
                 account_name
-                for account_name, role_key in account_role_rows
+                for account_name, department_name, role_key in account_role_rows
                 if role_key == "operator"
             })
 
             account_names = sorted({
                 account_name
-                for account_name, role_key in account_role_rows
+                for account_name, department_name, role_key in account_role_rows
+            })
+
+            department_names = sorted({
+                department_name
+                for account_name, department_name, role_key in account_role_rows
             })
 
             employees.append({
@@ -176,8 +186,8 @@ def get_employees(company_id: int | None = None):
                 "account_names": ", ".join(account_names) if account_names else None,
                 "accounts": account_names,
                 "contactNumber": contact_number,
-                "department_name": "None",
-                "departments": [],
+                "department_name": ", ".join(department_names) if department_names else "None",
+                "departments": department_names,
                 "company_id": emp_company_id
             })
 
