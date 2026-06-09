@@ -642,10 +642,10 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
   };
 
-  const applyForCover = async (id: string) => {
+  const applyForCover = async (request: CoverRequest) => {
     try {
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/coverage-requests/${id}/apply`,
+        `https://backend-production-6e75.up.railway.app/coverage-requests/${request.id}/apply`,
         {
           method: "POST",
           headers: {
@@ -661,7 +661,11 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.detail || "Failed to apply");
+        toast.error("Unable to apply for cover", {
+          description:
+            data.detail ||
+            "You are not allowed to apply for this cover request.",
+        });
         return;
       }
 
@@ -673,7 +677,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       } else if (absenceReplacementMode.toLowerCase() === "automatic") {
         toast.success("Cover application submitted", {
           description:
-            "Company setting is Automatic. The system will choose the best applicant when the request reaches the automatic processing window.",
+            "Company setting is Automatic. The system will automatically choose the best applicant when the request reaches the automatic processing window.",
         });
       } else {
         toast.success("Cover application submitted", {
