@@ -687,24 +687,16 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       }
 
       if (data.message === "Shift automatically transferred") {
-        toast.success("Emergency cover accepted", {
-          description:
-            "You are now assigned to this shift immediately because this request needs urgent coverage.",
+        toast.success("Emergency cover accepted, shift immediately accepted because this request needs urgent coverage.", {
         });
       } else if (requestType === "emergency") {
         toast.success("Emergency cover application submitted", {
-          description:
-            "This is an emergency cover request. Workload limits are bypassed so the shift can be covered urgently.",
         });
       } else if (absenceReplacementMode.toLowerCase() === "automatic") {
-        toast.success("Cover application submitted", {
-          description:
-            "Company setting is Automatic. The system will automatically choose the best applicant when the request reaches the automatic processing window.",
+        toast.success("Cover application submitted, The system will automatically choose the best applicant when the request reaches the automatic processing window.", {
         });
       } else {
-        toast.success("Cover application submitted", {
-          description:
-            "Company setting is Manual. An admin must approve your application before the shift is transferred.",
+        toast.success("Cover application submitted, An admin must approve your application before the shift is transferred.", {
         });
       }
 
