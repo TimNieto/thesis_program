@@ -25,6 +25,7 @@ def get_companies():
             LEFT JOIN employees e
                 ON c.company_id = e.company_id
                 AND e.employment_status = 'Active'
+            WHERE c.is_active = TRUE
             GROUP BY
                 c.company_id,
                 c.company_name,

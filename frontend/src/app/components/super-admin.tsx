@@ -93,14 +93,16 @@ export function SuperAdmin() {
 
       setCompanies(
         Array.isArray(data)
-          ? data.map((company: any) => ({
-              id: String(company.company_id),
-              name: company.company_name,
-              type: company.company_type || "Live Selling",
-              employeeCount: Number(company.employee_count || 0),
-              status: company.is_active ? "Active" : "Inactive",
-              createdDate: company.created_at,
-            }))
+          ? data
+              .filter((company: any) => company.is_active)
+              .map((company: any) => ({
+                id: String(company.company_id),
+                name: company.company_name,
+                type: company.company_type || "Live Selling",
+                employeeCount: Number(company.employee_count || 0),
+                status: "Active",
+                createdDate: company.created_at,
+              }))
           : [],
       );
     } catch (err) {
