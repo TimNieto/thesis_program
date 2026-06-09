@@ -251,6 +251,75 @@ def create_account(payload: dict):
         conn.close()
 
 
+@router.put("/accounts/{account_id}")
+def update_account(account_id: int, payload: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        priority_level = payload.get("priority_level", 2)
+        allow_partial_staffing = payload.get("allow_partial_staffing", False)
+        operator_policy = payload.get("operator_policy", "required")
+
+        cursor.execute("""
+            UPDATE accounts
+            SET
+                priority_level = %s,
+                allow_partial_staffing = %s,
+                operator_policy = %s,
+                updated_at = NOW()
+            WHERE account_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+            RETURNING account_id
+        """, (
+            priority_level,
+            allow_partial_staffing,
+            operator_policy,
+            account_id,
+            company_id
+        ))
+
+        updated = cursor.fetchone()
+
+        if not updated:
+            raise HTTPException(
+                status_code=404,
+                detail="Account not found"
+            )
+
+        conn.commit()
+
+        return {
+            "message": "Account updated",
+            "account_id": updated[0]
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as err:
+        conn.rollback()
+        print("Failed to update account:", err)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update account"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @router.delete("/accounts/{account_id}")
 def delete_account(account_id: int):
     conn = get_connection()

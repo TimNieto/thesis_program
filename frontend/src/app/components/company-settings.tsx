@@ -103,11 +103,22 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
 
   const fetchAccountSettings = async () => {
     try {
+      if (!currentUser.company_id) {
+        setAccountPolicies([]);
+        return;
+      }
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/accounts",
+        `https://backend-production-6e75.up.railway.app/accounts?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Failed to fetch account policies:", data);
+        setAccountPolicies([]);
+        return;
+      }
 
       setAccountPolicies(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -157,31 +168,32 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
       }
 
       for (const policy of accountPolicies) {
-        const policyId = policy.account_setting_id ?? policy.id;
+        const accountId = policy.account_id ?? policy.id;
 
-        if (!policyId) {
+        if (!accountId) {
           continue;
         }
 
         const policyRes = await fetch(
-          `https://backend-production-6e75.up.railway.app/account-settings/${policyId}`,
+          `https://backend-production-6e75.up.railway.app/accounts/${accountId}`,
           {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              priority_level: policy.priority_level,
-              require_host: policy.require_host,
-              require_operator: policy.require_operator,
-              operator_policy: policy.operator_policy,
-              allow_partial_staffing: policy.allow_partial_staffing,
+              company_id: currentUser.company_id,
+              priority_level: Number(policy.priority_level),
+              operator_policy: policy.operator_policy || "optional",
+              allow_partial_staffing: Boolean(policy.allow_partial_staffing),
             }),
           },
         );
 
+        const policyData = await policyRes.json();
+
         if (!policyRes.ok) {
-          throw new Error("Failed to save account policies");
+          throw new Error(policyData.detail || "Failed to save account policies");
         }
       }
 
@@ -443,10 +455,10 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
           {Array.isArray(accountPolicies) &&
             accountPolicies.map((policy, index) => (
               <div
-                key={policy.account_setting_id}
+                key={policy.account_id ?? policy.id}
                 className="border rounded-lg p-4 space-y-4"
               >
-                <div className="font-semibold">{policy.account_name}</div>
+                <div className="font-semibold">{policy.account_name ?? policy.name}</div>
 
                 {/* Priority */}
                 <div className="space-y-2">
