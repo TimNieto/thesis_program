@@ -140,6 +140,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [myShifts, setMyShifts] = useState<any[]>([]);
+  const [absenceReplacementMode, setAbsenceReplacementMode] = useState<string>("Manual");
 
   const employeesMap = Object.fromEntries(
     employees.map((emp) => [emp.id, emp.name]),
@@ -260,6 +261,27 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
   };
 
+  const fetchCompanySettings = async () => {
+  try {
+    if (!currentUser.company_id) return;
+
+    const res = await fetch(
+      `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error("Failed to fetch company settings:", data);
+      return;
+    }
+
+    setAbsenceReplacementMode(data.absence_replacement_mode || "Manual");
+  } catch (err) {
+    console.error("Failed to fetch company settings:", err);
+  }
+};
+
   const fetchShiftTemplates = async () => {
     try {
       if (!currentUser.company_id) return;
@@ -353,6 +375,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     const loadData = async () => {
       await processAutomaticCoverRequests();
 
+      fetchCompanySettings();
       fetchMyShifts();
       fetchEmployees();
       fetchApplications();
@@ -625,11 +648,9 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
         `https://backend-production-6e75.up.railway.app/coverage-requests/${id}/apply`,
         {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
             employee_id: currentUser.employee_id,
             reason: "Can cover this shift",
@@ -639,13 +660,33 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
       const data = await res.json();
 
-      toast.success(data.message);
+      if (!res.ok) {
+        toast.error(data.detail || "Failed to apply");
+        return;
+      }
+
+      if (data.message === "Shift automatically transferred") {
+        toast.success("Emergency cover accepted", {
+          description:
+            "You are now assigned to this shift immediately because this request needs urgent coverage.",
+        });
+      } else if (absenceReplacementMode.toLowerCase() === "automatic") {
+        toast.success("Cover application submitted", {
+          description:
+            "Company setting is Automatic. The system will choose the best applicant when the request reaches the automatic processing window.",
+        });
+      } else {
+        toast.success("Cover application submitted", {
+          description:
+            "Company setting is Manual. An admin must approve your application before the shift is transferred.",
+        });
+      }
 
       fetchCoverRequests();
       fetchApplications();
+      fetchMyShifts();
     } catch (err) {
       console.error(err);
-
       toast.error("Failed to apply");
     }
   };
