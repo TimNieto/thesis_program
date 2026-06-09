@@ -119,14 +119,13 @@ export function EmployeeProfile({
 
     try {
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/change-password`,
+        `https://backend-production-6e75.up.railway.app/employees/${userId}/password`,
         {
-          method: "POST",
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: userId,
-            current_password: currentPassword.trim(),
-            new_password: newPassword.trim(),
+            currentPassword: currentPassword.trim(),
+            newPassword: newPassword.trim(),
           }),
         },
       );

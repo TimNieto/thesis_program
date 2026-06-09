@@ -238,12 +238,23 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     useState<Employee | null>(null);
 
   const fetchEmployees = () => {
+    if (!currentUser.company_id) {
+      setEmployees([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
 
-    fetch("https://backend-production-6e75.up.railway.app/employees")
+    fetch(
+      `https://backend-production-6e75.up.railway.app/employees?company_id=${currentUser.company_id}`,
+    )
       .then((res) => res.json())
-      .then((data) => setEmployees(data))
-      .catch(() => console.log("Failed to load employees"))
+      .then((data) => setEmployees(Array.isArray(data) ? data : []))
+      .catch(() => {
+        console.log("Failed to load employees");
+        setEmployees([]);
+      })
       .finally(() => setIsLoading(false));
   };
 
@@ -270,8 +281,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const fetchStaffingRequirements = async () => {
     try {
+      if (!currentUser.company_id) {
+        setStaffingRoles([]);
+        return;
+      }
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/staffing-requirements",
+        `https://backend-production-6e75.up.railway.app/staffing-requirements?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -279,6 +295,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       setStaffingRoles(data.roles || []);
     } catch (err) {
       console.error("Failed to load staffing roles", err);
+      setStaffingRoles([]);
     }
   };
 
@@ -322,11 +339,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   };
 
   useEffect(() => {
-  if (!currentUser.company_id) return;
-  if (shiftTemplates.length === 0) return;
+    if (!currentUser.company_id) return;
+    if (shiftTemplates.length === 0) return;
 
-  fetchAvailability();
-}, [currentUser.company_id, shiftTemplates]);
+    fetchAvailability();
+  }, [currentUser.company_id, shiftTemplates]);
 
   useEffect(() => {
     if (currentUser.role.toLowerCase() === "admin") {
@@ -492,6 +509,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             nickname: newEmployeeNickname,
             email: newEmployeeEmail,
             contactNumber: newEmployeeContactNumber,
+            company_id: currentUser.company_id,
             created_by: currentUser.id,
           }),
         },
@@ -664,8 +682,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             day_of_week: day.toLowerCase(),
             preferred_shift: shift.toLowerCase(),
             shift_template_id:
-              shiftTemplates.find((s) => s.shift_name === shift)?.shift_template_id ||
-              null,
+              shiftTemplates.find((s) => s.shift_name === shift)
+                ?.shift_template_id || null,
             is_available: isCurrentlyUnavailable,
           }),
         },
@@ -705,8 +723,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         const matchedShift =
           shiftTemplates.find(
             (shift) =>
-              Number(shift.shift_template_id) ===
-              Number(row.shift_template_id),
+              Number(shift.shift_template_id) === Number(row.shift_template_id),
           ) ||
           shiftTemplates.find(
             (shift) =>

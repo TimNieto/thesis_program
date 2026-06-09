@@ -140,7 +140,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [myShifts, setMyShifts] = useState<any[]>([]);
-  const [absenceReplacementMode, setAbsenceReplacementMode] = useState<string>("Manual");
+  const [absenceReplacementMode, setAbsenceReplacementMode] =
+    useState<string>("Manual");
 
   const employeesMap = Object.fromEntries(
     employees.map((emp) => [emp.id, emp.name]),
@@ -180,8 +181,13 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
   const fetchAllLeaves = async () => {
     try {
+      if (!currentUser.company_id) {
+        setLeaveRequests([]);
+        return;
+      }
+
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/leaves",
+        `https://backend-production-6e75.up.railway.app/leaves?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -262,25 +268,25 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const fetchCompanySettings = async () => {
-  try {
-    if (!currentUser.company_id) return;
+    try {
+      if (!currentUser.company_id) return;
 
-    const res = await fetch(
-      `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
-    );
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      console.error("Failed to fetch company settings:", data);
-      return;
+      if (!res.ok) {
+        console.error("Failed to fetch company settings:", data);
+        return;
+      }
+
+      setAbsenceReplacementMode(data.absence_replacement_mode || "Manual");
+    } catch (err) {
+      console.error("Failed to fetch company settings:", err);
     }
-
-    setAbsenceReplacementMode(data.absence_replacement_mode || "Manual");
-  } catch (err) {
-    console.error("Failed to fetch company settings:", err);
-  }
-};
+  };
 
   const fetchShiftTemplates = async () => {
     try {
@@ -353,11 +359,11 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       .then((data) => setEmployees(Array.isArray(data) ? data : []))
       .catch(() => console.log("Failed to load employees"));
   };
-  
+
   const processAutomaticCoverRequests = async () => {
     try {
       const res = await fetch(
-         `https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic?company_id=${currentUser.company_id}`,
         {
           method: "POST",
         },
@@ -669,7 +675,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        let errorMessage = "You are not allowed to apply for this cover request.";
+        let errorMessage =
+          "You are not allowed to apply for this cover request.";
 
         if (typeof data.detail === "string") {
           errorMessage = data.detail;
@@ -679,24 +686,28 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           errorMessage = JSON.stringify(data.detail);
         }
 
-        toast.error("Unable to apply for cover, maximum shifts reached", {
-        });
+        toast.error("Unable to apply for cover, maximum shifts reached", {});
 
         return;
       }
 
       if (data.message === "Shift automatically transferred") {
-        toast.success("Emergency cover accepted, shift immediately accepted because this request needs urgent coverage.", {
-        });
+        toast.success(
+          "Emergency cover accepted, shift immediately accepted because this request needs urgent coverage.",
+          {},
+        );
       } else if (requestType === "emergency") {
-        toast.success("Emergency cover application submitted", {
-        });
+        toast.success("Emergency cover application submitted", {});
       } else if (absenceReplacementMode.toLowerCase() === "automatic") {
-        toast.success("Cover application submitted, The system will automatically choose the best applicant when the request reaches the automatic processing window.", {
-        });
+        toast.success(
+          "Cover application submitted, The system will automatically choose the best applicant when the request reaches the automatic processing window.",
+          {},
+        );
       } else {
-        toast.success("Cover application submitted, An admin must approve your application before the shift is transferred.", {
-        });
+        toast.success(
+          "Cover application submitted, An admin must approve your application before the shift is transferred.",
+          {},
+        );
       }
 
       fetchCoverRequests();
@@ -713,6 +724,11 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     status: "approved" | "rejected",
   ) => {
     try {
+      if (!currentUser.company_id) {
+        toast.error("Missing company ID");
+        return;
+      }
+
       const res = await fetch(
         `https://backend-production-6e75.up.railway.app/leaves/${requestId}`,
         {
@@ -720,24 +736,27 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({
+            status,
+            company_id: currentUser.company_id,
+          }),
         },
       );
 
       const data = await res.json();
 
-      if (data.error) {
-        toast.error(data.error);
-        return;
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to update leave");
       }
 
       toast.success(`Leave request ${status}`);
 
-      // 🔥 REFRESH FROM BACKEND (IMPORTANT)
       fetchAllLeaves();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update leave");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update leave",
+      );
     }
   };
 
@@ -814,46 +833,46 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const fetchMyShifts = async () => {
-  try {
-    if (!currentUser.company_id) {
-      console.error("Missing company_id in CoverApplication currentUser");
+    try {
+      if (!currentUser.company_id) {
+        console.error("Missing company_id in CoverApplication currentUser");
+        setMyShifts([]);
+        return;
+      }
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${currentUser.company_id}`,
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load my shifts");
+      }
+
+      console.log("SCHEDULE DATA:", data.assignments);
+
+      setMyShifts(
+        (data.assignments || [])
+          .filter(
+            (s: any) =>
+              Number(s.employee_id) === Number(currentUser.employee_id),
+          )
+          .map((s: any) => ({
+            schedule_id: s.schedule_id,
+            livestream: s.account || s.livestream || s.account_name,
+            day: new Date(s.shift_date).toLocaleDateString("en-US", {
+              weekday: "long",
+            }),
+            shift: s.shift_type || s.shift || s.shift_name,
+            role: String(s.role || s.role_key || "").replace(/_/g, " "),
+          })),
+      );
+    } catch (err) {
+      console.error("Failed to load my shifts", err);
       setMyShifts([]);
-      return;
     }
-
-    const res = await fetch(
-      `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${currentUser.company_id}`,
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.detail || "Failed to load my shifts");
-    }
-
-    console.log("SCHEDULE DATA:", data.assignments);
-
-    setMyShifts(
-      (data.assignments || [])
-        .filter(
-          (s: any) =>
-            Number(s.employee_id) === Number(currentUser.employee_id),
-        )
-        .map((s: any) => ({
-          schedule_id: s.schedule_id,
-          livestream: s.account || s.livestream || s.account_name,
-          day: new Date(s.shift_date).toLocaleDateString("en-US", {
-            weekday: "long",
-          }),
-          shift: s.shift_type || s.shift || s.shift_name,
-          role: String(s.role || s.role_key || "").replace(/_/g, " "),
-        })),
-    );
-  } catch (err) {
-    console.error("Failed to load my shifts", err);
-    setMyShifts([]);
-  }
-};
+  };
 
   return (
     <div className="space-y-6">
