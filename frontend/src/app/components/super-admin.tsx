@@ -409,15 +409,17 @@ export function SuperAdmin() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Company Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Employees</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="w-[22%]">Company Name</TableHead>
+                      <TableHead className="w-[16%]">Type</TableHead>
+                      <TableHead className="w-[12%]">Employees</TableHead>
+                      <TableHead className="w-[12%]">Status</TableHead>
+                      <TableHead className="w-[18%]">Created Date</TableHead>
+                      <TableHead className="w-[20%] text-right">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -444,8 +446,8 @@ export function SuperAdmin() {
                         <TableCell>
                           {new Date(company.createdDate).toLocaleDateString()}
                         </TableCell>
-                        <TableCell className="w-full">
-                          <div className="flex w-full justify-end gap-2">
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
                               size="sm"
