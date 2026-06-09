@@ -124,6 +124,7 @@ def create_staffing_role(payload: dict):
     try:
         company_id = payload.get("company_id", 1)
         role_name = payload.get("role_name", "").strip()
+        department_name = payload.get("department_name", "Default Department").strip()
 
         if not role_name:
             raise HTTPException(
@@ -131,7 +132,53 @@ def create_staffing_role(payload: dict):
                 detail="Role name required"
             )
 
+        if not department_name:
+            department_name = "Default Department"
+
         role_key = normalize_role_key(role_name)
+
+        # Ensure department exists.
+        cursor.execute("""
+            SELECT department_id
+            FROM departments
+            WHERE company_id = %s
+            AND LOWER(department_name) = LOWER(%s)
+            LIMIT 1
+        """, (
+            company_id,
+            department_name
+        ))
+
+        department_row = cursor.fetchone()
+
+        if department_row:
+            department_id = department_row[0]
+
+            cursor.execute("""
+                UPDATE departments
+                SET is_active = TRUE,
+                    updated_at = NOW()
+                WHERE department_id = %s
+                AND company_id = %s
+            """, (
+                department_id,
+                company_id
+            ))
+        else:
+            cursor.execute("""
+                INSERT INTO departments (
+                    company_id,
+                    department_name,
+                    is_active
+                )
+                VALUES (%s, %s, TRUE)
+                RETURNING department_id
+            """, (
+                company_id,
+                department_name
+            ))
+
+            department_id = cursor.fetchone()[0]
 
         cursor.execute("""
             SELECT
@@ -140,7 +187,10 @@ def create_staffing_role(payload: dict):
             FROM roles
             WHERE company_id = %s
             AND LOWER(role_key) = LOWER(%s)
-        """, (company_id, role_key))
+        """, (
+            company_id,
+            role_key
+        ))
 
         existing = cursor.fetchone()
 
@@ -157,36 +207,44 @@ def create_staffing_role(payload: dict):
             cursor.execute("""
                 UPDATE roles
                 SET
+                    department_id = %s,
                     role_name = %s,
                     is_active = TRUE,
                     updated_at = NOW()
                 WHERE company_id = %s
                 AND role_id = %s
+                RETURNING role_id
             """, (
+                department_id,
                 role_name,
                 company_id,
                 role_id
             ))
 
+            role_id = cursor.fetchone()[0]
+
         else:
             cursor.execute("""
                 INSERT INTO roles (
                     company_id,
+                    department_id,
                     role_name,
                     role_key,
                     is_active
                 )
-                VALUES (%s, %s, %s, TRUE)
+                VALUES (%s, %s, %s, %s, TRUE)
                 RETURNING role_id
             """, (
                 company_id,
+                department_id,
                 role_name,
                 role_key
             ))
 
             role_id = cursor.fetchone()[0]
 
-        # Create default requirement rows for every active account + shift template
+        # Create default requirement rows only for active accounts.
+        # If the company has no accounts yet, this inserts nothing, and that is valid.
         cursor.execute("""
             INSERT INTO shift_staffing_requirements (
                 company_id,
@@ -228,7 +286,9 @@ def create_staffing_role(payload: dict):
         return {
             "message": "Role saved",
             "role_id": role_id,
-            "staffing_role_id": role_id
+            "staffing_role_id": role_id,
+            "department_id": department_id,
+            "department_name": department_name
         }
 
     except HTTPException:

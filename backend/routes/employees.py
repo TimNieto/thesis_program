@@ -124,50 +124,44 @@ def get_employees(company_id: int | None = None):
             display_role = get_display_role(role_keys, role_names)
 
             cursor.execute("""
-                SELECT
-                    a.account_name,
+                SELECT DISTINCT
                     d.department_name,
-                    r.role_key
-                FROM account_preferences ap
-                JOIN accounts a
-                    ON ap.account_id = a.account_id
-                    AND ap.company_id = a.company_id
+                    a.account_name
+                FROM employee_roles er
+
+                JOIN roles r
+                    ON er.role_id = r.role_id
+                    AND er.company_id = r.company_id
+
                 JOIN departments d
+                    ON r.department_id = d.department_id
+                    AND r.company_id = d.company_id
+
+                LEFT JOIN accounts a
                     ON a.department_id = d.department_id
                     AND a.company_id = d.company_id
-                JOIN roles r
-                    ON ap.role_id = r.role_id
-                    AND ap.company_id = r.company_id
-                WHERE ap.employee_id = %s
-                AND ap.company_id = %s
-                AND a.is_active = TRUE
-                AND d.is_active = TRUE
+                    AND a.is_active = TRUE
+
+                WHERE er.employee_id = %s
+                AND er.company_id = %s
                 AND r.is_active = TRUE
-                ORDER BY d.department_name, a.account_name, r.role_key
+                AND d.is_active = TRUE
+
+                ORDER BY d.department_name, a.account_name
             """, (employee_id, emp_company_id))
 
-            account_role_rows = cursor.fetchall()
+            assignment_rows = cursor.fetchall()
 
-            host_accounts = sorted({
-                account_name
-                for account_name, department_name, role_key in account_role_rows
-                if role_key == "host"
-            })
-
-            operator_accounts = sorted({
-                account_name
-                for account_name, department_name, role_key in account_role_rows
-                if role_key == "operator"
+            department_names = sorted({
+                department_name
+                for department_name, account_name in assignment_rows
+                if department_name
             })
 
             account_names = sorted({
                 account_name
-                for account_name, department_name, role_key in account_role_rows
-            })
-
-            department_names = sorted({
-                department_name
-                for account_name, department_name, role_key in account_role_rows
+                for department_name, account_name in assignment_rows
+                if account_name
             })
 
             employees.append({
@@ -179,10 +173,6 @@ def get_employees(company_id: int | None = None):
                 "totalShifts": 0,
                 "joinedDate": str(joined_date) if joined_date else None,
                 "accountType": "Employee",
-                "can_be_host": len(host_accounts) > 0,
-                "host_accounts": ", ".join(host_accounts) if host_accounts else None,
-                "can_be_operator": len(operator_accounts) > 0,
-                "operator_accounts": ", ".join(operator_accounts) if operator_accounts else None,
                 "account_names": ", ".join(account_names) if account_names else None,
                 "accounts": account_names,
                 "contactNumber": contact_number,
@@ -260,8 +250,6 @@ def update_employee_account_preferences(employee_id: int, data: dict):
     cursor = conn.cursor()
 
     try:
-        host_accounts = normalize_list(data.get("host_accounts"))
-        operator_accounts = normalize_list(data.get("operator_accounts"))
 
         cursor.execute("""
             SELECT company_id
@@ -386,8 +374,6 @@ def add_employee(data: dict):
         company_id = data.get("company_id")
 
         role = data.get("role", "").strip()
-        host_accounts = normalize_list(data.get("host_accounts"))
-        operator_accounts = normalize_list(data.get("operator_accounts"))
 
         if not name:
             raise HTTPException(status_code=400, detail="Full name is required")
@@ -533,16 +519,6 @@ def add_employee(data: dict):
                         DO NOTHING
                     """, (employee_id, role_row[0], company_id))
 
-        # Optional account preferences, if frontend sends account arrays.
-        if host_accounts or operator_accounts:
-            cursor.execute("""
-                SELECT role_id, role_key
-                FROM roles
-                WHERE company_id = %s
-                AND role_key IN ('host', 'operator')
-                AND is_active = TRUE
-            """, (company_id,))
-
             role_rows = cursor.fetchall()
             role_map = {role_key: role_id for role_id, role_key in role_rows}
 
@@ -609,21 +585,6 @@ def add_employee(data: dict):
                         role_map["operator"],
                         company_id
                     ))
-
-        admin_ids = get_company_admin_employee_ids(
-            cursor,
-            company_id,
-            exclude_employee_id=created_by
-        )
-
-        for admin_id in admin_ids:
-            create_notification(
-                cursor,
-                admin_id,
-                "New Employee Added",
-                f"{name} was added to the system.",
-                "employee"
-            )
 
         conn.commit()
 

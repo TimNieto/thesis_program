@@ -48,53 +48,33 @@ def create_default_company_data(cursor, company_id: int):
 
     department_id = cursor.fetchone()[0]
 
-    # 2. Default Account
-    cursor.execute("""
-        INSERT INTO accounts (
-            company_id,
-            department_id,
-            account_name,
-            priority_level,
-            allow_partial_staffing,
-            operator_policy,
-            is_active
-        )
-        VALUES (%s, %s, 'Default Account', 2, FALSE, 'optional', TRUE)
-        ON CONFLICT (company_id, account_name)
-        DO UPDATE SET
-            department_id = EXCLUDED.department_id,
-            is_active = TRUE,
-            updated_at = NOW()
-        RETURNING account_id
-    """, (
-        company_id,
-        department_id
-    ))
-
-    cursor.fetchone()[0]
-
-    # 3. Default Admin Role
+    # 2. Default Admin Role under Default Department
     cursor.execute("""
         INSERT INTO roles (
             company_id,
+            department_id,
             role_key,
             role_name,
             is_admin,
             is_active
         )
-        VALUES (%s, 'default_role', 'Default Role', TRUE, TRUE)
+        VALUES (%s, %s, 'default_role', 'Default Role', TRUE, TRUE)
         ON CONFLICT (company_id, role_key)
         DO UPDATE SET
+            department_id = EXCLUDED.department_id,
             role_name = EXCLUDED.role_name,
             is_admin = TRUE,
             is_active = TRUE,
             updated_at = NOW()
         RETURNING role_id
-    """, (company_id,))
+    """, (
+        company_id,
+        department_id
+    ))
 
     role_id = cursor.fetchone()[0]
 
-    # 4. Default Admin Employee
+    # 3. Default Admin Employee
     cursor.execute("""
         SELECT company_name
         FROM companies
@@ -146,7 +126,7 @@ def create_default_company_data(cursor, company_id: int):
 
     employee_id = cursor.fetchone()[0]
 
-    # 5. Assign Default Admin Employee to Default Role
+    # 4. Assign Default Admin Employee to Default Role
     cursor.execute("""
         INSERT INTO employee_roles (
             employee_id,
@@ -154,7 +134,7 @@ def create_default_company_data(cursor, company_id: int):
             company_id
         )
         VALUES (%s, %s, %s)
-        ON CONFLICT (employee_id, role_id)
+        ON CONFLICT (company_id, employee_id, role_id)
         DO NOTHING
     """, (
         employee_id,
