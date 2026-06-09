@@ -195,7 +195,7 @@ export default function App() {
               </TabsContent>
 
               <TabsContent value="reports">
-                <DataReport />
+                <DataReport currentUser={user} />
               </TabsContent>
             </>
           )}
