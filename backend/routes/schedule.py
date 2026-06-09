@@ -10,6 +10,52 @@ from services.role_service import get_company_admin_employee_ids
 
 router = APIRouter()
 
+def record_absence_from_filled_cover(
+    cursor,
+    requester_id: int,
+    schedule_id: int,
+    company_id: int
+):
+    cursor.execute("""
+        SELECT
+            s.shift_date
+        FROM generated_schedule gs
+        JOIN shifts s
+            ON gs.shift_id = s.shift_id
+            AND gs.company_id = s.company_id
+        WHERE gs.schedule_id = %s
+        AND gs.company_id = %s
+        LIMIT 1
+    """, (
+        schedule_id,
+        company_id
+    ))
+
+    row = cursor.fetchone()
+
+    if not row:
+        return
+
+    shift_date = row[0]
+
+    cursor.execute("""
+        INSERT INTO absences (
+            employee_id,
+            date,
+            status,
+            company_id
+        )
+        VALUES (%s, %s, 'approved', %s)
+        ON CONFLICT (company_id, employee_id, date)
+        DO UPDATE SET
+            status = 'approved',
+            updated_at = NOW()
+    """, (
+        requester_id,
+        shift_date,
+        company_id
+    ))
+
 def get_week_bounds_for_shift(cursor, coverage_request_id: int):
     cursor.execute("""
         SELECT
@@ -127,6 +173,13 @@ def auto_approve_cover_application(cursor, application_id: int):
         schedule_id,
         company_id
     ))
+
+    record_absence_from_filled_cover(
+        cursor,
+        requester_id,
+        schedule_id,
+        company_id
+    )
 
     cursor.execute("""
         UPDATE coverage_requests
@@ -851,6 +904,13 @@ def apply_for_cover(id: int, payload: dict):
             company_id
         ))
 
+        record_absence_from_filled_cover(
+            cursor,
+            requested_by,
+            schedule_id,
+            company_id
+        )
+
         existing = cursor.fetchone()
 
         if existing:
@@ -1231,6 +1291,13 @@ def approve_application(id: int):
             schedule_id,
             company_id
         ))
+
+        record_absence_from_filled_cover(
+            cursor,
+            requester_id,
+            schedule_id,
+            company_id
+        )
 
         cursor.execute("""
             UPDATE coverage_requests
