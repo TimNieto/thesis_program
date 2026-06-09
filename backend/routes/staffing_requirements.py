@@ -16,17 +16,18 @@ def get_staffing_requirements(company_id: int = 1):
     cursor = conn.cursor()
 
     try:
-        # Use roles table, but return staffing_role_id for frontend compatibility
+        # Return all active company roles for the Admin Dashboard Roles section.
+        # Keep staffing_role_id for frontend compatibility.
         cursor.execute("""
             SELECT
                 r.role_id,
                 r.role_name,
                 r.role_key,
-                r.is_active
+                r.is_active,
+                r.is_admin
             FROM roles r
             WHERE r.company_id = %s
             AND r.is_active = TRUE
-            AND r.role_key IN ('host', 'operator')
             ORDER BY r.role_id
         """, (company_id,))
 
@@ -36,7 +37,8 @@ def get_staffing_requirements(company_id: int = 1):
                 "role_id": r[0],
                 "role_name": r[1],
                 "role_key": r[2],
-                "is_active": r[3]
+                "is_active": r[3],
+                "is_admin": r[4]
             }
             for r in cursor.fetchall()
         ]
