@@ -91,6 +91,11 @@ interface AccountDepartmentRow {
   status: "Active" | "Inactive";
 }
 
+interface AccountDepartmentDisplayRow extends AccountDepartmentRow {
+  display_key: string;
+  row_type: "department" | "account";
+}
+
 interface Request {
   id: string;
   type: "application" | "cover" | "leave";
@@ -666,6 +671,49 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const handleDeactivateAccountDepartment = async (
+    row: AccountDepartmentRow,
+  ) => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      const isAccount = row.account_id !== null;
+
+      const confirmMessage = isAccount
+        ? `Deactivate account "${row.account_name}"?`
+        : `Deactivate department "${row.department_name}"?`;
+
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+
+      const url = isAccount
+        ? `https://backend-production-6e75.up.railway.app/accounts/${row.account_id}`
+        : `https://backend-production-6e75.up.railway.app/departments/${row.department_id}?company_id=${currentUser.company_id}`;
+
+      const res = await fetch(url, {
+        method: "DELETE",
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to deactivate");
+      }
+
+      await fetchAccountDepartmentData();
+      await fetchAccounts();
+      await fetchStaffingRequirements();
+      await fetchEmployees();
+
+      toast.success(data?.message || "Deactivated successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to deactivate");
+    }
+  };
+
   const getEmployeeAccounts = (employee: Employee) => {
     if (employee.account_names) {
       return employee.account_names;
@@ -690,6 +738,46 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       {status}
     </Badge>
   );
+
+  const groupedAccountDepartmentRows: AccountDepartmentDisplayRow[] =
+    Array.from(
+      accountDepartmentRows
+        .reduce(
+          (map, row) => {
+            const existing = map.get(row.department_id) ?? {
+              departmentRow: {
+                ...row,
+                account_id: null,
+                account_name: null,
+                account_is_active: null,
+                display_key: `department-${row.department_id}`,
+                row_type: "department" as const,
+              },
+              accountRows: [] as AccountDepartmentDisplayRow[],
+            };
+
+            if (row.account_id !== null) {
+              existing.accountRows.push({
+                ...row,
+                display_key: `account-${row.account_id}`,
+                row_type: "account" as const,
+              });
+            }
+
+            map.set(row.department_id, existing);
+
+            return map;
+          },
+          new Map<
+            number,
+            {
+              departmentRow: AccountDepartmentDisplayRow;
+              accountRows: AccountDepartmentDisplayRow[];
+            }
+          >(),
+        )
+        .values(),
+    ).flatMap((group) => [group.departmentRow, ...group.accountRows]);
 
   // Add Employee
   const handleAddEmployee = async () => {
@@ -1604,7 +1692,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableHeader>
 
                   <TableBody>
-                    {accountDepartmentRows.length === 0 ? (
+                    {groupedAccountDepartmentRows.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={4}
@@ -1615,31 +1703,42 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      accountDepartmentRows.map((row) => (
-                        <TableRow
-                          key={`account-department-${row.department_id}-${row.account_id ?? "department-only"}`}
-                          className="h-12"
-                        >
+                      groupedAccountDepartmentRows.map((row) => (
+                        <TableRow key={row.display_key} className="h-12">
                           <TableCell className="font-medium truncate">
-                            {row.department_name}
+                            {row.row_type === "department"
+                              ? row.department_name
+                              : ""}
                           </TableCell>
 
-                          <TableCell className="truncate">
-                            {row.account_name || "—"}
+                          <TableCell
+                            className={
+                              row.row_type === "account"
+                                ? "truncate pl-6"
+                                : "truncate text-gray-400"
+                            }
+                          >
+                            {row.row_type === "account" ? row.account_name : ""}
                           </TableCell>
 
-                          <TableCell>{renderStatusBadge(row.status)}</TableCell>
+                          <TableCell>
+                            {renderStatusBadge(
+                              row.row_type === "account"
+                                ? row.account_is_active
+                                  ? "Active"
+                                  : "Inactive"
+                                : row.department_is_active
+                                  ? "Active"
+                                  : "Inactive",
+                            )}
+                          </TableCell>
 
                           <TableCell className={actionCellClass}>
                             <Button
                               size="sm"
                               className={dangerSmallButtonClass}
                               onClick={() =>
-                                toast.info(
-                                  row.account_id
-                                    ? "Deactivate account is frontend-only for now"
-                                    : "Deactivate department is frontend-only for now",
-                                )
+                                handleDeactivateAccountDepartment(row)
                               }
                             >
                               Deactivate

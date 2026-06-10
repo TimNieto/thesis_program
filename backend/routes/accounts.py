@@ -487,6 +487,105 @@ def delete_account(account_id: int):
         cursor.close()
         conn.close()
 
+@router.delete("/departments/{department_id}")
+def delete_department(department_id: int, company_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT department_id
+            FROM departments
+            WHERE department_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+            LIMIT 1
+        """, (
+            department_id,
+            company_id
+        ))
+
+        department_row = cursor.fetchone()
+
+        if not department_row:
+            raise HTTPException(
+                status_code=404,
+                detail="Department not found"
+            )
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM accounts
+            WHERE department_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+        """, (
+            department_id,
+            company_id
+        ))
+
+        active_account_count = cursor.fetchone()[0]
+
+        if active_account_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Deactivate active accounts under this department first"
+            )
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM roles
+            WHERE department_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+        """, (
+            department_id,
+            company_id
+        ))
+
+        active_role_count = cursor.fetchone()[0]
+
+        if active_role_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Deactivate active roles under this department first"
+            )
+
+        cursor.execute("""
+            UPDATE departments
+            SET is_active = FALSE,
+                updated_at = NOW()
+            WHERE department_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+        """, (
+            department_id,
+            company_id
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "Department deactivated"
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as err:
+        conn.rollback()
+        print("Failed to delete department:", err)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete department"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+        
 @router.post("/account-department-import")
 async def import_account_department_data(
     company_id: int = Form(...),
