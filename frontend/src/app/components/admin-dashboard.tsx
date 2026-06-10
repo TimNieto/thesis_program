@@ -180,7 +180,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const IMPORT_ENDPOINTS: Record<ImportCategory, string | null> = {
     departments: "/account-department-import",
-    roles: null,
+    roles: "/staffing-roles-import",
     employees: null,
     employeeAssignments: null,
     shifts: null,
@@ -714,6 +714,45 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const handleDeactivateRole = async (role: any) => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      const roleId = role.staffing_role_id ?? role.role_id;
+
+      if (!roleId) {
+        throw new Error("Invalid role");
+      }
+
+      if (!confirm(`Deactivate role "${role.role_name}"?`)) {
+        return;
+      }
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/staffing-roles/${roleId}?company_id=${currentUser.company_id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to deactivate role");
+      }
+
+      await fetchStaffingRequirements();
+
+      toast.success(data?.message || "Role deactivated");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to deactivate role",
+      );
+    }
+  };
+
   const getEmployeeAccounts = (employee: Employee) => {
     if (employee.account_names) {
       return employee.account_names;
@@ -778,6 +817,47 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         )
         .values(),
     ).flatMap((group) => [group.departmentRow, ...group.accountRows]);
+
+  const groupedRoleRows = Array.from(
+    staffingRoles
+      .reduce(
+        (map, role) => {
+          const departmentName = role.department_name || "None";
+          const key = departmentName.toLowerCase();
+
+          const existing = map.get(key) ?? {
+            departmentRow: {
+              display_key: `role-department-${key}`,
+              row_type: "department" as const,
+              department_name: departmentName,
+            },
+            roleRows: [] as any[],
+          };
+
+          existing.roleRows.push({
+            ...role,
+            display_key: `role-${role.staffing_role_id ?? role.role_id}`,
+            row_type: "role" as const,
+          });
+
+          map.set(key, existing);
+
+          return map;
+        },
+        new Map<
+          string,
+          {
+            departmentRow: {
+              display_key: string;
+              row_type: "department";
+              department_name: string;
+            };
+            roleRows: any[];
+          }
+        >(),
+      )
+      .values(),
+  ).flatMap((group) => [group.departmentRow, ...group.roleRows]);
 
   // Add Employee
   const handleAddEmployee = async () => {
@@ -1838,7 +1918,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableHeader>
 
                   <TableBody>
-                    {staffingRoles.length === 0 ? (
+                    {groupedRoleRows.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={5}
@@ -1849,37 +1929,44 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      staffingRoles.map((role) => (
-                        <TableRow
-                          key={`import-role-${role.staffing_role_id}`}
-                          className="h-12"
-                        >
-                          <TableCell className="truncate">
-                            {role.department_name || "None"}
-                          </TableCell>
-
+                      groupedRoleRows.map((row: any) => (
+                        <TableRow key={row.display_key} className="h-12">
                           <TableCell className="font-medium truncate">
-                            {role.role_name}
+                            {row.row_type === "department"
+                              ? row.department_name
+                              : ""}
+                          </TableCell>
+
+                          <TableCell
+                            className={
+                              row.row_type === "role"
+                                ? "font-medium truncate pl-6"
+                                : "truncate text-gray-400"
+                            }
+                          >
+                            {row.row_type === "role" ? row.role_name : ""}
                           </TableCell>
 
                           <TableCell className="truncate">
-                            {role.role_key}
+                            {row.row_type === "role" ? row.role_key : ""}
                           </TableCell>
 
-                          <TableCell>{renderStatusBadge("Active")}</TableCell>
+                          <TableCell>
+                            {row.row_type === "role"
+                              ? renderStatusBadge("Active")
+                              : ""}
+                          </TableCell>
 
                           <TableCell className={actionCellClass}>
-                            <Button
-                              size="sm"
-                              className={dangerSmallButtonClass}
-                              onClick={() =>
-                                toast.info(
-                                  "Deactivate role is frontend-only for now",
-                                )
-                              }
-                            >
-                              Deactivate
-                            </Button>
+                            {row.row_type === "role" && (
+                              <Button
+                                size="sm"
+                                className={dangerSmallButtonClass}
+                                onClick={() => handleDeactivateRole(row)}
+                              >
+                                Deactivate
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))

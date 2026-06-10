@@ -1,6 +1,8 @@
 # backend/routes/staffing_requirements.py
 
-from fastapi import APIRouter, HTTPException
+import csv
+import io
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db.database import get_connection
 
 router = APIRouter()
@@ -9,6 +11,56 @@ router = APIRouter()
 def normalize_role_key(role_name: str) -> str:
     return role_name.strip().lower().replace(" ", "_")
 
+def normalize_name(value: str) -> str:
+    return " ".join(str(value or "").strip().split()).title()
+
+
+def get_csv_value(row: dict, *keys: str) -> str:
+    for key in keys:
+        value = row.get(key)
+
+        if value is not None:
+            return str(value).strip()
+
+    return ""
+
+
+def ensure_default_role_requirements(cursor, company_id: int, role_id: int):
+    cursor.execute("""
+        INSERT INTO shift_staffing_requirements (
+            company_id,
+            account_id,
+            shift_template_id,
+            role_id,
+            required_count,
+            is_active
+        )
+        SELECT
+            a.company_id,
+            a.account_id,
+            st.shift_template_id,
+            %s,
+            1,
+            TRUE
+        FROM accounts a
+        JOIN shift_templates st
+            ON st.company_id = a.company_id
+            AND st.is_active = TRUE
+        WHERE a.company_id = %s
+        AND a.is_active = TRUE
+        AND NOT EXISTS (
+            SELECT 1
+            FROM shift_staffing_requirements ssr
+            WHERE ssr.company_id = a.company_id
+            AND ssr.account_id = a.account_id
+            AND ssr.shift_template_id = st.shift_template_id
+            AND ssr.role_id = %s
+        )
+    """, (
+        role_id,
+        company_id,
+        role_id
+    ))
 
 @router.get("/staffing-requirements")
 def get_staffing_requirements(company_id: int = 1):
@@ -186,9 +238,11 @@ def create_staffing_role(payload: dict):
                 is_active
             FROM roles
             WHERE company_id = %s
+            AND department_id = %s
             AND LOWER(role_key) = LOWER(%s)
         """, (
             company_id,
+            department_id,
             role_key
         ))
 
@@ -245,41 +299,11 @@ def create_staffing_role(payload: dict):
 
         # Create default requirement rows only for active accounts.
         # If the company has no accounts yet, this inserts nothing, and that is valid.
-        cursor.execute("""
-            INSERT INTO shift_staffing_requirements (
-                company_id,
-                account_id,
-                shift_template_id,
-                role_id,
-                required_count,
-                is_active
-            )
-            SELECT
-                a.company_id,
-                a.account_id,
-                st.shift_template_id,
-                %s,
-                1,
-                TRUE
-            FROM accounts a
-            JOIN shift_templates st
-                ON st.company_id = a.company_id
-                AND st.is_active = TRUE
-            WHERE a.company_id = %s
-            AND a.is_active = TRUE
-            AND NOT EXISTS (
-                SELECT 1
-                FROM shift_staffing_requirements ssr
-                WHERE ssr.company_id = a.company_id
-                AND ssr.account_id = a.account_id
-                AND ssr.shift_template_id = st.shift_template_id
-                AND ssr.role_id = %s
-            )
-        """, (
-            role_id,
+        ensure_default_role_requirements(
+            cursor,
             company_id,
             role_id
-        ))
+        )
 
         conn.commit()
 
@@ -298,6 +322,265 @@ def create_staffing_role(payload: dict):
     except Exception as e:
         conn.rollback()
         print("CREATE STAFFING ROLE ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.post("/staffing-roles-import")
+async def import_staffing_roles(
+    company_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    existing_departments = 0
+
+    created_roles = 0
+    reactivated_roles = 0
+
+    errors = []
+
+    try:
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. Only .csv files are allowed."
+            )
+
+        content = await file.read()
+
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File must be UTF-8 encoded."
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File is empty."
+            )
+
+        normalized_headers = [
+            str(header).strip().lower().replace(" ", "_")
+            for header in reader.fieldnames
+            if header
+        ]
+
+        required_headers = ["department_name", "role_name"]
+
+        if normalized_headers != required_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid CSV file. Required exact header: "
+                    "department_name,role_name"
+                )
+            )
+
+        rows = []
+
+        for row_number, row in enumerate(reader, start=2):
+            normalized_row = {
+                str(key).strip().lower().replace(" ", "_"): value
+                for key, value in row.items()
+                if key
+            }
+
+            department_name = normalize_name(
+                get_csv_value(
+                    normalized_row,
+                    "department_name"
+                )
+            )
+
+            role_name = normalize_name(
+                get_csv_value(
+                    normalized_row,
+                    "role_name"
+                )
+            )
+
+            if not department_name and not role_name:
+                continue
+
+            if not department_name:
+                errors.append(f"Row {row_number}: Department is required")
+                continue
+
+            if not role_name:
+                errors.append(f"Row {row_number}: Role Name is required")
+                continue
+
+            rows.append({
+                "row_number": row_number,
+                "department_name": department_name,
+                "role_name": role_name,
+                "role_key": normalize_role_key(role_name)
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid role import data",
+                    "errors": errors
+                }
+            )
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV has no valid role rows"
+            )
+
+        for item in rows:
+            department_name = item["department_name"]
+            role_name = item["role_name"]
+            role_key = item["role_key"]
+
+            cursor.execute("""
+                SELECT
+                    department_id
+                FROM departments
+                WHERE company_id = %s
+                AND LOWER(department_name) = LOWER(%s)
+                AND is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                department_name
+            ))
+
+            department_row = cursor.fetchone()
+
+            if not department_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Row {item['row_number']}: Department "
+                        f"'{department_name}' does not exist in Account / Department Data"
+                    )
+                )
+
+            department_id = department_row[0]
+            existing_departments += 1
+
+            cursor.execute("""
+                SELECT
+                    role_id,
+                    is_active
+                FROM roles
+                WHERE company_id = %s
+                AND department_id = %s
+                AND LOWER(role_key) = LOWER(%s)
+                LIMIT 1
+            """, (
+                company_id,
+                department_id,
+                role_key
+            ))
+
+            role_row = cursor.fetchone()
+
+            if role_row:
+                role_id = role_row[0]
+                role_is_active = role_row[1]
+
+                if role_is_active:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Row {item['row_number']}: Role "
+                            f"'{role_name}' already exists under department "
+                            f"'{department_name}'"
+                        )
+                    )
+
+                cursor.execute("""
+                    UPDATE roles
+                    SET
+                        department_id = %s,
+                        role_name = %s,
+                        role_key = %s,
+                        is_active = TRUE,
+                        updated_at = NOW()
+                    WHERE role_id = %s
+                    AND company_id = %s
+                    RETURNING role_id
+                """, (
+                    department_id,
+                    role_name,
+                    role_key,
+                    role_id,
+                    company_id
+                ))
+
+                role_id = cursor.fetchone()[0]
+                reactivated_roles += 1
+
+            else:
+                cursor.execute("""
+                    INSERT INTO roles (
+                        company_id,
+                        department_id,
+                        role_name,
+                        role_key,
+                        is_active
+                    )
+                    VALUES (%s, %s, %s, %s, TRUE)
+                    RETURNING role_id
+                """, (
+                    company_id,
+                    department_id,
+                    role_name,
+                    role_key
+                ))
+
+                role_id = cursor.fetchone()[0]
+                created_roles += 1
+
+            ensure_default_role_requirements(
+                cursor,
+                company_id,
+                role_id
+            )
+
+        conn.commit()
+
+        return {
+            "message": "Roles imported successfully",
+            "summary": {
+                "existing_departments": existing_departments,
+                "created_roles": created_roles,
+                "reactivated_roles": reactivated_roles,
+                "total_rows": len(rows)
+            }
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("IMPORT STAFFING ROLES ERROR:", e)
         raise HTTPException(
             status_code=500,
             detail=str(e)
