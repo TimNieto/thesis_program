@@ -199,6 +199,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [importRecords, setImportRecords] = useState<ImportRecord[]>([]);
 
   const [isTemplatePreviewOpen, setIsTemplatePreviewOpen] = useState(false);
+  const [isRolesTemplatePreviewOpen, setIsRolesTemplatePreviewOpen] =
+    useState(false);
 
   const [isAccountDepartmentDialogOpen, setIsAccountDepartmentDialogOpen] =
     useState(false);
@@ -1853,15 +1855,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      downloadImportTemplate(
-                        "roles",
-                        "role_name,role_key,status",
-                      )
-                    }
+                    onClick={() => setIsRolesTemplatePreviewOpen(true)}
                   >
                     <Download className="size-4" />
-                    Template
+                    View Template
                   </Button>
 
                   <Button
@@ -3232,6 +3229,41 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           <DialogFooter>
             <Button onClick={() => setIsAvailabilityDialogOpen(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Roles Template Preview Dialog */}
+      <Dialog
+        open={isRolesTemplatePreviewOpen}
+        onOpenChange={setIsRolesTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Roles CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. Departments must already
+              exist in Account / Department Data.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/roles-template.png"
+              alt="Roles CSV template preview"
+              className="w-full h-auto"
+            />
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>Accepted: same role name under different departments.</p>
+            <p>Rejected: department does not exist.</p>
+            <p>Rejected: role already exists under the same department.</p>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setIsRolesTemplatePreviewOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
