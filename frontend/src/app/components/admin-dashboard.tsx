@@ -1974,30 +1974,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableBody>
                 </Table>
               </div>
-
-              {importPreviews.roles.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {importPreviews.roles[0].map((header, index) => (
-                          <TableHead key={index}>{header}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {importPreviews.roles.slice(1).map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <TableCell key={cellIndex}>{cell}</TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </CardContent>
           </Card>
 
