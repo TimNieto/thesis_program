@@ -195,6 +195,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const [isTemplatePreviewOpen, setIsTemplatePreviewOpen] = useState(false);
 
+  const [isAccountDepartmentDialogOpen, setIsAccountDepartmentDialogOpen] =
+    useState(false);
+
+  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [newDepartmentAccountName, setNewDepartmentAccountName] = useState("");
+
+  const [selectedExistingDepartment, setSelectedExistingDepartment] =
+    useState("");
+  const [newAccountName, setNewAccountName] = useState("");
+
   const [importPreviews, setImportPreviews] = useState<
     Record<ImportCategory, string[][]>
   >({
@@ -546,6 +556,114 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const triggerImportInput = (category: ImportCategory) => {
     document.getElementById(`${category}-csv-input`)?.click();
+  };
+
+  const resetAccountDepartmentForm = () => {
+    setNewDepartmentName("");
+    setNewDepartmentAccountName("");
+    setSelectedExistingDepartment("");
+    setNewAccountName("");
+  };
+
+  const handleAddDepartmentSubmit = async () => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!newDepartmentName.trim()) {
+        throw new Error("Department name is required");
+      }
+
+      const hasAccountName = newDepartmentAccountName.trim().length > 0;
+
+      const endpoint = hasAccountName ? "/accounts" : "/departments";
+
+      const body = hasAccountName
+        ? {
+            company_id: currentUser.company_id,
+            department_name: newDepartmentName,
+            account_name: newDepartmentAccountName,
+          }
+        : {
+            company_id: currentUser.company_id,
+            department_name: newDepartmentName,
+          };
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app${endpoint}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to save department");
+      }
+
+      await fetchAccountDepartmentData();
+      await fetchAccounts();
+
+      resetAccountDepartmentForm();
+      setIsAccountDepartmentDialogOpen(false);
+
+      toast.success(data?.message || "Department saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+  };
+
+  const handleAddAccountSubmit = async () => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!selectedExistingDepartment) {
+        throw new Error("Please select a department");
+      }
+
+      if (!newAccountName.trim()) {
+        throw new Error("Account name is required");
+      }
+
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/accounts",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            department_name: selectedExistingDepartment,
+            account_name: newAccountName,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to save account");
+      }
+
+      await fetchAccountDepartmentData();
+      await fetchAccounts();
+
+      resetAccountDepartmentForm();
+      setIsAccountDepartmentDialogOpen(false);
+
+      toast.success(data?.message || "Account saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
   };
 
   const getEmployeeAccounts = (employee: Employee) => {
@@ -1464,11 +1582,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <Button
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      toast.info(
-                        "Manual account/department add is frontend-only for now",
-                      )
-                    }
+                    onClick={() => setIsAccountDepartmentDialogOpen(true)}
                   >
                     <Plus className="size-4" />
                     Add Account/Department
@@ -2550,6 +2664,121 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         </TabsContent>
         */}
       </Tabs>
+      {/* Add Account / Department Dialog */}
+      <Dialog
+        open={isAccountDepartmentDialogOpen}
+        onOpenChange={(open) => {
+          setIsAccountDepartmentDialogOpen(open);
+
+          if (!open) {
+            resetAccountDepartmentForm();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Account / Department</DialogTitle>
+            <DialogDescription>
+              Add a new department, or add an account under an existing
+              department.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs defaultValue="department" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="department">Add Department</TabsTrigger>
+              <TabsTrigger value="account">Add Account</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="department" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newDepartmentName">Department Name</Label>
+                <Input
+                  id="newDepartmentName"
+                  placeholder="e.g. Sales"
+                  value={newDepartmentName}
+                  onChange={(e) => setNewDepartmentName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newDepartmentAccountName">
+                  Optional Account Name
+                </Label>
+                <Input
+                  id="newDepartmentAccountName"
+                  placeholder="e.g. Shopee"
+                  value={newDepartmentAccountName}
+                  onChange={(e) => setNewDepartmentAccountName(e.target.value)}
+                />
+                <p className="text-xs text-gray-500">
+                  Leave this blank if you only want to create the department.
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAccountDepartmentDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+
+                <Button onClick={handleAddDepartmentSubmit}>
+                  Save Department
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+
+            <TabsContent value="account" className="space-y-4">
+              <div className="space-y-2">
+                <Label>Existing Department</Label>
+                <Select
+                  value={selectedExistingDepartment}
+                  onValueChange={setSelectedExistingDepartment}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {Array.from(
+                      new Set(
+                        accountDepartmentRows.map((row) => row.department_name),
+                      ),
+                    ).map((departmentName) => (
+                      <SelectItem key={departmentName} value={departmentName}>
+                        {departmentName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newAccountName">Account Name</Label>
+                <Input
+                  id="newAccountName"
+                  placeholder="e.g. Mamypoko"
+                  value={newAccountName}
+                  onChange={(e) => setNewAccountName(e.target.value)}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAccountDepartmentDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+
+                <Button onClick={handleAddAccountSubmit}>Save Account</Button>
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
       {/* Account / Department Template Preview Dialog */}
       <Dialog
         open={isTemplatePreviewOpen}

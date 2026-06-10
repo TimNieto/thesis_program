@@ -99,6 +99,106 @@ def get_accounts(company_id: int):
         cursor.close()
         conn.close()
 
+@router.post("/departments")
+def create_department(payload: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+        department_name = normalize_name(payload.get("department_name", ""))
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No managed company selected"
+            )
+
+        if not department_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Department name is required"
+            )
+
+        cursor.execute("""
+            SELECT department_id, is_active
+            FROM departments
+            WHERE company_id = %s
+            AND LOWER(department_name) = LOWER(%s)
+            LIMIT 1
+        """, (
+            company_id,
+            department_name
+        ))
+
+        department_row = cursor.fetchone()
+
+        if department_row:
+            department_id = department_row[0]
+            department_is_active = department_row[1]
+
+            cursor.execute("""
+                UPDATE departments
+                SET department_name = %s,
+                    is_active = TRUE,
+                    updated_at = NOW()
+                WHERE department_id = %s
+                AND company_id = %s
+            """, (
+                department_name,
+                department_id,
+                company_id
+            ))
+
+            conn.commit()
+
+            return {
+                "message": (
+                    "Department already exists"
+                    if department_is_active
+                    else "Department reactivated"
+                ),
+                "department_id": department_id
+            }
+
+        cursor.execute("""
+            INSERT INTO departments (
+                company_id,
+                department_name,
+                is_active
+            )
+            VALUES (%s, %s, TRUE)
+            RETURNING department_id
+        """, (
+            company_id,
+            department_name
+        ))
+
+        department_id = cursor.fetchone()[0]
+
+        conn.commit()
+
+        return {
+            "message": "Department created",
+            "department_id": department_id
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as err:
+        conn.rollback()
+        print("Failed to create department:", err)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create department"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
 
 @router.post("/accounts")
 def create_account(payload: dict):
@@ -139,7 +239,10 @@ def create_account(payload: dict):
             WHERE company_id = %s
             AND LOWER(department_name) = LOWER(%s)
             LIMIT 1
-        """, (company_id, department_name))
+        """, (
+            company_id,
+            department_name
+        ))
 
         department_row = cursor.fetchone()
 
@@ -152,7 +255,11 @@ def create_account(payload: dict):
                     updated_at = NOW()
                 WHERE department_id = %s
                 AND company_id = %s
-            """, (department_id, company_id))
+            """, (
+                department_id,
+                company_id
+            ))
+
         else:
             cursor.execute("""
                 INSERT INTO departments (
@@ -162,27 +269,41 @@ def create_account(payload: dict):
                 )
                 VALUES (%s, %s, TRUE)
                 RETURNING department_id
-            """, (company_id, department_name))
+            """, (
+                company_id,
+                department_name
+            ))
 
             department_id = cursor.fetchone()[0]
 
         # Check duplicate account under same company.
         cursor.execute("""
-            SELECT account_id
+            SELECT account_id, is_active
             FROM accounts
             WHERE company_id = %s
             AND LOWER(account_name) = LOWER(%s)
             LIMIT 1
-        """, (company_id, account_name))
+        """, (
+            company_id,
+            account_name
+        ))
 
         existing_account = cursor.fetchone()
 
         if existing_account:
             account_id = existing_account[0]
+            account_is_active = existing_account[1]
+
+            if account_is_active:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Account already exists in this company"
+                )
 
             cursor.execute("""
                 UPDATE accounts
                 SET department_id = %s,
+                    account_name = %s,
                     priority_level = %s,
                     allow_partial_staffing = %s,
                     operator_policy = %s,
@@ -192,6 +313,7 @@ def create_account(payload: dict):
                 AND company_id = %s
             """, (
                 department_id,
+                account_name,
                 priority_level,
                 allow_partial_staffing,
                 operator_policy,
@@ -202,7 +324,7 @@ def create_account(payload: dict):
             conn.commit()
 
             return {
-                "message": "Account updated",
+                "message": "Account reactivated",
                 "account_id": account_id,
                 "department_id": department_id,
             }
