@@ -193,6 +193,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const [importRecords, setImportRecords] = useState<ImportRecord[]>([]);
 
+  const [isTemplatePreviewOpen, setIsTemplatePreviewOpen] = useState(false);
+
   const [importPreviews, setImportPreviews] = useState<
     Record<ImportCategory, string[][]>
   >({
@@ -1427,15 +1429,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      downloadImportTemplate(
-                        "departments",
-                        "department_name,account_name",
-                      )
-                    }
+                    onClick={() => setIsTemplatePreviewOpen(true)}
                   >
                     <Download className="size-4" />
-                    Template
+                    View Template
                   </Button>
 
                   <Button
@@ -1540,32 +1537,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableBody>
                 </Table>
               </div>
-
-              {importPreviews.departments.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {importPreviews.departments[0].map((header, index) => (
-                          <TableHead key={index}>{header}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {importPreviews.departments
-                        .slice(1)
-                        .map((row, rowIndex) => (
-                          <TableRow key={rowIndex}>
-                            {row.map((cell, cellIndex) => (
-                              <TableCell key={cellIndex}>{cell}</TableCell>
-                            ))}
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -2579,7 +2550,41 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         </TabsContent>
         */}
       </Tabs>
+      {/* Account / Department Template Preview Dialog */}
+      <Dialog
+        open={isTemplatePreviewOpen}
+        onOpenChange={setIsTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Account / Department CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. Department-only rows are
+              allowed.
+            </DialogDescription>
+          </DialogHeader>
 
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/account-department-template.png"
+              alt="Account department CSV template preview"
+              className="w-full h-auto"
+            />
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>Accepted: department without account.</p>
+            <p>Rejected: account without department.</p>
+            <p>Rejected: duplicate account names.</p>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setIsTemplatePreviewOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Add Employee Dialog */}
       <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
