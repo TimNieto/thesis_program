@@ -173,6 +173,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     | "shifts"
     | "staffing";
 
+  const IMPORT_ENDPOINTS: Record<ImportCategory, string | null> = {
+    departments: "/account-department-import",
+    roles: null,
+    employees: null,
+    employeeAssignments: null,
+    shifts: null,
+    staffing: null,
+  };
+
   interface ImportRecord {
     id: string;
     category: ImportCategory;
@@ -386,60 +395,133 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     toast.success("Holiday removed");
   };
 
-  const handleFileImport = (category: ImportCategory, file: File) => {
-    const reader = new FileReader();
+  const refreshAfterImport = async (category: ImportCategory) => {
+    if (category === "departments") {
+      await fetchAccountDepartmentData();
+      await fetchAccounts();
+    }
 
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
+    if (category === "roles") {
+      await fetchStaffingRequirements();
+    }
 
-        const rows = text
-          .trim()
-          .split("\n")
-          .map((r) => r.split(",").map((c) => c.replace(/^"|"$/g, "").trim()));
+    if (category === "employees") {
+      await fetchEmployees();
+    }
 
-        if (rows.length < 2) {
-          throw new Error("File has no data rows");
-        }
+    if (category === "employeeAssignments") {
+      await fetchEmployees();
+    }
 
-        setImportPreviews((prev) => ({
-          ...prev,
-          [category]: rows.slice(0, 6),
-        }));
+    if (category === "shifts") {
+      await fetchShiftTemplates();
+    }
 
-        setImportRecords((prev) => [
-          {
-            id: Date.now().toString(),
-            category,
-            fileName: file.name,
-            rowCount: rows.length - 1,
-            importedAt: new Date().toLocaleString(),
-            status: "success",
-          },
-          ...prev,
-        ]);
+    if (category === "staffing") {
+      await fetchStaffingRequirements();
+    }
+  };
 
-        toast.success(`Imported ${rows.length - 1} rows from ${file.name}`);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Failed to parse file";
+  const parseCsvPreview = (text: string) => {
+    return text
+      .trim()
+      .split("\n")
+      .map((row) =>
+        row.split(",").map((cell) => cell.replace(/^"|"$/g, "").trim()),
+      );
+  };
 
-        setImportRecords((prev) => [
-          {
-            id: Date.now().toString(),
-            category,
-            fileName: file.name,
-            rowCount: 0,
-            importedAt: new Date().toLocaleString(),
-            status: "error",
-          },
-          ...prev,
-        ]);
+  const getImportErrorMessage = (data: any) => {
+    if (typeof data?.detail === "string") {
+      return data.detail;
+    }
 
-        toast.error(`Import failed: ${msg}`);
+    if (data?.detail?.message && Array.isArray(data.detail.errors)) {
+      return `${data.detail.message}\n${data.detail.errors.join("\n")}`;
+    }
+
+    if (data?.detail?.message) {
+      return data.detail.message;
+    }
+
+    return "Import failed";
+  };
+
+  const handleFileImport = async (category: ImportCategory, file: File) => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
       }
-    };
 
-    reader.readAsText(file);
+      const endpoint = IMPORT_ENDPOINTS[category];
+
+      if (!endpoint) {
+        throw new Error("This import type is not connected to the backend yet");
+      }
+
+      const text = await file.text();
+      const rows = parseCsvPreview(text);
+
+      if (rows.length < 2) {
+        throw new Error("File has no data rows");
+      }
+
+      const formData = new FormData();
+
+      formData.append("company_id", String(currentUser.company_id));
+      formData.append("file", file);
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app${endpoint}`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(getImportErrorMessage(data));
+      }
+
+      setImportPreviews((prev) => ({
+        ...prev,
+        [category]: rows.slice(0, 6),
+      }));
+
+      setImportRecords((prev) => [
+        {
+          id: Date.now().toString(),
+          category,
+          fileName: file.name,
+          rowCount: rows.length - 1,
+          importedAt: new Date().toLocaleString(),
+          status: "success",
+        },
+        ...prev,
+      ]);
+
+      await refreshAfterImport(category);
+
+      toast.success(data?.message || `Imported ${rows.length - 1} rows`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Import failed";
+
+      setImportRecords((prev) => [
+        {
+          id: Date.now().toString(),
+          category,
+          fileName: file.name,
+          rowCount: 0,
+          importedAt: new Date().toLocaleString(),
+          status: "error",
+        },
+        ...prev,
+      ]);
+
+      toast.error(msg);
+    }
   };
 
   const downloadImportTemplate = (
@@ -1348,7 +1430,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     onClick={() =>
                       downloadImportTemplate(
                         "departments",
-                        "department_name,account_name,status",
+                        "department_name,account_name",
                       )
                     }
                   >
