@@ -137,25 +137,25 @@ export function ScheduleGenerator({
     }
   };
 
-const fetchStaffingRequirements = async () => {
-  try {
-    if (!companyId) return;
+  const fetchStaffingRequirements = async () => {
+    try {
+      if (!companyId) return;
 
-    const res = await fetch(
-      `https://backend-production-6e75.up.railway.app/staffing-requirements?company_id=${companyId}`,
-    );
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/staffing-requirements?company_id=${companyId}`,
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      throw new Error(data.detail || "Failed to load staffing requirements");
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load staffing requirements");
+      }
+
+      setStaffingRequirements(data.requirements || []);
+    } catch (err) {
+      console.error("Failed to load staffing requirements", err);
     }
-
-    setStaffingRequirements(data.requirements || []);
-  } catch (err) {
-    console.error("Failed to load staffing requirements", err);
-  }
-};
+  };
 
   const fetchAccounts = async () => {
     try {

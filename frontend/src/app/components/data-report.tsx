@@ -4,18 +4,42 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/app/components/ui/table";
 import { Badge } from "@/app/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
 import {
   BarChart3,
   TrendingUp,
   Users,
   Calendar,
   Clock,
-  Activity
+  Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -85,33 +109,33 @@ export function DataReport({ currentUser }: DataReportProps) {
   const [timePeriod, setTimePeriod] = useState("this-month");
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
 
-const [generalData, setGeneralData] = useState<GeneralData>({
-  period: "this-month",
-  start: "",
-  end: "",
-  isUtilizationApproximate: true,
+  const [generalData, setGeneralData] = useState<GeneralData>({
+    period: "this-month",
+    start: "",
+    end: "",
+    isUtilizationApproximate: true,
 
-  totalShifts: 0,
-  filledShifts: 0,
-  vacantShifts: 0,
+    totalShifts: 0,
+    filledShifts: 0,
+    vacantShifts: 0,
 
-  totalAbsences: 0,
+    totalAbsences: 0,
 
-  totalLeaveRequests: 0,
-  approvedLeaveRequests: 0,
-  pendingLeaveRequests: 0,
+    totalLeaveRequests: 0,
+    approvedLeaveRequests: 0,
+    pendingLeaveRequests: 0,
 
-  totalCoverageRequests: 0,
-  approvedCoverageRequests: 0,
-  pendingCoverageRequests: 0,
-  deniedCoverageRequests: 0,
+    totalCoverageRequests: 0,
+    approvedCoverageRequests: 0,
+    pendingCoverageRequests: 0,
+    deniedCoverageRequests: 0,
 
-  totalCoverApplications: 0,
-  approvedCoverApplications: 0,
-});
+    totalCoverApplications: 0,
+    approvedCoverApplications: 0,
+  });
 
-const [employeeData, setEmployeeData] = useState<EmployeeData[]>([]);
-const [loading, setLoading] = useState(false);
+  const [employeeData, setEmployeeData] = useState<EmployeeData[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const getTimePeriodLabel = () => {
     switch (timePeriod) {
@@ -142,7 +166,6 @@ const [loading, setLoading] = useState(false);
     return "destructive";
   };
 
-
   const fetchReports = async () => {
     try {
       if (!currentUser.company_id) {
@@ -169,7 +192,9 @@ const [loading, setLoading] = useState(false);
       }
 
       if (!employeeRes.ok) {
-        throw new Error(employeeJson.detail || "Failed to load employee report");
+        throw new Error(
+          employeeJson.detail || "Failed to load employee report",
+        );
       }
 
       setGeneralData(generalJson);
@@ -230,9 +255,10 @@ const [loading, setLoading] = useState(false);
     toast.success("Report exported successfully");
   };
 
-  const filteredEmployeeData = selectedEmployee === "all"
-    ? employeeData
-    : employeeData.filter((emp) => emp.id === selectedEmployee);
+  const filteredEmployeeData =
+    selectedEmployee === "all"
+      ? employeeData
+      : employeeData.filter((emp) => emp.id === selectedEmployee);
 
   return (
     <div className="space-y-6">
@@ -287,7 +313,9 @@ const [loading, setLoading] = useState(false);
           <Card>
             <CardHeader>
               <CardTitle>General Overview - {getTimePeriodLabel()}</CardTitle>
-              <CardDescription>Summary of absences, coverage requests, and shifts</CardDescription>
+              <CardDescription>
+                Summary of absences, coverage requests, and shifts
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Statistics Cards */}
@@ -297,7 +325,9 @@ const [loading, setLoading] = useState(false);
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-600">Total Absences</p>
-                        <p className="text-3xl font-bold">{generalData.totalAbsences}</p>
+                        <p className="text-3xl font-bold">
+                          {generalData.totalAbsences}
+                        </p>
                       </div>
                       <Calendar className="size-8 text-red-600" />
                     </div>
@@ -308,10 +338,15 @@ const [loading, setLoading] = useState(false);
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600">Coverage Requests</p>
-                        <p className="text-3xl font-bold">{generalData.totalCoverageRequests}</p>
+                        <p className="text-sm text-gray-600">
+                          Coverage Requests
+                        </p>
+                        <p className="text-3xl font-bold">
+                          {generalData.totalCoverageRequests}
+                        </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {generalData.approvedCoverageRequests} approved, {generalData.pendingCoverageRequests} pending
+                          {generalData.approvedCoverageRequests} approved,{" "}
+                          {generalData.pendingCoverageRequests} pending
                         </p>
                       </div>
                       <Clock className="size-8 text-orange-600" />
@@ -324,9 +359,12 @@ const [loading, setLoading] = useState(false);
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-600">Total Shifts</p>
-                        <p className="text-3xl font-bold">{generalData.totalShifts}</p>
+                        <p className="text-3xl font-bold">
+                          {generalData.totalShifts}
+                        </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {generalData.filledShifts} filled, {generalData.vacantShifts} vacant
+                          {generalData.filledShifts} filled,{" "}
+                          {generalData.vacantShifts} vacant
                         </p>
                       </div>
                       <Activity className="size-8 text-blue-600" />
@@ -345,45 +383,74 @@ const [loading, setLoading] = useState(false);
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">Shift Coverage Rate</p>
-                        <p className="text-sm text-gray-600">Percentage of filled shifts</p>
+                        <p className="text-sm text-gray-600">
+                          Percentage of filled shifts
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-green-600">
                           {generalData.totalShifts > 0
-                            ? ((generalData.filledShifts / generalData.totalShifts) * 100).toFixed(1)
-                            : "0.0"}%
+                            ? (
+                                (generalData.filledShifts /
+                                  generalData.totalShifts) *
+                                100
+                              ).toFixed(1)
+                            : "0.0"}
+                          %
                         </p>
-                        <p className="text-xs text-gray-500">{generalData.filledShifts} / {generalData.totalShifts}</p>
+                        <p className="text-xs text-gray-500">
+                          {generalData.filledShifts} / {generalData.totalShifts}
+                        </p>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
-                        <p className="font-medium">Coverage Request Approval Rate</p>
-                        <p className="text-sm text-gray-600">Percentage of approved requests</p>
+                        <p className="font-medium">
+                          Coverage Request Approval Rate
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Percentage of approved requests
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-blue-600">
                           {generalData.totalCoverageRequests > 0
-                            ? ((generalData.approvedCoverageRequests / generalData.totalCoverageRequests) * 100).toFixed(1)
-                            : "0.0"}%
+                            ? (
+                                (generalData.approvedCoverageRequests /
+                                  generalData.totalCoverageRequests) *
+                                100
+                              ).toFixed(1)
+                            : "0.0"}
+                          %
                         </p>
-                        <p className="text-xs text-gray-500">{generalData.approvedCoverageRequests} / {generalData.totalCoverageRequests}</p>
+                        <p className="text-xs text-gray-500">
+                          {generalData.approvedCoverageRequests} /{" "}
+                          {generalData.totalCoverageRequests}
+                        </p>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
-                        <p className="font-medium">Average Absences per Employee</p>
-                        <p className="text-sm text-gray-600">Based on active employees</p>
+                        <p className="font-medium">
+                          Average Absences per Employee
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Based on active employees
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-orange-600">
                           {employeeData.length > 0
-                            ? (generalData.totalAbsences / employeeData.length).toFixed(1)
+                            ? (
+                                generalData.totalAbsences / employeeData.length
+                              ).toFixed(1)
                             : "0.0"}
                         </p>
-                        <p className="text-xs text-gray-500">{generalData.totalAbsences} total absences</p>
+                        <p className="text-xs text-gray-500">
+                          {generalData.totalAbsences} total absences
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -399,19 +466,28 @@ const [loading, setLoading] = useState(false);
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Employee Overview - {getTimePeriodLabel()}</CardTitle>
+                  <CardTitle>
+                    Employee Overview - {getTimePeriodLabel()}
+                  </CardTitle>
 
                   {generalData.isUtilizationApproximate && (
                     <p className="text-xs text-orange-600 mt-1">
-                      Utilization is approximate because this report uses the current weekly workload setting for the whole selected period.
+                      Utilization is approximate because this report uses the
+                      current weekly workload setting for the whole selected
+                      period.
                     </p>
                   )}
 
-                  <CardDescription>Individual employee performance and workload data</CardDescription>
+                  <CardDescription>
+                    Individual employee performance and workload data
+                  </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <Label>Filter Employee:</Label>
-                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                  <Select
+                    value={selectedEmployee}
+                    onValueChange={setSelectedEmployee}
+                  >
                     <SelectTrigger className="w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -445,11 +521,19 @@ const [loading, setLoading] = useState(false);
                   <TableBody>
                     {filteredEmployeeData.map((employee) => (
                       <TableRow key={employee.id}>
-                        <TableCell className="font-medium">{employee.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {employee.name}
+                        </TableCell>
                         <TableCell>{employee.totalShifts}</TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
-                            <Badge variant={employee.coverageRequests > 2 ? "destructive" : "secondary"}>
+                            <Badge
+                              variant={
+                                employee.coverageRequests > 2
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
                               {employee.coverageRequests}
                             </Badge>
                             <span className="text-xs text-gray-500">
@@ -460,7 +544,13 @@ const [loading, setLoading] = useState(false);
 
                         <TableCell>
                           <div className="flex flex-col gap-1">
-                            <Badge variant={employee.coverApplications > 2 ? "destructive" : "secondary"}>
+                            <Badge
+                              variant={
+                                employee.coverApplications > 2
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
                               {employee.coverApplications}
                             </Badge>
                             <span className="text-xs text-gray-500">
@@ -470,25 +560,44 @@ const [loading, setLoading] = useState(false);
                         </TableCell>
 
                         <TableCell>
-                          <Badge variant={employee.absences > 2 ? "destructive" : "secondary"}>
+                          <Badge
+                            variant={
+                              employee.absences > 2
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
                             {employee.absences}
                           </Badge>
                         </TableCell>
 
                         <TableCell>
-                          <Badge variant={employee.leaves > 2 ? "destructive" : "secondary"}>
+                          <Badge
+                            variant={
+                              employee.leaves > 2 ? "destructive" : "secondary"
+                            }
+                          >
                             {employee.leaves}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium">{employee.assignedWorkload} / {employee.maxWorkload}</span>
-                            <span className="text-xs text-gray-500">Assigned / Maximum</span>
+                            <span className="font-medium">
+                              {employee.assignedWorkload} /{" "}
+                              {employee.maxWorkload}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Assigned / Maximum
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Badge variant={getUtilizationBadge(employee.utilization) as any}>
+                            <Badge
+                              variant={
+                                getUtilizationBadge(employee.utilization) as any
+                              }
+                            >
                               {employee.utilization.toFixed(1)}%
                             </Badge>
                             <div className="w-24 bg-gray-200 rounded-full h-2">
@@ -497,10 +606,12 @@ const [loading, setLoading] = useState(false);
                                   employee.utilization >= 90
                                     ? "bg-green-600"
                                     : employee.utilization >= 70
-                                    ? "bg-yellow-600"
-                                    : "bg-red-600"
+                                      ? "bg-yellow-600"
+                                      : "bg-red-600"
                                 }`}
-                                style={{ width: `${Math.min(employee.utilization, 100)}%` }}
+                                style={{
+                                  width: `${Math.min(employee.utilization, 100)}%`,
+                                }}
                               />
                             </div>
                           </div>
@@ -522,10 +633,13 @@ const [loading, setLoading] = useState(false);
                   <p className="text-3xl font-bold text-blue-600">
                     {filteredEmployeeData.length > 0
                       ? (
-                          filteredEmployeeData.reduce((sum, emp) => sum + emp.utilization, 0) /
-                          filteredEmployeeData.length
+                          filteredEmployeeData.reduce(
+                            (sum, emp) => sum + emp.utilization,
+                            0,
+                          ) / filteredEmployeeData.length
                         ).toFixed(1)
-                      : "0.0"}%
+                      : "0.0"}
+                    %
                   </p>
                 </div>
               </CardContent>
@@ -534,9 +648,14 @@ const [loading, setLoading] = useState(false);
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <p className="text-sm text-gray-600">Total Coverage Requests</p>
+                  <p className="text-sm text-gray-600">
+                    Total Coverage Requests
+                  </p>
                   <p className="text-3xl font-bold text-orange-600">
-                    {filteredEmployeeData.reduce((sum, emp) => sum + emp.coverageRequests, 0)}
+                    {filteredEmployeeData.reduce(
+                      (sum, emp) => sum + emp.coverageRequests,
+                      0,
+                    )}
                   </p>
                 </div>
               </CardContent>
@@ -547,7 +666,10 @@ const [loading, setLoading] = useState(false);
                 <div className="text-center">
                   <p className="text-sm text-gray-600">Total Absences</p>
                   <p className="text-3xl font-bold text-red-600">
-                    {filteredEmployeeData.reduce((sum, emp) => sum + emp.absences, 0)}
+                    {filteredEmployeeData.reduce(
+                      (sum, emp) => sum + emp.absences,
+                      0,
+                    )}
                   </p>
                 </div>
               </CardContent>
@@ -558,7 +680,10 @@ const [loading, setLoading] = useState(false);
                 <div className="text-center">
                   <p className="text-sm text-gray-600">Total Shifts Assigned</p>
                   <p className="text-3xl font-bold text-green-600">
-                    {filteredEmployeeData.reduce((sum, emp) => sum + emp.totalShifts, 0)}
+                    {filteredEmployeeData.reduce(
+                      (sum, emp) => sum + emp.totalShifts,
+                      0,
+                    )}
                   </p>
                 </div>
               </CardContent>

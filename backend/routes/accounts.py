@@ -1,11 +1,15 @@
 #---------------------------------------------
 # backend/routes/accounts.py
 
-from fastapi import APIRouter, HTTPException
+import csv
+import io
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db.database import get_connection
 
 router = APIRouter()
 
+def normalize_name(value: str):
+    return " ".join(value.strip().split()).title()
 
 @router.get("/account-department-data")
 def get_account_department_data(company_id: int):
@@ -103,8 +107,8 @@ def create_account(payload: dict):
 
     try:
         company_id = payload.get("company_id")
-        department_name = payload.get("department_name", "").strip()
-        account_name = payload.get("account_name", "").strip()
+        department_name = normalize_name(payload.get("department_name", ""))
+        account_name = normalize_name(payload.get("account_name", ""))
 
         if not company_id:
             raise HTTPException(
@@ -355,6 +359,335 @@ def delete_account(account_id: int):
         raise HTTPException(
             status_code=500,
             detail="Failed to delete account"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.post("/account-department-import")
+async def import_account_department_data(
+    company_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    created_departments = 0
+    reactivated_departments = 0
+    existing_departments = 0
+
+    created_accounts = 0
+    updated_accounts = 0
+    reactivated_accounts = 0
+
+    try:
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. Only .csv files are allowed."
+            )
+
+        content = await file.read()
+
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File must be UTF-8 encoded."
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File is empty."
+            )
+
+        headers = [
+            str(header).strip().lower()
+            for header in reader.fieldnames
+            if header
+        ]
+
+        required_headers = ["department_name", "account_name"]
+
+        missing_headers = [
+            header for header in required_headers
+            if header not in headers
+        ]
+
+        if missing_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid CSV file. Missing required column(s): "
+                    + ", ".join(missing_headers)
+                )
+            )
+
+        rows = []
+
+        for row_number, row in enumerate(reader, start=2):
+            normalized_row = {
+                str(key).strip().lower(): value
+                for key, value in row.items()
+                if key
+            }
+
+            department_name = normalize_name(
+                normalized_row.get("department_name") or ""
+            )
+
+            account_name = normalize_name(
+                normalized_row.get("account_name") or ""
+            )
+
+            # Ignore fully blank rows.
+            if not department_name and not account_name:
+                continue
+
+            rows.append({
+                "row_number": row_number,
+                "department_name": department_name,
+                "account_name": account_name
+            })
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. No valid data rows found."
+            )
+
+        errors = []
+        csv_accounts = set()
+
+        for item in rows:
+            row_number = item["row_number"]
+            department_name = item["department_name"]
+            account_name = item["account_name"]
+
+            if not department_name:
+                errors.append(
+                    f"Row {row_number}: department_name is required."
+                )
+
+            if account_name and not department_name:
+                errors.append(
+                    f"Row {row_number}: account_name cannot exist without department_name."
+                )
+
+            if account_name:
+                account_key = account_name.lower()
+
+                if account_key in csv_accounts:
+                    errors.append(
+                        f"Row {row_number}: duplicate account_name in CSV: {account_name}."
+                    )
+                else:
+                    csv_accounts.add(account_key)
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid CSV file. No records were imported.",
+                    "errors": errors
+                }
+            )
+
+        # Check duplicate account conflicts in database.
+        if csv_accounts:
+            cursor.execute("""
+                SELECT account_name
+                FROM accounts
+                WHERE company_id = %s
+                AND LOWER(account_name) = ANY(%s::text[])
+                AND is_active = TRUE
+            """, (
+                company_id,
+                list(csv_accounts)
+            ))
+
+            existing_active_accounts = cursor.fetchall()
+
+            if existing_active_accounts:
+                errors = [
+                    f"Account already exists in this company: {row[0]}."
+                    for row in existing_active_accounts
+                ]
+
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "message": "Invalid CSV file. No records were imported.",
+                        "errors": errors
+                    }
+                )
+
+        # Insert only after all validation passes.
+        department_id_map = {}
+
+        for item in rows:
+            department_name = item["department_name"]
+
+            department_key = department_name.lower()
+
+            if department_key in department_id_map:
+                continue
+
+            cursor.execute("""
+                SELECT department_id, is_active
+                FROM departments
+                WHERE company_id = %s
+                AND LOWER(department_name) = LOWER(%s)
+                LIMIT 1
+            """, (
+                company_id,
+                department_name
+            ))
+
+            department_row = cursor.fetchone()
+
+            if department_row:
+                department_id = department_row[0]
+                department_is_active = department_row[1]
+
+                cursor.execute("""
+                    UPDATE departments
+                    SET
+                        department_name = %s,
+                        is_active = TRUE,
+                        updated_at = NOW()
+                    WHERE department_id = %s
+                    AND company_id = %s
+                """, (
+                    department_name,
+                    department_id,
+                    company_id
+                ))
+
+                if department_is_active:
+                    existing_departments += 1
+                else:
+                    reactivated_departments += 1
+
+            else:
+                cursor.execute("""
+                    INSERT INTO departments (
+                        company_id,
+                        department_name,
+                        is_active
+                    )
+                    VALUES (%s, %s, TRUE)
+                    RETURNING department_id
+                """, (
+                    company_id,
+                    department_name
+                ))
+
+                department_id = cursor.fetchone()[0]
+                created_departments += 1
+
+            department_id_map[department_key] = department_id
+
+        for item in rows:
+            department_name = item["department_name"]
+            account_name = item["account_name"]
+
+            if not account_name:
+                continue
+
+            department_id = department_id_map[department_name.lower()]
+
+            cursor.execute("""
+                SELECT account_id, is_active
+                FROM accounts
+                WHERE company_id = %s
+                AND LOWER(account_name) = LOWER(%s)
+                LIMIT 1
+            """, (
+                company_id,
+                account_name
+            ))
+
+            account_row = cursor.fetchone()
+
+            if account_row:
+                account_id = account_row[0]
+                account_is_active = account_row[1]
+
+                cursor.execute("""
+                    UPDATE accounts
+                    SET
+                        department_id = %s,
+                        account_name = %s,
+                        is_active = TRUE,
+                        updated_at = NOW()
+                    WHERE account_id = %s
+                    AND company_id = %s
+                """, (
+                    department_id,
+                    account_name,
+                    account_id,
+                    company_id
+                ))
+
+                if account_is_active:
+                    updated_accounts += 1
+                else:
+                    reactivated_accounts += 1
+
+            else:
+                cursor.execute("""
+                    INSERT INTO accounts (
+                        company_id,
+                        department_id,
+                        account_name,
+                        priority_level,
+                        allow_partial_staffing,
+                        operator_policy,
+                        is_active
+                    )
+                    VALUES (%s, %s, %s, 2, FALSE, 'required', TRUE)
+                """, (
+                    company_id,
+                    department_id,
+                    account_name
+                ))
+
+                created_accounts += 1
+
+        conn.commit()
+
+        return {
+            "message": "Account / department CSV import completed",
+            "created_departments": created_departments,
+            "existing_departments": existing_departments,
+            "reactivated_departments": reactivated_departments,
+            "created_accounts": created_accounts,
+            "updated_accounts": updated_accounts,
+            "reactivated_accounts": reactivated_accounts
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as err:
+        conn.rollback()
+        print("ACCOUNT DEPARTMENT IMPORT ERROR:", err)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to import account / department data"
         )
 
     finally:

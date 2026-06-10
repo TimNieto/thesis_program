@@ -182,7 +182,9 @@ export function SuperAdmin() {
       setNewCompanyName("");
       setNewCompanyType("Live Selling");
 
-      toast.success(data.message || `Company "${newCompanyName}" added successfully`);
+      toast.success(
+        data.message || `Company "${newCompanyName}" added successfully`,
+      );
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to create company",

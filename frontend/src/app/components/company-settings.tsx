@@ -193,7 +193,9 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
         const policyData = await policyRes.json();
 
         if (!policyRes.ok) {
-          throw new Error(policyData.detail || "Failed to save account policies");
+          throw new Error(
+            policyData.detail || "Failed to save account policies",
+          );
         }
       }
 
@@ -458,7 +460,9 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
                 key={policy.account_id ?? policy.id}
                 className="border rounded-lg p-4 space-y-4"
               >
-                <div className="font-semibold">{policy.account_name ?? policy.name}</div>
+                <div className="font-semibold">
+                  {policy.account_name ?? policy.name}
+                </div>
 
                 {/* Priority */}
                 <div className="space-y-2">

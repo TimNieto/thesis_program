@@ -73,7 +73,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         company_id: data.user.company_id,
         company_name: data.user.company_name,
       });
-
     } catch (err) {
       setError("Server not reachable");
     }
