@@ -175,7 +175,7 @@ def create_staffing_role(payload: dict):
 
     try:
         company_id = payload.get("company_id", 1)
-        role_name = payload.get("role_name", "").strip()
+        role_name = normalize_name(payload.get("role_name", ""))
         department_name = payload.get("department_name", "Default Department").strip()
 
         if not role_name:
@@ -189,12 +189,13 @@ def create_staffing_role(payload: dict):
 
         role_key = normalize_role_key(role_name)
 
-        # Ensure department exists.
+        # Department must already exist and be active.
         cursor.execute("""
-            SELECT department_id
+            SELECT department_id, department_name
             FROM departments
             WHERE company_id = %s
             AND LOWER(department_name) = LOWER(%s)
+            AND is_active = TRUE
             LIMIT 1
         """, (
             company_id,
@@ -203,34 +204,17 @@ def create_staffing_role(payload: dict):
 
         department_row = cursor.fetchone()
 
-        if department_row:
-            department_id = department_row[0]
-
-            cursor.execute("""
-                UPDATE departments
-                SET is_active = TRUE,
-                    updated_at = NOW()
-                WHERE department_id = %s
-                AND company_id = %s
-            """, (
-                department_id,
-                company_id
-            ))
-        else:
-            cursor.execute("""
-                INSERT INTO departments (
-                    company_id,
-                    department_name,
-                    is_active
+        if not department_row:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Department '{department_name}' does not exist in "
+                    "Account / Department Data"
                 )
-                VALUES (%s, %s, TRUE)
-                RETURNING department_id
-            """, (
-                company_id,
-                department_name
-            ))
+            )
 
-            department_id = cursor.fetchone()[0]
+        department_id = department_row[0]
+        department_name = department_row[1]
 
         cursor.execute("""
             SELECT
@@ -263,6 +247,7 @@ def create_staffing_role(payload: dict):
                 SET
                     department_id = %s,
                     role_name = %s,
+                    role_key = %s,
                     is_active = TRUE,
                     updated_at = NOW()
                 WHERE company_id = %s
@@ -271,6 +256,7 @@ def create_staffing_role(payload: dict):
             """, (
                 department_id,
                 role_name,
+                role_key,
                 company_id,
                 role_id
             ))

@@ -202,6 +202,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [isRolesTemplatePreviewOpen, setIsRolesTemplatePreviewOpen] =
     useState(false);
 
+  const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
+  const [newRoleDepartmentName, setNewRoleDepartmentName] = useState("");
+  const [newRoleName, setNewRoleName] = useState("");
+
   const [isAccountDepartmentDialogOpen, setIsAccountDepartmentDialogOpen] =
     useState(false);
 
@@ -716,6 +720,55 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const handleAddRoleSubmit = async () => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!newRoleDepartmentName) {
+        throw new Error("Please select a department");
+      }
+
+      if (!newRoleName.trim()) {
+        throw new Error("Role name is required");
+      }
+
+      const normalizedRoleName = newRoleName.trim();
+
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/staffing-roles",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            department_name: newRoleDepartmentName,
+            role_name: normalizedRoleName,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to add role");
+      }
+
+      await fetchStaffingRequirements();
+
+      setNewRoleDepartmentName("");
+      setNewRoleName("");
+      setIsAddRoleOpen(false);
+
+      toast.success(data?.message || "Role saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add role");
+    }
+  };
+
   const handleDeactivateRole = async (role: any) => {
     try {
       if (!currentUser.company_id) {
@@ -819,6 +872,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         )
         .values(),
     ).flatMap((group) => [group.departmentRow, ...group.accountRows]);
+
+  const activeDepartmentOptions = Array.from(
+    accountDepartmentRows
+      .reduce((map, row) => {
+        if (row.department_is_active) {
+          map.set(row.department_id, row.department_name);
+        }
+
+        return map;
+      }, new Map<number, string>())
+      .values(),
+  ).sort((a, b) => a.localeCompare(b));
 
   const groupedRoleRows = Array.from(
     staffingRoles
@@ -1890,9 +1955,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <Button
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      toast.info("Manual role add is frontend-only for now")
-                    }
+                    onClick={() => setIsAddRoleOpen(true)}
                   >
                     <Plus className="size-4" />
                     Add Role
@@ -3233,6 +3296,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       {/* Roles Template Preview Dialog */}
       <Dialog
         open={isRolesTemplatePreviewOpen}
@@ -3265,6 +3329,69 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             <Button onClick={() => setIsRolesTemplatePreviewOpen(false)}>
               Close
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Role Dialog */}
+      <Dialog open={isAddRoleOpen} onOpenChange={setIsAddRoleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Role</DialogTitle>
+            <DialogDescription>
+              Select an existing department and enter a role name.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Department</Label>
+              <Select
+                value={newRoleDepartmentName}
+                onValueChange={setNewRoleDepartmentName}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {activeDepartmentOptions.map((departmentName) => (
+                    <SelectItem key={departmentName} value={departmentName}>
+                      {departmentName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role Name</Label>
+              <Input
+                placeholder="e.g. Sales Specialist"
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleAddRoleSubmit();
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewRoleDepartmentName("");
+                setNewRoleName("");
+                setIsAddRoleOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button onClick={handleAddRoleSubmit}>Save Role</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
