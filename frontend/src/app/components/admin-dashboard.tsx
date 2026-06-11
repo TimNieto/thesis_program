@@ -2215,8 +2215,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <div>
                     <CardTitle>Employee Assignments</CardTitle>
                     <CardDescription>
-                      Connects existing employees to departments, roles, and
-                      accounts.
+                      Connects existing employees to departments and roles.
                     </CardDescription>
                   </div>
                 </div>
@@ -2229,7 +2228,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     onClick={() =>
                       downloadImportTemplate(
                         "employeeAssignments",
-                        "employee_email,department_name,role_name,account_name,status",
+                        "employee_name,department_name,role_name",
                       )
                     }
                   >

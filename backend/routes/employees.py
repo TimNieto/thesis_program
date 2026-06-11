@@ -47,6 +47,9 @@ def normalize_list(value):
 def get_display_role(role_names):
     return ", ".join(role_names) if role_names else "None"
 
+def normalize_person_name(value: str) -> str:
+    return " ".join(str(value or "").strip().split()).title()
+
 
 @router.get("/employees")
 def get_employees(company_id: int | None = None):
@@ -357,7 +360,7 @@ def add_employee(data: dict):
     cursor = conn.cursor()
 
     try:
-        name = str(data.get("name") or "").strip()
+        name = normalize_person_name(data.get("name"))
         nickname = str(data.get("nickname") or "").strip()
         email = str(data.get("email") or "").strip().lower()
         contact_number = str(data.get("contactNumber") or "").strip()
@@ -417,6 +420,36 @@ def add_employee(data: dict):
             )
 
         employee_id_to_exclude = existing_by_email[0] if existing_by_email else None
+
+        # Duplicate full name check.
+        # Nickname is intentionally NOT checked, because duplicate nicknames are allowed.
+        if employee_id_to_exclude:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE company_id = %s
+                AND LOWER(full_name) = LOWER(%s)
+                AND employment_status = 'Active'
+                AND employee_id <> %s
+                LIMIT 1
+            """, (company_id, name, employee_id_to_exclude))
+        else:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE company_id = %s
+                AND LOWER(full_name) = LOWER(%s)
+                AND employment_status = 'Active'
+                LIMIT 1
+            """, (company_id, name))
+
+        existing_name = cursor.fetchone()
+
+        if existing_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee name already exists"
+            )
 
         if employee_id_to_exclude:
             cursor.execute("""
@@ -589,6 +622,7 @@ async def import_employees(
 
         rows = []
         errors = []
+        csv_full_names = set()
         csv_emails = set()
         csv_contact_numbers = set()
 
@@ -599,7 +633,7 @@ async def import_employees(
                 if key
             }
 
-            full_name = str(normalized_row.get("full_name") or "").strip()
+            full_name = normalize_person_name(normalized_row.get("full_name"))
             nickname = str(normalized_row.get("nickname") or "").strip()
             email = str(normalized_row.get("email") or "").strip().lower()
             contact_number = str(
@@ -611,6 +645,10 @@ async def import_employees(
 
             if not full_name:
                 errors.append(f"Row {row_number}: full_name is required")
+            elif full_name.lower() in csv_full_names:
+                errors.append(f"Row {row_number}: duplicate full_name in CSV: {full_name}")
+            else:
+                csv_full_names.add(full_name.lower())
 
             if not nickname:
                 errors.append(f"Row {row_number}: nickname is required")
@@ -657,6 +695,19 @@ async def import_employees(
             )
 
         cursor.execute("""
+            SELECT full_name
+            FROM employees
+            WHERE company_id = %s
+            AND LOWER(full_name) = ANY(%s::text[])
+            AND employment_status = 'Active'
+        """, (
+            company_id,
+            list(csv_full_names)
+        ))
+
+        existing_active_names = cursor.fetchall()
+
+        cursor.execute("""
             SELECT email
             FROM employees
             WHERE company_id = %s
@@ -683,6 +734,11 @@ async def import_employees(
         existing_active_contacts = cursor.fetchall()
 
         duplicate_errors = []
+
+        duplicate_errors.extend([
+            f"Employee name already exists: {row[0]}"
+            for row in existing_active_names
+        ])
 
         duplicate_errors.extend([
             f"Employee email already exists: {row[0]}"
