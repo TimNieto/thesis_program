@@ -1389,7 +1389,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
           <TabsTrigger value="imports" className="gap-2">
             <Upload className="size-4" />
-            Imports
+            Data & Imports
           </TabsTrigger>
 
           {/*
