@@ -261,25 +261,24 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [selectedEmployeeForAvailability, setSelectedEmployeeForAvailability] =
     useState<Employee | null>(null);
 
-  const fetchEmployees = () => {
+  const fetchEmployees = async () => {
     if (!currentUser.company_id) {
       setEmployees([]);
-      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/employees?company_id=${currentUser.company_id}`,
+      );
 
-    fetch(
-      `https://backend-production-6e75.up.railway.app/employees?company_id=${currentUser.company_id}`,
-    )
-      .then((res) => res.json())
-      .then((data) => setEmployees(Array.isArray(data) ? data : []))
-      .catch(() => {
-        console.log("Failed to load employees");
-        setEmployees([]);
-      })
-      .finally(() => setIsLoading(false));
+      const data = await res.json();
+
+      setEmployees(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.log("Failed to load employees");
+      setEmployees([]);
+    }
   };
 
   const fetchShiftTemplates = async () => {
@@ -370,13 +369,25 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   }, [currentUser.company_id, shiftTemplates]);
 
   useEffect(() => {
-    if (currentUser.role.toLowerCase() === "admin") {
-      fetchEmployees();
-      fetchShiftTemplates();
-      fetchStaffingRequirements();
-      fetchAccounts();
-      fetchAccountDepartmentData();
-    }
+    const loadAdminData = async () => {
+      if (currentUser.role.toLowerCase() !== "admin") {
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        await fetchEmployees();
+        await fetchShiftTemplates();
+        await fetchStaffingRequirements();
+        await fetchAccounts();
+        await fetchAccountDepartmentData();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAdminData();
   }, [currentUser.role, currentUser.company_id]);
 
   const handleAddHoliday = () => {
