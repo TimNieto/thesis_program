@@ -219,17 +219,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     useState("");
   const [newAccountName, setNewAccountName] = useState("");
 
-  const [importPreviews, setImportPreviews] = useState<
-    Record<ImportCategory, string[][]>
-  >({
-    departments: [],
-    roles: [],
-    employees: [],
-    employeeAssignments: [],
-    shifts: [],
-    staffing: [],
-  });
-
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
   const [staffingRoles, setStaffingRoles] = useState<any[]>([]);
@@ -510,11 +499,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       if (!res.ok) {
         throw new Error(getImportErrorMessage(data));
       }
-
-      setImportPreviews((prev) => ({
-        ...prev,
-        [category]: rows.slice(0, 6),
-      }));
 
       setImportRecords((prev) => [
         {
@@ -2191,32 +2175,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableBody>
                 </Table>
               </div>
-
-              {importPreviews.employees.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {importPreviews.employees[0].map((header, index) => (
-                          <TableHead key={index}>{header}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {importPreviews.employees
-                        .slice(1)
-                        .map((row, rowIndex) => (
-                          <TableRow key={rowIndex}>
-                            {row.map((cell, cellIndex) => (
-                              <TableCell key={cellIndex}>{cell}</TableCell>
-                            ))}
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -2363,34 +2321,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableBody>
                 </Table>
               </div>
-
-              {importPreviews.employeeAssignments.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {importPreviews.employeeAssignments[0].map(
-                          (header, index) => (
-                            <TableHead key={index}>{header}</TableHead>
-                          ),
-                        )}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {importPreviews.employeeAssignments
-                        .slice(1)
-                        .map((row, rowIndex) => (
-                          <TableRow key={rowIndex}>
-                            {row.map((cell, cellIndex) => (
-                              <TableCell key={cellIndex}>{cell}</TableCell>
-                            ))}
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -2533,30 +2463,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableBody>
                 </Table>
               </div>
-
-              {importPreviews.shifts.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {importPreviews.shifts[0].map((header, index) => (
-                          <TableHead key={index}>{header}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {importPreviews.shifts.slice(1).map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <TableCell key={cellIndex}>{cell}</TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -2704,30 +2610,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableBody>
                 </Table>
               </div>
-
-              {importPreviews.staffing.length > 0 && (
-                <div className="mt-4 overflow-x-auto rounded border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {importPreviews.staffing[0].map((header, index) => (
-                          <TableHead key={index}>{header}</TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {importPreviews.staffing.slice(1).map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          {row.map((cell, cellIndex) => (
-                            <TableCell key={cellIndex}>{cell}</TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </CardContent>
           </Card>
 
