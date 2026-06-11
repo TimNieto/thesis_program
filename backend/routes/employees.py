@@ -62,6 +62,7 @@ def get_employees(company_id: int | None = None):
                 SELECT
                     e.employee_id,
                     e.full_name,
+                    e.nickname,
                     e.email,
                     e.employment_status,
                     e.joined_date,
@@ -77,6 +78,7 @@ def get_employees(company_id: int | None = None):
                 SELECT
                     e.employee_id,
                     e.full_name,
+                    e.nickname,
                     e.email,
                     e.employment_status,
                     e.joined_date,
@@ -93,11 +95,12 @@ def get_employees(company_id: int | None = None):
         for row in employee_rows:
             employee_id = row[0]
             full_name = row[1]
-            email = row[2]
-            employment_status = row[3]
-            joined_date = row[4]
-            contact_number = row[5]
-            emp_company_id = row[6]
+            nickname = row[2]
+            email = row[3]
+            employment_status = row[4]
+            joined_date = row[5]
+            contact_number = row[6]
+            emp_company_id = row[7]
 
             cursor.execute("""
                 SELECT r.role_key, r.role_name
@@ -161,6 +164,7 @@ def get_employees(company_id: int | None = None):
             employees.append({
                 "id": employee_id,
                 "name": full_name,
+                "nickname": nickname,
                 "email": email,
                 "role": display_role,
                 "status": employment_status,

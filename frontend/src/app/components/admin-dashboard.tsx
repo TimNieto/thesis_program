@@ -67,6 +67,7 @@ import { toast } from "sonner";
 interface Employee {
   id: number;
   name: string;
+  nickname?: string;
   email: string;
   contactNumber?: string;
   role: string;
@@ -2000,7 +2001,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     {groupedRoleRows.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           className="text-center text-gray-500 py-6"
                         >
                           No roles found. Use Add Role or Import CSV to add
@@ -2135,11 +2136,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[22%]">Name</TableHead>
-                      <TableHead className="w-[26%]">Email</TableHead>
-                      <TableHead className="w-[18%]">Contact Number</TableHead>
-                      <TableHead className="w-[14%]">Joined Date</TableHead>
-                      <TableHead className="w-[10%]">Status</TableHead>
+                      <TableHead className="w-[18%]">Name</TableHead>
+                      <TableHead className="w-[14%]">Nickname</TableHead>
+                      <TableHead className="w-[24%]">Email</TableHead>
+                      <TableHead className="w-[16%]">Contact Number</TableHead>
+                      <TableHead className="w-[12%]">Joined Date</TableHead>
+                      <TableHead className="w-[8%]">Status</TableHead>
                       <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -2148,7 +2150,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     {employees.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           className="text-center text-gray-500 py-6"
                         >
                           No employees found. Use Add Employee or Import CSV to
@@ -2163,6 +2165,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         >
                           <TableCell className="font-medium truncate">
                             {employee.name}
+                          </TableCell>
+
+                          <TableCell className="truncate">
+                            {employee.nickname || "—"}
                           </TableCell>
 
                           <TableCell className="truncate">
