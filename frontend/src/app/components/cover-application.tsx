@@ -99,7 +99,6 @@ interface LeaveRequest {
   livestream: string;
   day: string;
   shift: string;
-  role: string;
   leaveType: string;
   reason: string;
   status: "pending" | "approved" | "denied";
@@ -167,9 +166,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               ? new Date(r.from).toLocaleDateString()
               : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
           shift: "All",
-          role: "Host", // can improve later
           leaveType: r.leave_type,
-          reason: r.reason || "—", // optional (not returned yet)
+          reason: r.reason || "—",
           status: r.status,
           submittedAt: new Date().toISOString(),
         })),
@@ -205,7 +203,6 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               ? new Date(r.from).toLocaleDateString()
               : `${new Date(r.from).toLocaleDateString()} - ${new Date(r.to).toLocaleDateString()}`,
           shift: "All",
-          role: "Host",
           leaveType: r.leave_type,
           reason: r.reason || "—",
           status: r.status,

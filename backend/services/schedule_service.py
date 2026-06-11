@@ -378,7 +378,6 @@ def fetch_account_settings(cursor, company_id: int):
         SELECT
             account_name,
             priority_level,
-            operator_policy,
             allow_partial_staffing
         FROM accounts
         WHERE company_id = %s
@@ -395,8 +394,7 @@ def fetch_account_settings(cursor, company_id: int):
 
         account_settings[account_name] = {
             "priority_level": row[1],
-            "operator_policy": row[2] or "optional",
-            "allow_partial_staffing": row[3]
+            "allow_partial_staffing": row[2]
         }
 
     return account_settings

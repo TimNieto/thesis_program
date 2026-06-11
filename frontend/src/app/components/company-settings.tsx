@@ -184,7 +184,6 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
             body: JSON.stringify({
               company_id: currentUser.company_id,
               priority_level: Number(policy.priority_level),
-              operator_policy: policy.operator_policy || "optional",
               allow_partial_staffing: Boolean(policy.allow_partial_staffing),
             }),
           },
@@ -491,39 +490,6 @@ export function CompanySettings({ currentUser }: CompanySettingsProps) {
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Operator Policy */}
-                <div className="space-y-2">
-                  <Label>Operator Policy</Label>
-
-                  <Select
-                    value={policy.operator_policy}
-                    onValueChange={(value) => {
-                      const updated = [...accountPolicies];
-
-                      updated[index].operator_policy = value;
-
-                      setAccountPolicies(updated);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-
-                    <SelectContent>
-                      <SelectItem value="required">Required</SelectItem>
-
-                      <SelectItem value="optional">Optional</SelectItem>
-
-                      <SelectItem value="avoid">Avoid</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <p className="text-xs text-gray-500">
-                    Configure how strongly the scheduler should assign operators
-                  </p>
-                </div>
-
                 {/* Partial Staffing */}
                 <div className="flex items-center justify-between">
                   <div>

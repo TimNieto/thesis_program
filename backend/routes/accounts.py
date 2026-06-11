@@ -69,7 +69,6 @@ def get_accounts(company_id: int):
                 a.account_name,
                 a.priority_level,
                 a.allow_partial_staffing,
-                a.operator_policy,
                 d.department_name
             FROM accounts a
             LEFT JOIN departments d
@@ -89,8 +88,7 @@ def get_accounts(company_id: int):
                 "name": r[1],
                 "priority_level": r[2],
                 "allow_partial_staffing": r[3],
-                "operator_policy": r[4],
-                "department_name": r[5] or "None",
+                "department_name": r[4] or "None",
             }
             for r in rows
         ]
@@ -230,7 +228,6 @@ def create_account(payload: dict):
 
         priority_level = payload.get("priority_level", 2)
         allow_partial_staffing = payload.get("allow_partial_staffing", False)
-        operator_policy = payload.get("operator_policy", "required")
 
         # Department must already exist and be active.
         cursor.execute("""
@@ -288,7 +285,6 @@ def create_account(payload: dict):
                     account_name = %s,
                     priority_level = %s,
                     allow_partial_staffing = %s,
-                    operator_policy = %s,
                     is_active = TRUE,
                     updated_at = NOW()
                 WHERE account_id = %s
@@ -298,7 +294,6 @@ def create_account(payload: dict):
                 account_name,
                 priority_level,
                 allow_partial_staffing,
-                operator_policy,
                 account_id,
                 company_id,
             ))
@@ -318,10 +313,9 @@ def create_account(payload: dict):
                 account_name,
                 priority_level,
                 allow_partial_staffing,
-                operator_policy,
                 is_active
             )
-            VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+            VALUES (%s, %s, %s, %s, %s, TRUE)
             RETURNING account_id
         """, (
             company_id,
@@ -329,7 +323,6 @@ def create_account(payload: dict):
             account_name,
             priority_level,
             allow_partial_staffing,
-            operator_policy,
         ))
 
         account_id = cursor.fetchone()[0]
@@ -375,14 +368,12 @@ def update_account(account_id: int, payload: dict):
 
         priority_level = payload.get("priority_level", 2)
         allow_partial_staffing = payload.get("allow_partial_staffing", False)
-        operator_policy = payload.get("operator_policy", "required")
 
         cursor.execute("""
             UPDATE accounts
             SET
                 priority_level = %s,
                 allow_partial_staffing = %s,
-                operator_policy = %s,
                 updated_at = NOW()
             WHERE account_id = %s
             AND company_id = %s
@@ -391,7 +382,6 @@ def update_account(account_id: int, payload: dict):
         """, (
             priority_level,
             allow_partial_staffing,
-            operator_policy,
             account_id,
             company_id
         ))
@@ -940,10 +930,9 @@ async def import_account_department_data(
                         account_name,
                         priority_level,
                         allow_partial_staffing,
-                        operator_policy,
                         is_active
                     )
-                    VALUES (%s, %s, %s, 2, FALSE, 'required', TRUE)
+                    VALUES (%s, %s, %s, 2, FALSE, TRUE)
                 """, (
                     company_id,
                     department_id,
