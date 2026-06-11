@@ -21,21 +21,25 @@ def get_shift_templates(company_id: int = 1):
                 st.shift_template_id,
                 st.account_id,
                 a.account_name,
+                d.department_id,
+                d.department_name,
                 st.shift_name,
                 st.start_time,
                 st.end_time,
-                st.is_overnight,
-                st.fatigue_penalty,
-                st.difficulty_weight,
                 st.is_active
             FROM shift_templates st
             JOIN accounts a
                 ON st.account_id = a.account_id
                 AND st.company_id = a.company_id
+            JOIN departments d
+                ON a.department_id = d.department_id
+                AND a.company_id = d.company_id
             WHERE st.company_id = %s
             AND st.is_active = TRUE
             AND a.is_active = TRUE
+            AND d.is_active = TRUE
             ORDER BY
+                d.department_name ASC,
                 a.account_name ASC,
                 st.start_time ASC,
                 st.shift_name ASC
@@ -48,13 +52,12 @@ def get_shift_templates(company_id: int = 1):
                 "shift_template_id": r[0],
                 "account_id": r[1],
                 "account_name": r[2],
-                "shift_name": r[3],
-                "start_time": str(r[4]),
-                "end_time": str(r[5]),
-                "is_overnight": r[6],
-                "fatigue_penalty": r[7],
-                "difficulty_weight": r[8],
-                "is_active": r[9],
+                "department_id": r[3],
+                "department_name": r[4],
+                "shift_name": r[5],
+                "start_time": str(r[6]),
+                "end_time": str(r[7]),
+                "is_active": r[8],
             }
             for r in rows
         ]

@@ -347,6 +347,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       const data = await res.json();
 
       const orderedShifts = (Array.isArray(data) ? data : []).sort((a, b) => {
+        const departmentCompare = String(a.department_name || "").localeCompare(
+          String(b.department_name || ""),
+        );
+
+        if (departmentCompare !== 0) {
+          return departmentCompare;
+        }
+
         const accountCompare = String(a.account_name || "").localeCompare(
           String(b.account_name || ""),
         );
@@ -358,7 +366,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         const aTime = String(a.start_time || "00:00:00");
         const bTime = String(b.start_time || "00:00:00");
 
-        return aTime.localeCompare(bTime);
+        if (aTime !== bTime) {
+          return aTime.localeCompare(bTime);
+        }
+
+        return String(a.shift_name || "").localeCompare(
+          String(b.shift_name || ""),
+        );
       });
 
       setShiftTemplates(orderedShifts);
@@ -1090,6 +1104,47 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         ];
       });
 
+  const groupedShiftTemplateRows = Array.from(
+    shiftTemplates
+      .reduce(
+        (map, shift) => {
+          const departmentName = shift.department_name || "None";
+          const departmentKey = String(departmentName).toLowerCase();
+
+          const existing = map.get(departmentKey) ?? {
+            departmentRow: {
+              display_key: `shift-department-${departmentKey}`,
+              row_type: "department" as const,
+              department_name: departmentName,
+            },
+            shiftRows: [] as any[],
+          };
+
+          existing.shiftRows.push({
+            ...shift,
+            display_key: `shift-template-${shift.shift_template_id}`,
+            row_type: "shift" as const,
+          });
+
+          map.set(departmentKey, existing);
+
+          return map;
+        },
+        new Map<
+          string,
+          {
+            departmentRow: {
+              display_key: string;
+              row_type: "department";
+              department_name: string;
+            };
+            shiftRows: any[];
+          }
+        >(),
+      )
+      .values(),
+  ).flatMap((group) => [group.departmentRow, ...group.shiftRows]);
+
   // Add Employee
   const handleAddEmployee = async () => {
     if (!newEmployeeName.trim()) {
@@ -1476,27 +1531,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const getShiftInfo = (code: string) => {
     return shiftTemplates.find((s) => s.shift_name === code);
-  };
-
-  const getShiftDisplayOrder = (targetShift: any) => {
-    const sameAccountShifts = shiftTemplates
-      .filter(
-        (shift) => Number(shift.account_id) === Number(targetShift.account_id),
-      )
-      .sort((a, b) => {
-        const aTime = String(a.start_time || "00:00:00");
-        const bTime = String(b.start_time || "00:00:00");
-
-        return aTime.localeCompare(bTime);
-      });
-
-    const index = sameAccountShifts.findIndex(
-      (shift) =>
-        Number(shift.shift_template_id) ===
-        Number(targetShift.shift_template_id),
-    );
-
-    return index >= 0 ? index + 1 : 1;
   };
 
   if (currentUser.role.toLowerCase() !== "admin") {
@@ -2621,24 +2655,24 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Account</TableHead>
-                      <TableHead>Shift Name</TableHead>
-                      <TableHead>Start Time</TableHead>
-                      <TableHead>End Time</TableHead>
-                      <TableHead>Overnight</TableHead>
-                      <TableHead>Display Order</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead className="w-[22%]">Department</TableHead>
+                      <TableHead className="w-[20%]">Account Name</TableHead>
+                      <TableHead className="w-[18%]">Shift Name</TableHead>
+                      <TableHead className="w-[14%]">Start Time</TableHead>
+                      <TableHead className="w-[14%]">End Time</TableHead>
+                      <TableHead className="w-[8%]">Status</TableHead>
+                      <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
-                    {shiftTemplates.length === 0 ? (
+                    {groupedShiftTemplateRows.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={8}
+                          colSpan={7}
                           className="text-center text-gray-500 py-6"
                         >
                           No shift templates found. Use Add Shift or Import CSV
@@ -2646,42 +2680,66 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      shiftTemplates.map((shift, index) => (
-                        <TableRow key={`shift-${shift.shift_template_id}`}>
-                          <TableCell className="font-medium">
-                            {shift.account_name || "-"}
+                      groupedShiftTemplateRows.map((row: any) => (
+                        <TableRow key={row.display_key} className="h-12">
+                          <TableCell className="font-medium truncate">
+                            {row.row_type === "department"
+                              ? row.department_name
+                              : ""}
                           </TableCell>
 
-                          <TableCell className="font-medium">
-                            {shift.shift_name}
+                          <TableCell
+                            className={
+                              row.row_type === "shift"
+                                ? "font-medium truncate pl-6"
+                                : "truncate text-gray-400"
+                            }
+                          >
+                            {row.row_type === "shift" ? row.account_name : ""}
                           </TableCell>
 
-                          <TableCell>{shift.start_time || "-"}</TableCell>
-
-                          <TableCell>{shift.end_time || "-"}</TableCell>
+                          <TableCell
+                            className={
+                              row.row_type === "shift"
+                                ? "font-medium truncate"
+                                : "truncate text-gray-400"
+                            }
+                          >
+                            {row.row_type === "shift" ? row.shift_name : ""}
+                          </TableCell>
 
                           <TableCell>
-                            {shift.is_overnight ? "Yes" : "No"}
-                          </TableCell>
-
-                          <TableCell>{getShiftDisplayOrder(shift)}</TableCell>
-
-                          <TableCell>
-                            <Badge>Active</Badge>
+                            {row.row_type === "shift"
+                              ? row.start_time || "-"
+                              : ""}
                           </TableCell>
 
                           <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                toast.info(
-                                  "Deactivate shift is frontend-only for now",
-                                )
-                              }
-                            >
-                              Deactivate
-                            </Button>
+                            {row.row_type === "shift"
+                              ? row.end_time || "-"
+                              : ""}
+                          </TableCell>
+
+                          <TableCell>
+                            {row.row_type === "shift"
+                              ? renderStatusBadge("Active")
+                              : ""}
+                          </TableCell>
+
+                          <TableCell className={actionCellClass}>
+                            {row.row_type === "shift" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  toast.info(
+                                    "Deactivate shift is frontend-only for now",
+                                  )
+                                }
+                              >
+                                Deactivate
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
