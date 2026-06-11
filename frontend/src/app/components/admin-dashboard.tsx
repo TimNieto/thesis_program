@@ -201,6 +201,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [isTemplatePreviewOpen, setIsTemplatePreviewOpen] = useState(false);
   const [isRolesTemplatePreviewOpen, setIsRolesTemplatePreviewOpen] =
     useState(false);
+  const [isEmployeesTemplatePreviewOpen, setIsEmployeesTemplatePreviewOpen] =
+    useState(false);
 
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
   const [newRoleDepartmentName, setNewRoleDepartmentName] = useState("");
@@ -1379,10 +1381,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </CardDescription>
                 </div>
                 <Button
-                  onClick={() => setIsAddEmployeeOpen(true)}
+                  size="sm"
                   className="gap-2"
+                  onClick={() => setIsAddEmployeeOpen(true)}
                 >
-                  <UserPlus className="size-4" />
+                  <Plus className="size-4" />
                   Add Employee
                 </Button>
               </div>
@@ -2072,15 +2075,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      downloadImportTemplate(
-                        "employees",
-                        "full_name,nickname,email,contact_number,joined_date,status",
-                      )
-                    }
+                    onClick={() => setIsEmployeesTemplatePreviewOpen(true)}
                   >
                     <Download className="size-4" />
-                    Template
+                    View Template
                   </Button>
 
                   <Button
@@ -2108,13 +2106,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       e.currentTarget.value = "";
                     }}
                   />
-
                   <Button
                     size="sm"
                     className="gap-2"
                     onClick={() => setIsAddEmployeeOpen(true)}
                   >
-                    <UserPlus className="size-4" />
+                    <Plus className="size-4" />
                     Add Employee
                   </Button>
                 </div>
@@ -3312,7 +3309,45 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Employee Template Preview Dialog */}
+      <Dialog
+        open={isEmployeesTemplatePreviewOpen}
+        onOpenChange={setIsEmployeesTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Employee Data CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. This creates basic
+              employee profiles only.
+            </DialogDescription>
+          </DialogHeader>
 
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/employees-template.png"
+              alt="Employee Data CSV template preview"
+              className="w-full h-auto"
+            />
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>Required columns: full_name, nickname, email, contact_number.</p>
+            <p>
+              Accepted: inactive employee with same email will be reactivated.
+            </p>
+            <p>
+              Rejected: active duplicate email or duplicate email inside CSV.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setIsEmployeesTemplatePreviewOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Roles Template Preview Dialog */}
       <Dialog
         open={isRolesTemplatePreviewOpen}
