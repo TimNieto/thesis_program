@@ -643,6 +643,28 @@ def delete_staffing_role(staffing_role_id: int, company_id: int = 1):
             )
 
         cursor.execute("""
+            SELECT COUNT(*)
+            FROM shift_staffing_requirements
+            WHERE role_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+        """, (
+            staffing_role_id,
+            company_id
+        ))
+
+        active_staffing_requirement_count = cursor.fetchone()[0]
+
+        if active_staffing_requirement_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot deactivate role. "
+                    f"{active_staffing_requirement_count} active staffing requirement(s) use this role."
+                )
+            )
+
+        cursor.execute("""
             UPDATE roles
             SET
                 is_active = FALSE,
