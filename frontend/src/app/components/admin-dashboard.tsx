@@ -1000,18 +1000,31 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const confirmRemoveEmployee = async () => {
     if (!employeeToDelete) return;
 
-    await fetch(
-      `https://backend-production-6e75.up.railway.app/employees/${employeeToDelete}`,
-      {
-        method: "DELETE",
-      },
-    );
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/employees/${employeeToDelete}`,
+        {
+          method: "DELETE",
+        },
+      );
 
-    fetchEmployees();
-    setIsConfirmDeleteOpen(false);
-    setEmployeeToDelete(null);
+      const data = await res.json().catch(() => null);
 
-    toast.success("Employee deactivated");
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to deactivate employee");
+      }
+
+      await fetchEmployees();
+
+      setIsConfirmDeleteOpen(false);
+      setEmployeeToDelete(null);
+
+      toast.success(data?.message || "Employee deactivated");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to deactivate employee",
+      );
+    }
   };
 
   // Toggle Employee Status

@@ -804,29 +804,49 @@ def delete_employee(employee_id: int):
 
     try:
         cursor.execute("""
-            SELECT employment_status
+            SELECT employee_id, employment_status, company_id
             FROM employees
             WHERE employee_id = %s
         """, (employee_id,))
 
-        row = cursor.fetchone()
+        employee = cursor.fetchone()
 
-        if not row:
+        if not employee:
             raise HTTPException(status_code=404, detail="Employee not found")
 
-        if row[0] == "Inactive":
+        employee_id = employee[0]
+        employment_status = employee[1]
+        company_id = employee[2]
+
+        if employment_status == "Inactive":
             return {"message": "Employee already inactive"}
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM employee_roles
+            WHERE employee_id = %s
+            AND company_id = %s
+        """, (employee_id, company_id))
+
+        assignment_count = cursor.fetchone()[0]
+
+        if assignment_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot deactivate employee. Remove employee assignment first."
+            )
 
         cursor.execute("""
             UPDATE employees
             SET employment_status = 'Inactive',
                 updated_at = NOW()
             WHERE employee_id = %s
-        """, (employee_id,))
+            AND company_id = %s
+        """, (employee_id, company_id))
 
         conn.commit()
 
-        return {"message": "Employee marked as inactive"}
+        return {"message": "Employee deactivated"}
 
     except HTTPException:
         conn.rollback()
@@ -835,7 +855,10 @@ def delete_employee(employee_id: int):
     except Exception as e:
         conn.rollback()
         print("ERROR deleting employee:", e)
-        raise HTTPException(status_code=500, detail="Failed to delete employee")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to deactivate employee"
+        )
 
     finally:
         cursor.close()
