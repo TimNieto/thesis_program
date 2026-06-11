@@ -857,6 +857,281 @@ async def import_employees(
         conn.close()
 
 
+@router.post("/employee-assignments-import")
+async def import_employee_assignments(
+    company_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    created_assignments = 0
+
+    try:
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to identify your company. Please sign in again."
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. Only .csv files are allowed."
+            )
+
+        content = await file.read()
+
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File must be UTF-8 encoded."
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File is empty."
+            )
+
+        normalized_headers = [
+            str(header).strip().lower().replace(" ", "_")
+            for header in reader.fieldnames
+            if header
+        ]
+
+        required_headers = [
+            "employee_name",
+            "department_name",
+            "role_name"
+        ]
+
+        if normalized_headers != required_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid CSV file. Required exact header: "
+                    "employee_name,department_name,role_name"
+                )
+            )
+
+        rows = []
+        errors = []
+        csv_assignment_keys = set()
+
+        for row_number, row in enumerate(reader, start=2):
+            normalized_row = {
+                str(key).strip().lower().replace(" ", "_"): value
+                for key, value in row.items()
+                if key
+            }
+
+            employee_name = normalize_person_name(
+                normalized_row.get("employee_name")
+            )
+            department_name = str(
+                normalized_row.get("department_name") or ""
+            ).strip()
+            role_name = str(
+                normalized_row.get("role_name") or ""
+            ).strip()
+
+            if not employee_name and not department_name and not role_name:
+                continue
+
+            if not employee_name:
+                errors.append(f"Row {row_number}: employee_name is required")
+
+            if not department_name:
+                errors.append(f"Row {row_number}: department_name is required")
+
+            if not role_name:
+                errors.append(f"Row {row_number}: role_name is required")
+
+            assignment_key = (
+                employee_name.lower(),
+                department_name.lower(),
+                role_name.lower()
+            )
+
+            if employee_name and department_name and role_name:
+                if assignment_key in csv_assignment_keys:
+                    errors.append(
+                        f"Row {row_number}: duplicate assignment in CSV: "
+                        f"{employee_name} / {department_name} / {role_name}"
+                    )
+                else:
+                    csv_assignment_keys.add(assignment_key)
+
+            rows.append({
+                "row_number": row_number,
+                "employee_name": employee_name,
+                "department_name": department_name,
+                "role_name": role_name
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid employee assignment import data",
+                    "errors": errors
+                }
+            )
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV has no valid employee assignment rows"
+            )
+
+        validated_assignments = []
+
+        for item in rows:
+            row_number = item["row_number"]
+            employee_name = item["employee_name"]
+            department_name = item["department_name"]
+            role_name = item["role_name"]
+
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE company_id = %s
+                AND LOWER(full_name) = LOWER(%s)
+                AND employment_status = 'Active'
+                LIMIT 1
+            """, (company_id, employee_name))
+
+            employee = cursor.fetchone()
+
+            if not employee:
+                errors.append(
+                    f"Row {row_number}: active employee not found: {employee_name}"
+                )
+                continue
+
+            employee_id = employee[0]
+
+            cursor.execute("""
+                SELECT department_id
+                FROM departments
+                WHERE company_id = %s
+                AND LOWER(department_name) = LOWER(%s)
+                AND is_active = TRUE
+                LIMIT 1
+            """, (company_id, department_name))
+
+            department = cursor.fetchone()
+
+            if not department:
+                errors.append(
+                    f"Row {row_number}: active department not found: {department_name}"
+                )
+                continue
+
+            department_id = department[0]
+
+            cursor.execute("""
+                SELECT role_id
+                FROM roles
+                WHERE company_id = %s
+                AND department_id = %s
+                AND LOWER(role_name) = LOWER(%s)
+                AND is_active = TRUE
+                LIMIT 1
+            """, (company_id, department_id, role_name))
+
+            role = cursor.fetchone()
+
+            if not role:
+                errors.append(
+                    f"Row {row_number}: active role not found under department "
+                    f"'{department_name}': {role_name}"
+                )
+                continue
+
+            role_id = role[0]
+
+            cursor.execute("""
+                SELECT employee_role_id
+                FROM employee_roles
+                WHERE company_id = %s
+                AND employee_id = %s
+                AND role_id = %s
+                LIMIT 1
+            """, (company_id, employee_id, role_id))
+
+            existing_assignment = cursor.fetchone()
+
+            if existing_assignment:
+                errors.append(
+                    f"Row {row_number}: employee assignment already exists: "
+                    f"{employee_name} / {department_name} / {role_name}"
+                )
+                continue
+
+            validated_assignments.append({
+                "employee_id": employee_id,
+                "role_id": role_id,
+                "company_id": company_id
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid employee assignment import data",
+                    "errors": errors
+                }
+            )
+
+        for assignment in validated_assignments:
+            cursor.execute("""
+                INSERT INTO employee_roles (
+                    employee_id,
+                    role_id,
+                    company_id
+                )
+                VALUES (%s, %s, %s)
+            """, (
+                assignment["employee_id"],
+                assignment["role_id"],
+                assignment["company_id"]
+            ))
+
+            created_assignments += 1
+
+        conn.commit()
+
+        return {
+            "message": "Employee assignments imported successfully",
+            "summary": {
+                "created_assignments": created_assignments,
+                "total_rows": len(rows)
+            }
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("EMPLOYEE ASSIGNMENTS IMPORT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to import employee assignments"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @router.delete("/employees/{employee_id}")
 def delete_employee(employee_id: int):
     conn = get_connection()

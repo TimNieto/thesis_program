@@ -183,7 +183,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     departments: "/account-department-import",
     roles: "/staffing-roles-import",
     employees: "/employees-import",
-    employeeAssignments: null,
+    employeeAssignments: "/employee-assignments-import",
     shifts: null,
     staffing: null,
   };
@@ -804,18 +804,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     } finally {
       setRoleToDeactivate(null);
     }
-  };
-
-  const getEmployeeAccounts = (employee: Employee) => {
-    if (employee.account_names) {
-      return employee.account_names;
-    }
-
-    if (Array.isArray(employee.accounts) && employee.accounts.length > 0) {
-      return employee.accounts.join(", ");
-    }
-
-    return "None";
   };
 
   const tableClass = "table-fixed w-full";
@@ -2289,10 +2277,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[22%]">Employee</TableHead>
-                      <TableHead className="w-[22%]">Department</TableHead>
-                      <TableHead className="w-[18%]">Role</TableHead>
-                      <TableHead className="w-[22%]">Account</TableHead>
+                      <TableHead className="w-[30%]">Employee</TableHead>
+                      <TableHead className="w-[30%]">Department</TableHead>
+                      <TableHead className="w-[20%]">Role</TableHead>
                       <TableHead className="w-[10%]">Status</TableHead>
                       <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
@@ -2302,11 +2289,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     {assignedEmployees.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={5}
                           className="text-center text-gray-500 py-6"
                         >
                           No employee assignments found. Import employees,
-                          departments, accounts, and roles first.
+                          departments, and roles first.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -2325,10 +2312,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                           <TableCell className="truncate">
                             {employee.role || "None"}
-                          </TableCell>
-
-                          <TableCell className="truncate">
-                            {getEmployeeAccounts(employee)}
                           </TableCell>
 
                           <TableCell>
