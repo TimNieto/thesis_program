@@ -204,6 +204,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     useState(false);
   const [isEmployeesTemplatePreviewOpen, setIsEmployeesTemplatePreviewOpen] =
     useState(false);
+  const [
+    isEmployeeAssignmentsTemplatePreviewOpen,
+    setIsEmployeeAssignmentsTemplatePreviewOpen,
+  ] = useState(false);
 
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
   const [newRoleDepartmentName, setNewRoleDepartmentName] = useState("");
@@ -2163,14 +2167,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     size="sm"
                     className="gap-2"
                     onClick={() =>
-                      downloadImportTemplate(
-                        "employeeAssignments",
-                        "employee_name,department_name,role_name",
-                      )
+                      setIsEmployeeAssignmentsTemplatePreviewOpen(true)
                     }
                   >
                     <Download className="size-4" />
-                    Template
+                    View Template
                   </Button>
 
                   <Button
@@ -3271,6 +3272,48 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
           <DialogFooter>
             <Button onClick={() => setIsEmployeesTemplatePreviewOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Employee Assignments Template Preview Dialog */}
+      <Dialog
+        open={isEmployeeAssignmentsTemplatePreviewOpen}
+        onOpenChange={setIsEmployeeAssignmentsTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Employee Assignments CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. Employees, departments,
+              and roles must already exist.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/employee-assignments-template.png"
+              alt="Employee Assignments CSV template preview"
+              className="w-full h-auto"
+            />
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>Required columns: employee_name, department_name, role_name.</p>
+            <p>
+              Accepted: multiple roles in the same department with the same
+              admin type.
+            </p>
+            <p>
+              Rejected: cross-department roles or mixed admin/non-admin roles.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setIsEmployeeAssignmentsTemplatePreviewOpen(false)}
+            >
               Close
             </Button>
           </DialogFooter>
