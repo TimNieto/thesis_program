@@ -205,6 +205,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
   const [newRoleDepartmentName, setNewRoleDepartmentName] = useState("");
   const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleIsAdmin, setNewRoleIsAdmin] = useState("no");
 
   const [isAccountDepartmentDialogOpen, setIsAccountDepartmentDialogOpen] =
     useState(false);
@@ -747,6 +748,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             company_id: currentUser.company_id,
             department_name: newRoleDepartmentName,
             role_name: normalizedRoleName,
+            is_admin: newRoleIsAdmin,
           }),
         },
       );
@@ -761,6 +763,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       setNewRoleDepartmentName("");
       setNewRoleName("");
+      setNewRoleIsAdmin("no");
       setIsAddRoleOpen(false);
 
       toast.success(data?.message || "Role saved");
@@ -3377,6 +3380,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 }}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Admin Role</Label>
+              <Select value={newRoleIsAdmin} onValueChange={setNewRoleIsAdmin}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select yes or no" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="yes">Yes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter>
@@ -3385,6 +3401,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               onClick={() => {
                 setNewRoleDepartmentName("");
                 setNewRoleName("");
+                setNewRoleIsAdmin("no");
                 setIsAddRoleOpen(false);
               }}
             >

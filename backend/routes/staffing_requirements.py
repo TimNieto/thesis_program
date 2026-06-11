@@ -24,43 +24,19 @@ def get_csv_value(row: dict, *keys: str) -> str:
 
     return ""
 
+def parse_yes_no(value: str, row_number: int, field_name: str) -> bool:
+    normalized = str(value or "").strip().lower()
 
-def ensure_default_role_requirements(cursor, company_id: int, role_id: int):
-    cursor.execute("""
-        INSERT INTO shift_staffing_requirements (
-            company_id,
-            account_id,
-            shift_template_id,
-            role_id,
-            required_count,
-            is_active
-        )
-        SELECT
-            a.company_id,
-            a.account_id,
-            st.shift_template_id,
-            %s,
-            1,
-            TRUE
-        FROM accounts a
-        JOIN shift_templates st
-            ON st.company_id = a.company_id
-            AND st.is_active = TRUE
-        WHERE a.company_id = %s
-        AND a.is_active = TRUE
-        AND NOT EXISTS (
-            SELECT 1
-            FROM shift_staffing_requirements ssr
-            WHERE ssr.company_id = a.company_id
-            AND ssr.account_id = a.account_id
-            AND ssr.shift_template_id = st.shift_template_id
-            AND ssr.role_id = %s
-        )
-    """, (
-        role_id,
-        company_id,
-        role_id
-    ))
+    if normalized == "yes":
+        return True
+
+    if normalized == "no":
+        return False
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Row {row_number}: {field_name} must be yes or no"
+    )
 
 @router.get("/staffing-requirements")
 def get_staffing_requirements(company_id: int = 1):
@@ -177,6 +153,14 @@ def create_staffing_role(payload: dict):
         company_id = payload.get("company_id", 1)
         role_name = normalize_name(payload.get("role_name", ""))
         department_name = payload.get("department_name", "Default Department").strip()
+        is_admin_value = payload.get("is_admin", False)
+
+        if isinstance(is_admin_value, bool):
+            is_admin = is_admin_value
+        elif isinstance(is_admin_value, str):
+            is_admin = is_admin_value.strip().lower() == "yes"
+        else:
+            is_admin = False
 
         if not role_name:
             raise HTTPException(
@@ -248,6 +232,7 @@ def create_staffing_role(payload: dict):
                     department_id = %s,
                     role_name = %s,
                     role_key = %s,
+                    is_admin = %s,
                     is_active = TRUE,
                     updated_at = NOW()
                 WHERE company_id = %s
@@ -257,6 +242,7 @@ def create_staffing_role(payload: dict):
                 department_id,
                 role_name,
                 role_key,
+                is_admin,
                 company_id,
                 role_id
             ))
@@ -270,26 +256,21 @@ def create_staffing_role(payload: dict):
                     department_id,
                     role_name,
                     role_key,
+                    is_admin,
                     is_active
                 )
-                VALUES (%s, %s, %s, %s, TRUE)
+                VALUES (%s, %s, %s, %s, %s, TRUE)
                 RETURNING role_id
             """, (
                 company_id,
                 department_id,
                 role_name,
-                role_key
+                role_key,
+                is_admin
             ))
 
             role_id = cursor.fetchone()[0]
 
-        # Create default requirement rows only for active accounts.
-        # If the company has no accounts yet, this inserts nothing, and that is valid.
-        ensure_default_role_requirements(
-            cursor,
-            company_id,
-            role_id
-        )
 
         conn.commit()
 
@@ -369,14 +350,14 @@ async def import_staffing_roles(
             if header
         ]
 
-        required_headers = ["department_name", "role_name"]
+        required_headers = ["department_name", "role_name", "is_admin"]
 
         if normalized_headers != required_headers:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     "Invalid CSV file. Required exact header: "
-                    "department_name,role_name"
+                    "department_name,role_name,is_admin"
                 )
             )
 
@@ -403,6 +384,11 @@ async def import_staffing_roles(
                 )
             )
 
+            is_admin_raw = get_csv_value(
+                normalized_row,
+                "is_admin"
+            )
+
             if not department_name and not role_name:
                 continue
 
@@ -413,12 +399,21 @@ async def import_staffing_roles(
             if not role_name:
                 errors.append(f"Row {row_number}: Role Name is required")
                 continue
+            
+            if not is_admin_raw:
+                errors.append(f"Row {row_number}: is_admin is required")
+                continue
 
             rows.append({
                 "row_number": row_number,
                 "department_name": department_name,
                 "role_name": role_name,
-                "role_key": normalize_role_key(role_name)
+                "role_key": normalize_role_key(role_name),
+                "is_admin": parse_yes_no(
+                    is_admin_raw,
+                    row_number,
+                    "is_admin"
+                )
             })
 
         if errors:
@@ -440,6 +435,7 @@ async def import_staffing_roles(
             department_name = item["department_name"]
             role_name = item["role_name"]
             role_key = item["role_key"]
+            is_admin = item["is_admin"]
 
             cursor.execute("""
                 SELECT
@@ -505,6 +501,7 @@ async def import_staffing_roles(
                         department_id = %s,
                         role_name = %s,
                         role_key = %s,
+                        is_admin = %s,
                         is_active = TRUE,
                         updated_at = NOW()
                     WHERE role_id = %s
@@ -514,6 +511,7 @@ async def import_staffing_roles(
                     department_id,
                     role_name,
                     role_key,
+                    is_admin,
                     role_id,
                     company_id
                 ))
@@ -528,25 +526,21 @@ async def import_staffing_roles(
                         department_id,
                         role_name,
                         role_key,
+                        is_admin,
                         is_active
                     )
-                    VALUES (%s, %s, %s, %s, TRUE)
+                    VALUES (%s, %s, %s, %s, %s, TRUE)
                     RETURNING role_id
                 """, (
                     company_id,
                     department_id,
                     role_name,
-                    role_key
+                    role_key,
+                    is_admin
                 ))
 
                 role_id = cursor.fetchone()[0]
                 created_roles += 1
-
-            ensure_default_role_requirements(
-                cursor,
-                company_id,
-                role_id
-            )
 
         conn.commit()
 
@@ -602,19 +596,32 @@ def delete_staffing_role(staffing_role_id: int, company_id: int = 1):
             )
 
         cursor.execute("""
-            UPDATE roles
-            SET
-                is_active = FALSE,
-                updated_at = NOW()
-            WHERE role_id = %s
-            AND company_id = %s
+            SELECT COUNT(*)
+            FROM employee_roles er
+            JOIN employees e
+                ON e.employee_id = er.employee_id
+                AND e.company_id = er.company_id
+            WHERE er.role_id = %s
+            AND er.company_id = %s
+            AND LOWER(e.employment_status) = 'active'
         """, (
             staffing_role_id,
             company_id
         ))
 
+        active_employee_count = cursor.fetchone()[0]
+
+        if active_employee_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot deactivate role. "
+                    f"{active_employee_count} active employee(s) are assigned to this role."
+                )
+            )
+
         cursor.execute("""
-            UPDATE shift_staffing_requirements
+            UPDATE roles
             SET
                 is_active = FALSE,
                 updated_at = NOW()
