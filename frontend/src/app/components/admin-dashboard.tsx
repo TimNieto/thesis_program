@@ -301,6 +301,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const [roleToDeactivate, setRoleToDeactivate] = useState<any | null>(null);
 
+  const [assignmentToDeactivate, setAssignmentToDeactivate] = useState<
+    number | null
+  >(null);
+
+  const [assignmentDeactivatePreview, setAssignmentDeactivatePreview] =
+    useState<any | null>(null);
+
   const [selectedEmployeeForDayOff, setSelectedEmployeeForDayOff] = useState<
     number | null
   >(null);
@@ -1247,33 +1254,27 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         );
       }
 
-      const assignment = previewData.assignment;
-      const cleanup = previewData.cleanup;
-
-      const confirmed = confirm(
-        [
-          "Deactivate this employee assignment?",
-          "",
-          `${assignment.employee_name}`,
-          `${assignment.department_name} / ${assignment.role_name}`,
-          "",
-          "Affected records:",
-          `- Employee assignment deactivated: ${cleanup.employee_assignment_deactivated}`,
-          `- Account preferences disabled: ${cleanup.account_preferences_disabled}`,
-          `- Future schedule slots unassigned: ${cleanup.future_schedule_slots_unassigned}`,
-          `- Coverage requests cancelled: ${cleanup.coverage_requests_cancelled}`,
-          `- Shift applications cancelled: ${cleanup.shift_applications_cancelled}`,
-          `- Emergency cover targets cancelled: ${cleanup.emergency_cover_targets_cancelled}`,
-          `- Historical finalized assignments changed: ${cleanup.historical_finalized_assignments_changed}`,
-        ].join("\n"),
+      setAssignmentToDeactivate(employeeRoleId);
+      setAssignmentDeactivatePreview(previewData);
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to load deactivation impact",
       );
+    }
+  };
 
-      if (!confirmed) {
-        return;
+  const confirmDeactivateEmployeeAssignment = async () => {
+    if (!assignmentToDeactivate) return;
+
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
       }
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/employee-assignments/${employeeRoleId}?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/employee-assignments/${assignmentToDeactivate}?company_id=${currentUser.company_id}`,
         {
           method: "DELETE",
         },
@@ -1296,6 +1297,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           ? err.message
           : "Failed to deactivate employee assignment",
       );
+    } finally {
+      setAssignmentToDeactivate(null);
+      setAssignmentDeactivatePreview(null);
     }
   };
 
@@ -3300,7 +3304,134 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Confirm Deactivate Employee Assignment Dialog */}
+      <Dialog
+        open={assignmentDeactivatePreview !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAssignmentToDeactivate(null);
+            setAssignmentDeactivatePreview(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Employee Assignment</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this employee assignment?
+              Related active workflow records will be cleaned up, but finalized
+              history will be preserved.
+            </DialogDescription>
+          </DialogHeader>
 
+          {assignmentDeactivatePreview && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-md border bg-gray-50 p-3 text-sm">
+                <p className="font-medium">
+                  {assignmentDeactivatePreview.assignment.employee_name}
+                </p>
+                <p className="text-gray-600">
+                  {assignmentDeactivatePreview.assignment.department_name} /{" "}
+                  {assignmentDeactivatePreview.assignment.role_name}
+                </p>
+              </div>
+
+              <div className="rounded-md border p-3 text-sm space-y-2">
+                <p className="font-medium">Affected records</p>
+
+                <div className="flex justify-between gap-4">
+                  <span>Employee assignment deactivated</span>
+                  <span className="font-medium">
+                    {
+                      assignmentDeactivatePreview.cleanup
+                        .employee_assignment_deactivated
+                    }
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <span>Account preferences disabled</span>
+                  <span className="font-medium">
+                    {
+                      assignmentDeactivatePreview.cleanup
+                        .account_preferences_disabled
+                    }
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <span>Future schedule slots unassigned</span>
+                  <span className="font-medium">
+                    {
+                      assignmentDeactivatePreview.cleanup
+                        .future_schedule_slots_unassigned
+                    }
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <span>Coverage requests cancelled</span>
+                  <span className="font-medium">
+                    {
+                      assignmentDeactivatePreview.cleanup
+                        .coverage_requests_cancelled
+                    }
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <span>Shift applications cancelled</span>
+                  <span className="font-medium">
+                    {
+                      assignmentDeactivatePreview.cleanup
+                        .shift_applications_cancelled
+                    }
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <span>Emergency cover targets cancelled</span>
+                  <span className="font-medium">
+                    {
+                      assignmentDeactivatePreview.cleanup
+                        .emergency_cover_targets_cancelled
+                    }
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-4 border-t pt-2">
+                  <span>Historical finalized assignments changed</span>
+                  <span className="font-medium">
+                    {
+                      assignmentDeactivatePreview.cleanup
+                        .historical_finalized_assignments_changed
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAssignmentToDeactivate(null);
+                setAssignmentDeactivatePreview(null);
+              }}
+            >
+              No
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={confirmDeactivateEmployeeAssignment}
+            >
+              Yes, Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Confirm Deactivate Account / Department Dialog */}
       <Dialog
         open={accountDepartmentToDeactivate !== null}
