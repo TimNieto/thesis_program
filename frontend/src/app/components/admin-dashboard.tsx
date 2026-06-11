@@ -1229,14 +1229,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
-  const handleRemoveEmployeeAssignment = async (employeeRoleId: number) => {
+  const handleDeactivateEmployeeAssignment = async (employeeRoleId: number) => {
     try {
       if (!currentUser.company_id) {
         throw new Error("No company selected");
       }
 
       const confirmed = confirm(
-        "Are you sure you want to remove this employee assignment?",
+        "Are you sure you want to deactivate this employee assignment?",
       );
 
       if (!confirmed) {
@@ -1253,17 +1253,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(data?.detail || "Failed to remove employee assignment");
+        throw new Error(
+          data?.detail || "Failed to deactivate employee assignment",
+        );
       }
 
       await fetchEmployees();
 
-      toast.success(data?.message || "Employee assignment removed");
+      toast.success(data?.message || "Employee assignment deactivated");
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Failed to remove employee assignment",
+          : "Failed to deactivate employee assignment",
       );
     }
   };
@@ -2471,12 +2473,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 size="sm"
                                 className={dangerSmallButtonClass}
                                 onClick={() =>
-                                  handleRemoveEmployeeAssignment(
+                                  handleDeactivateEmployeeAssignment(
                                     row.employee_role_id,
                                   )
                                 }
                               >
-                                Remove
+                                Deactivate
                               </Button>
                             )}
                           </TableCell>

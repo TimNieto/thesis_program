@@ -16,6 +16,7 @@ def get_company_admin_employee_ids(cursor, company_id: int, exclude_employee_id:
 
         WHERE e.company_id = %s
         AND e.employment_status = 'Active'
+        AND er.is_active = TRUE
         AND r.is_admin = TRUE
         AND r.is_active = TRUE
     """

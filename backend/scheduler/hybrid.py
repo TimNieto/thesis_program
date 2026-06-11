@@ -37,15 +37,6 @@ def calculate_unfilled_slots(assignments, shifts, account_settings):
     unfilled = []
 
     for shift in shifts:
-        account_policy = account_settings.get(
-            shift["account"],
-            {}
-        )
-
-        operator_policy = account_policy.get(
-            "operator_policy",
-            "required"
-        )
 
         for req in shift.get("staffing_requirements", []):
 
@@ -53,9 +44,6 @@ def calculate_unfilled_slots(assignments, shifts, account_settings):
             required_count = req.get("required_count", 0) or 0
 
             if required_count <= 0:
-                continue
-
-            if role == "operator" and operator_policy == "avoid":
                 continue
 
             current_count = assigned_counts.get(

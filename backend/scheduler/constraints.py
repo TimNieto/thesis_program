@@ -136,13 +136,6 @@ def has_role(employee, role, context=None):
 
             return role in allowed_roles
 
-    # Fallback for old behavior
-    if role == "host":
-        return employee.get("can_be_host", False)
-
-    if role == "operator":
-        return employee.get("can_be_operator", False)
-
     return False
 
 

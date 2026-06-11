@@ -462,6 +462,7 @@ def delete_account(account_id: int, company_id: int):
                 AND e.company_id = ap.company_id
             WHERE ap.account_id = %s
             AND ap.company_id = %s
+            AND ap.is_active = TRUE
             AND LOWER(e.employment_status) = 'active'
         """, (
             account_id,

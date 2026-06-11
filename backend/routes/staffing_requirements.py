@@ -625,6 +625,7 @@ def delete_staffing_role(staffing_role_id: int, company_id: int = 1):
                 AND e.company_id = er.company_id
             WHERE er.role_id = %s
             AND er.company_id = %s
+            AND er.is_active = TRUE
             AND LOWER(e.employment_status) = 'active'
         """, (
             staffing_role_id,

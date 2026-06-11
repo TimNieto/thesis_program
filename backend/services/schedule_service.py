@@ -42,7 +42,6 @@ def fetch_active_staffing_roles(cursor, company_id: int):
         FROM roles
         WHERE company_id = %s
         AND is_active = TRUE
-        AND role_key IN ('host', 'operator')
         ORDER BY role_id
     """, (company_id,))
 
@@ -123,21 +122,40 @@ def fetch_employees(cursor, company_id: int):
     employees = []
 
     for employee_id, full_name, emp_company_id in employee_rows:
-        # General roles for display/scoring fallback only
+        # Active employee roles for display/scoring fallback.
         cursor.execute("""
-            SELECT r.role_key
+            SELECT
+                r.role_key,
+                r.role_name
             FROM employee_roles er
             JOIN roles r
                 ON er.role_id = r.role_id
                 AND er.company_id = r.company_id
             WHERE er.employee_id = %s
             AND er.company_id = %s
+            AND er.is_active = TRUE
             AND r.is_active = TRUE
-        """, (employee_id, emp_company_id))
+            ORDER BY r.role_name
+        """, (
+            employee_id,
+            emp_company_id
+        ))
 
-        general_role_keys = [r[0] for r in cursor.fetchall()]
+        general_role_rows = cursor.fetchall()
 
-        # Account-specific scheduling permissions
+        general_role_keys = [
+            str(row[0]).strip().lower()
+            for row in general_role_rows
+            if row[0]
+        ]
+
+        general_role_names = [
+            str(row[1]).strip()
+            for row in general_role_rows
+            if row[1]
+        ]
+
+        # Account-specific scheduling permissions for ANY active role.
         cursor.execute("""
             SELECT
                 a.account_name,
@@ -151,18 +169,24 @@ def fetch_employees(cursor, company_id: int):
                 AND ap.company_id = r.company_id
             WHERE ap.employee_id = %s
             AND ap.company_id = %s
+            AND ap.is_active = TRUE
             AND a.is_active = TRUE
             AND r.is_active = TRUE
-            AND r.role_key IN ('host', 'operator')
-        """, (employee_id, emp_company_id))
+        """, (
+            employee_id,
+            emp_company_id
+        ))
 
         account_role_rows = cursor.fetchall()
 
         account_role_permissions = {}
 
         for account_name, role_key in account_role_rows:
-            account_key = account_name.strip().lower()
-            role_key = role_key.strip().lower()
+            if not account_name or not role_key:
+                continue
+
+            account_key = str(account_name).strip().lower()
+            role_key = str(role_key).strip().lower()
 
             if account_key not in account_role_permissions:
                 account_role_permissions[account_key] = set()
@@ -170,37 +194,22 @@ def fetch_employees(cursor, company_id: int):
             account_role_permissions[account_key].add(role_key)
 
         account_role_permissions = {
-            account: list(role_keys)
+            account: sorted(list(role_keys))
             for account, role_keys in account_role_permissions.items()
         }
 
-        can_be_host = any(
-            "host" in role_keys
+        scheduled_role_keys = sorted({
+            role_key
             for role_keys in account_role_permissions.values()
-        )
-
-        can_be_operator = any(
-            "operator" in role_keys
-            for role_keys in account_role_permissions.values()
-        )
-
-        if can_be_host and can_be_operator:
-            main_role = "Both"
-        elif can_be_host:
-            main_role = "Host"
-        elif can_be_operator:
-            main_role = "Operator"
-        elif "hr_manager" in general_role_keys:
-            main_role = "Team Leader"
-        else:
-            main_role = "Employee"
+            for role_key in role_keys
+        })
 
         employees.append({
             "employee_id": employee_id,
             "full_name": full_name,
-            "main_role": main_role,
-            "can_be_host": can_be_host,
-            "can_be_operator": can_be_operator,
+            "main_role": ", ".join(general_role_names) if general_role_names else "Employee",
+            "role_keys": general_role_keys,
+            "scheduled_role_keys": scheduled_role_keys,
             "account_role_permissions": account_role_permissions,
             "company_id": emp_company_id
         })
@@ -386,8 +395,6 @@ def fetch_account_settings(cursor, company_id: int):
 
         account_settings[account_name] = {
             "priority_level": row[1],
-            "require_host": True,
-            "require_operator": True,
             "operator_policy": row[2] or "optional",
             "allow_partial_staffing": row[3]
         }

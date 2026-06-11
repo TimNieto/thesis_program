@@ -63,20 +63,29 @@ def prepare_context(employees, shifts, availability, leaves, absences, settings,
         }
     }
 
-    hosts = [e for e in employees if e.get("can_be_host")]
-    operators = [e for e in employees if e.get("can_be_operator")]
-
-    role_pools = {
-        "host": hosts,
-        "operator": operators
-    }
+    required_role_keys = set()
 
     for shift in shifts:
         for req in shift.get("staffing_requirements", []):
-            role_key = req["role_key"]
+            role_key = str(req["role_key"]).strip().lower()
 
-            if role_key not in role_pools:
-                role_pools[role_key] = []
+            if role_key:
+                required_role_keys.add(role_key)
+
+    role_pools = {
+        role_key: []
+        for role_key in required_role_keys
+    }
+
+    for employee in employees:
+        employee_role_keys = set(
+            employee.get("scheduled_role_keys")
+            or []
+        )
+
+        for role_key in required_role_keys:
+            if role_key in employee_role_keys:
+                role_pools[role_key].append(employee)
 
     context["role_pools"] = role_pools
 
@@ -132,11 +141,9 @@ def sort_shifts_by_difficulty(shifts, employees, context):
             .get(account_name, {})
         )
 
-        priority_level = (
-            account_policy.get(
-                "priority_level",
-                999
-            )
+        priority_level = account_policy.get(
+            "priority_level",
+            999
         )
 
         # fewer candidates → higher priority
@@ -183,18 +190,6 @@ def score_employee(employee, shift, role, context):
 
     score = 0
 
-    account_policy = (
-        context["account_settings"]
-        .get(shift["account"], {})
-    )
-
-    operator_policy = (
-        account_policy.get(
-            "operator_policy",
-            "required"
-        )
-    )
-
     # 1. FAIRNESS
     assignment_count = context["assignment_counts"][emp_id]
 
@@ -204,40 +199,16 @@ def score_employee(employee, shift, role, context):
         )
     score -= assignment_count * fairness_weight
 
-    # 1.5 MAIN ROLE PRIORITY
-    main_role = (employee.get("main_role") or "").strip()
+    # 1.5 ROLE MATCH PRIORITY
+    employee_role_keys = set(
+        employee.get("scheduled_role_keys")
+        or []
+    )
 
-    if role == "host":
-        if main_role == "Host":
-            score += 8
-        elif main_role == "Both":
-            score += 4
-        else:
-            score -= 6
-
-    elif role == "operator":
-        if main_role == "Operator":
-            score += 8
-        elif main_role == "Both":
-            score += 4
-        else:
-            score -= 6
-
-    # OPERATOR POLICY
-    if (
-        role == "operator"
-        and
-        operator_policy == "avoid"
-    ):
-
-        score -= 50
-
-    if (
-        role == "host"
-        and
-        operator_policy == "avoid"
-    ):
-        score += 15
+    if role in employee_role_keys:
+        score += 8
+    else:
+        score -= 6
 
     # 2. PRESERVE FLEXIBLE EMPLOYEES
     remaining_shifts = [
@@ -586,20 +557,6 @@ def fill_shift_staffing_requirements(
         if required_count <= 0:
             continue
 
-        # Keep existing operator policy behavior
-        account_policy = (
-            context["account_settings"]
-            .get(shift["account"], {})
-        )
-
-        operator_policy = account_policy.get(
-            "operator_policy",
-            "required"
-        )
-
-        if role == "operator" and operator_policy == "avoid":
-            continue
-
         assigned_count = fill_role(
             shift,
             role,
@@ -662,7 +619,18 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
             emp_id = e["employee_id"]
 
             # ROLE
-            if not (e.get("can_be_host") or e.get("can_be_operator")):
+            employee_role_keys = set(
+                e.get("scheduled_role_keys")
+                or []
+            )
+
+            required_role_keys = {
+                str(req["role_key"]).strip().lower()
+                for req in shift.get("staffing_requirements", [])
+                if req.get("role_key")
+            }
+
+            if required_role_keys and not employee_role_keys.intersection(required_role_keys):
                 reasons["role_fail"] += 1
                 continue
 
@@ -966,11 +934,12 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
                 emp_id = e["employee_id"]
 
                 # ROLE CHECK
-                if role == "host" and not e.get("can_be_host"):
-                    reasons["role_fail"] += 1
-                    continue
+                employee_role_keys = set(
+                    e.get("scheduled_role_keys")
+                    or []
+                )
 
-                if role == "operator" and not e.get("can_be_operator"):
+                if role not in employee_role_keys:
                     reasons["role_fail"] += 1
                     continue
 

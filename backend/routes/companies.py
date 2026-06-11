@@ -131,11 +131,13 @@ def create_default_company_data(cursor, company_id: int):
         INSERT INTO employee_roles (
             employee_id,
             role_id,
-            company_id
+            company_id,
+            is_active
         )
-        VALUES (%s, %s, %s)
+        VALUES (%s, %s, %s, TRUE)
         ON CONFLICT (company_id, employee_id, role_id)
-        DO NOTHING
+        DO UPDATE SET
+            is_active = TRUE
     """, (
         employee_id,
         role_id,

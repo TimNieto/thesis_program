@@ -312,7 +312,6 @@ def update_employee_account_preferences(employee_id: int, data: dict):
     cursor = conn.cursor()
 
     try:
-
         cursor.execute("""
             SELECT company_id
             FROM employees
@@ -327,79 +326,130 @@ def update_employee_account_preferences(employee_id: int, data: dict):
 
         company_id = employee[0]
 
-        cursor.execute("""
-            SELECT role_id, role_key
-            FROM roles
-            WHERE company_id = %s
-            AND role_key IN ('host', 'operator')
-            AND is_active = TRUE
-        """, (company_id,))
+        preferences = (
+            data.get("preferences")
+            or data.get("account_preferences")
+            or data.get("accountPreferences")
+            or []
+        )
 
-        role_rows = cursor.fetchall()
-        role_map = {role_key: role_id for role_id, role_key in role_rows}
-
-        host_role_id = role_map.get("host")
-        operator_role_id = role_map.get("operator")
-
-        if not host_role_id or not operator_role_id:
+        if not isinstance(preferences, list):
             raise HTTPException(
                 status_code=400,
-                detail="Host or operator role is missing"
+                detail="preferences must be a list"
             )
 
+        # Soft-disable old preferences first.
         cursor.execute("""
-            DELETE FROM account_preferences
+            UPDATE account_preferences
+            SET is_active = FALSE
             WHERE employee_id = %s
             AND company_id = %s
-        """, (employee_id, company_id))
+            AND is_active = TRUE
+        """, (
+            employee_id,
+            company_id
+        ))
 
-        for account_name in host_accounts:
+        for item in preferences:
+            account_name = normalize_title_text(
+                item.get("account_name") or item.get("accountName")
+            )
+
+            role_name = normalize_title_text(
+                item.get("role_name") or item.get("roleName")
+            )
+
+            role_id = item.get("role_id") or item.get("roleId")
+
+            if not account_name:
+                continue
+
+            if not role_name and not role_id:
+                continue
+
             cursor.execute("""
-                SELECT account_id
+                SELECT account_id, department_id
                 FROM accounts
                 WHERE company_id = %s
                 AND LOWER(account_name) = LOWER(%s)
                 AND is_active = TRUE
-            """, (company_id, account_name))
+                LIMIT 1
+            """, (
+                company_id,
+                account_name
+            ))
 
             account = cursor.fetchone()
 
-            if account:
-                cursor.execute("""
-                    INSERT INTO account_preferences (
-                        employee_id,
-                        account_id,
-                        role_id,
-                        company_id
-                    )
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (employee_id, account_id, role_id)
-                    DO NOTHING
-                """, (employee_id, account[0], host_role_id, company_id))
+            if not account:
+                continue
 
-        for account_name in operator_accounts:
+            account_id = account[0]
+            department_id = account[1]
+
+            if role_id:
+                cursor.execute("""
+                    SELECT role_id
+                    FROM roles
+                    WHERE company_id = %s
+                    AND role_id = %s
+                    AND department_id = %s
+                    AND is_active = TRUE
+                    LIMIT 1
+                """, (
+                    company_id,
+                    role_id,
+                    department_id
+                ))
+            else:
+                cursor.execute("""
+                    SELECT role_id
+                    FROM roles
+                    WHERE company_id = %s
+                    AND department_id = %s
+                    AND LOWER(role_name) = LOWER(%s)
+                    AND is_active = TRUE
+                    LIMIT 1
+                """, (
+                    company_id,
+                    department_id,
+                    role_name
+                ))
+
+            role = cursor.fetchone()
+
+            if not role:
+                continue
+
+            role_id = role[0]
+
             cursor.execute("""
-                SELECT account_id
-                FROM accounts
-                WHERE company_id = %s
-                AND LOWER(account_name) = LOWER(%s)
-                AND is_active = TRUE
-            """, (company_id, account_name))
-
-            account = cursor.fetchone()
-
-            if account:
-                cursor.execute("""
-                    INSERT INTO account_preferences (
-                        employee_id,
-                        account_id,
-                        role_id,
-                        company_id
-                    )
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (employee_id, account_id, role_id)
-                    DO NOTHING
-                """, (employee_id, account[0], operator_role_id, company_id))
+                INSERT INTO account_preferences (
+                    employee_id,
+                    account_id,
+                    role_id,
+                    company_id,
+                    department_id,
+                    is_active
+                )
+                VALUES (%s, %s, %s, %s, %s, TRUE)
+                ON CONFLICT (
+                    company_id,
+                    employee_id,
+                    account_id,
+                    role_id
+                )
+                DO UPDATE SET
+                    department_id = EXCLUDED.department_id,
+                    is_active = TRUE
+            """, (
+                employee_id,
+                account_id,
+                role_id,
+                company_id,
+                department_id
+            ))
 
         conn.commit()
 
@@ -1605,7 +1655,7 @@ def add_employee_assignment(data: dict):
 
 
 @router.delete("/employee-assignments/{employee_role_id}")
-def remove_employee_assignment(employee_role_id: int, company_id: int):
+def deactivate_employee_assignment(employee_role_id: int, company_id: int):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1613,6 +1663,8 @@ def remove_employee_assignment(employee_role_id: int, company_id: int):
         cursor.execute("""
             SELECT
                 er.employee_role_id,
+                er.employee_id,
+                er.role_id,
                 er.is_active,
                 e.full_name,
                 d.department_name,
@@ -1630,7 +1682,10 @@ def remove_employee_assignment(employee_role_id: int, company_id: int):
             WHERE er.employee_role_id = %s
             AND er.company_id = %s
             LIMIT 1
-        """, (employee_role_id, company_id))
+        """, (
+            employee_role_id,
+            company_id
+        ))
 
         assignment = cursor.fetchone()
 
@@ -1640,10 +1695,12 @@ def remove_employee_assignment(employee_role_id: int, company_id: int):
                 detail="Employee assignment not found"
             )
 
-        is_active = bool(assignment[1])
-        employee_name = assignment[2]
-        department_name = assignment[3]
-        role_name = assignment[4]
+        employee_id = assignment[1]
+        role_id = assignment[2]
+        is_active = bool(assignment[3])
+        employee_name = assignment[4]
+        department_name = assignment[5]
+        role_name = assignment[6]
 
         if not is_active:
             return {
@@ -1653,20 +1710,143 @@ def remove_employee_assignment(employee_role_id: int, company_id: int):
                 )
             }
 
+        # Find active future generated schedule rows tied to this exact employee + role.
+        cursor.execute("""
+            SELECT
+                gs.schedule_id
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            WHERE gs.company_id = %s
+            AND gs.employee_id = %s
+            AND gs.role_id = %s
+            AND gs.is_archived = FALSE
+            AND s.shift_date >= CURRENT_DATE
+        """, (
+            company_id,
+            employee_id,
+            role_id
+        ))
+
+        affected_schedule_ids = [
+            row[0]
+            for row in cursor.fetchall()
+        ]
+
+        affected_coverage_request_ids = []
+
+        if affected_schedule_ids:
+            cursor.execute("""
+                SELECT coverage_request_id
+                FROM coverage_requests
+                WHERE company_id = %s
+                AND schedule_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_schedule_ids
+            ))
+
+            affected_coverage_request_ids = [
+                row[0]
+                for row in cursor.fetchall()
+            ]
+
+        # Cancel/archive emergency cover targets tied to affected coverage requests.
+        if affected_coverage_request_ids:
+            cursor.execute("""
+                UPDATE emergency_cover_targets
+                SET
+                    status = 'cancelled',
+                    is_archived = TRUE,
+                    updated_at = NOW()
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_coverage_request_ids
+            ))
+
+            cursor.execute("""
+                UPDATE shift_applications
+                SET
+                    status = 'cancelled',
+                    is_archived = TRUE,
+                    updated_at = NOW()
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_coverage_request_ids
+            ))
+
+            cursor.execute("""
+                UPDATE coverage_requests
+                SET
+                    status = 'cancelled',
+                    is_archived = TRUE,
+                    updated_at = NOW()
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_coverage_request_ids
+            ))
+
+        # Option B:
+        # Keep future schedule rows, but free the slot by clearing employee_id.
+        if affected_schedule_ids:
+            cursor.execute("""
+                UPDATE generated_schedule
+                SET employee_id = NULL
+                WHERE company_id = %s
+                AND schedule_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_schedule_ids
+            ))
+
+        # Soft-deactivate account preferences for this employee + role.
+        cursor.execute("""
+            UPDATE account_preferences
+            SET is_active = FALSE
+            WHERE company_id = %s
+            AND employee_id = %s
+            AND role_id = %s
+            AND is_active = TRUE
+        """, (
+            company_id,
+            employee_id,
+            role_id
+        ))
+
+        # Soft-deactivate the employee-role assignment.
         cursor.execute("""
             UPDATE employee_roles
             SET is_active = FALSE
             WHERE employee_role_id = %s
             AND company_id = %s
-        """, (employee_role_id, company_id))
+        """, (
+            employee_role_id,
+            company_id
+        ))
 
         conn.commit()
 
         return {
             "message": (
-                f"Employee assignment removed: "
+                f"Employee assignment deactivated: "
                 f"{employee_name} / {department_name} / {role_name}"
-            )
+            ),
+            "cleanup": {
+                "future_schedule_slots_unassigned": len(affected_schedule_ids),
+                "coverage_requests_cancelled": len(affected_coverage_request_ids)
+            }
         }
 
     except HTTPException:
@@ -1675,10 +1855,10 @@ def remove_employee_assignment(employee_role_id: int, company_id: int):
 
     except Exception as e:
         conn.rollback()
-        print("REMOVE EMPLOYEE ASSIGNMENT ERROR:", e)
+        print("DEACTIVATE EMPLOYEE ASSIGNMENT ERROR:", e)
         raise HTTPException(
             status_code=500,
-            detail="Failed to remove employee assignment"
+            detail="Failed to deactivate employee assignment"
         )
 
     finally:
