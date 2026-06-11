@@ -121,7 +121,7 @@ def login(data: LoginRequest):
                 detail="Invalid credentials"
             )
 
-        # 3. Get employee roles for display and admin permission
+        # 3. Get active employee roles for display and access control
         cursor.execute(
             """
             SELECT
@@ -142,10 +142,15 @@ def login(data: LoginRequest):
 
         role_rows = cursor.fetchall()
 
-        display_role = ", ".join([row[1] for row in role_rows])
+        # Employees without at least one active role are not allowed to log in.
+        # Active role assignment is required before we can decide admin vs employee access.
+        if not role_rows:
+            raise HTTPException(
+                status_code=403,
+                detail="No active role assigned. Please contact an administrator."
+            )
 
-        if not display_role:
-            display_role = "General Employee"
+        display_role = ", ".join([row[1] for row in role_rows])
 
         # 4. Admin access is based on roles.is_admin
         is_admin = any(bool(row[2]) for row in role_rows)

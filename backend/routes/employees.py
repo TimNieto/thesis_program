@@ -47,8 +47,11 @@ def normalize_list(value):
 def get_display_role(role_names):
     return ", ".join(role_names) if role_names else "None"
 
-def normalize_person_name(value: str) -> str:
+def normalize_title_text(value: str) -> str:
     return " ".join(str(value or "").strip().split()).title()
+
+def normalize_person_name(value: str) -> str:
+    return normalize_title_text(value)
 
 
 @router.get("/employees")
@@ -930,15 +933,15 @@ async def import_employee_assignments(
                 if key
             }
 
-            employee_name = normalize_person_name(
+            employee_name = normalize_title_text(
                 normalized_row.get("employee_name")
             )
-            department_name = str(
-                normalized_row.get("department_name") or ""
-            ).strip()
-            role_name = str(
-                normalized_row.get("role_name") or ""
-            ).strip()
+            department_name = normalize_title_text(
+                normalized_row.get("department_name")
+            )
+            role_name = normalize_title_text(
+                normalized_row.get("role_name")
+            )
 
             if not employee_name and not department_name and not role_name:
                 continue
@@ -991,6 +994,10 @@ async def import_employee_assignments(
 
         validated_assignments = []
 
+        # Tracks what this CSV is trying to assign per employee.
+        # One employee may only have one department and one admin classification.
+        csv_employee_policy = {}
+
         for item in rows:
             row_number = item["row_number"]
             employee_name = item["employee_name"]
@@ -1036,7 +1043,7 @@ async def import_employee_assignments(
             department_id = department[0]
 
             cursor.execute("""
-                SELECT role_id
+                SELECT role_id, is_admin
                 FROM roles
                 WHERE company_id = %s
                 AND department_id = %s
@@ -1055,6 +1062,7 @@ async def import_employee_assignments(
                 continue
 
             role_id = role[0]
+            role_is_admin = bool(role[1])
 
             cursor.execute("""
                 SELECT employee_role_id
@@ -1073,6 +1081,110 @@ async def import_employee_assignments(
                     f"{employee_name} / {department_name} / {role_name}"
                 )
                 continue
+
+            # Check the employee's existing active assignments.
+            # Existing roles decide the employee's department and admin classification.
+            cursor.execute("""
+                SELECT DISTINCT
+                    r.department_id,
+                    d.department_name,
+                    r.is_admin
+                FROM employee_roles er
+                JOIN roles r
+                    ON er.role_id = r.role_id
+                    AND er.company_id = r.company_id
+                JOIN departments d
+                    ON r.department_id = d.department_id
+                    AND r.company_id = d.company_id
+                WHERE er.company_id = %s
+                AND er.employee_id = %s
+                AND r.is_active = TRUE
+                AND d.is_active = TRUE
+                ORDER BY d.department_name
+            """, (company_id, employee_id))
+
+            existing_role_rows = cursor.fetchall()
+
+            existing_department_ids = {
+                row[0]
+                for row in existing_role_rows
+            }
+
+            existing_department_names = {
+                row[1]
+                for row in existing_role_rows
+            }
+
+            existing_admin_values = {
+                bool(row[2])
+                for row in existing_role_rows
+            }
+
+            if len(existing_department_ids) > 1:
+                errors.append(
+                    f"Row {row_number}: employee already has roles in multiple "
+                    f"departments. Remove existing assignments first: {employee_name}"
+                )
+                continue
+
+            if len(existing_admin_values) > 1:
+                errors.append(
+                    f"Row {row_number}: employee already has mixed admin and "
+                    f"non-admin roles. Remove existing assignments first: {employee_name}"
+                )
+                continue
+
+            if existing_department_ids:
+                existing_department_id = next(iter(existing_department_ids))
+                existing_department_name = next(iter(existing_department_names))
+
+                if existing_department_id != department_id:
+                    errors.append(
+                        f"Row {row_number}: employee already belongs to department "
+                        f"'{existing_department_name}'. Remove existing roles first "
+                        f"before assigning to '{department_name}': {employee_name}"
+                    )
+                    continue
+
+            if existing_admin_values:
+                existing_is_admin = next(iter(existing_admin_values))
+
+                if existing_is_admin != role_is_admin:
+                    errors.append(
+                        f"Row {row_number}: employee already has "
+                        f"{'admin' if existing_is_admin else 'non-admin'} role access. "
+                        f"Remove existing roles first before assigning a "
+                        f"{'admin' if role_is_admin else 'non-admin'} role: "
+                        f"{employee_name}"
+                    )
+                    continue
+
+            # Check what this same CSV is assigning for this employee.
+            existing_csv_policy = csv_employee_policy.get(employee_id)
+
+            if existing_csv_policy:
+                if existing_csv_policy["department_id"] != department_id:
+                    errors.append(
+                        f"Row {row_number}: employee cannot be assigned roles "
+                        f"across multiple departments in the same CSV. "
+                        f"Already assigned to '{existing_csv_policy['department_name']}', "
+                        f"but row uses '{department_name}': {employee_name}"
+                    )
+                    continue
+
+                if existing_csv_policy["is_admin"] != role_is_admin:
+                    errors.append(
+                        f"Row {row_number}: employee cannot mix admin and "
+                        f"non-admin roles in the same CSV: {employee_name}"
+                    )
+                    continue
+
+            else:
+                csv_employee_policy[employee_id] = {
+                    "department_id": department_id,
+                    "department_name": department_name,
+                    "is_admin": role_is_admin
+                }
 
             validated_assignments.append({
                 "employee_id": employee_id,
@@ -1202,89 +1314,13 @@ def delete_employee(employee_id: int):
 
 @router.put("/employees/{employee_id}/role")
 def update_employee_role(employee_id: int, data: dict):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        role = data.get("role", "").strip()
-
-        role_key_map = {
-            "Host": ["host"],
-            "Operator": ["operator"],
-            "Both": ["host", "operator"],
-            "Team Leader": ["hr_manager"],
-            "HR Manager": ["hr_manager"],
-        }
-
-        role_keys = role_key_map.get(role)
-
-        if not role_keys:
-            raise HTTPException(status_code=400, detail="Invalid role")
-
-        cursor.execute("""
-            SELECT company_id
-            FROM employees
-            WHERE employee_id = %s
-            AND employment_status = 'Active'
-        """, (employee_id,))
-
-        employee = cursor.fetchone()
-
-        if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
-
-        company_id = employee[0]
-
-        cursor.execute("""
-            DELETE FROM employee_roles
-            WHERE employee_id = %s
-            AND company_id = %s
-        """, (employee_id, company_id))
-
-        for role_key in role_keys:
-            cursor.execute("""
-                SELECT role_id
-                FROM roles
-                WHERE company_id = %s
-                AND role_key = %s
-                AND is_active = TRUE
-            """, (company_id, role_key))
-
-            role_row = cursor.fetchone()
-
-            if not role_row:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Role not found: {role_key}"
-                )
-
-            cursor.execute("""
-                INSERT INTO employee_roles (
-                    employee_id,
-                    role_id,
-                    company_id
-                )
-                VALUES (%s, %s, %s)
-                ON CONFLICT (employee_id, role_id)
-                DO NOTHING
-            """, (employee_id, role_row[0], company_id))
-
-        conn.commit()
-
-        return {"message": "Employee role updated"}
-
-    except HTTPException:
-        conn.rollback()
-        raise
-
-    except Exception as e:
-        conn.rollback()
-        print("ERROR updating role:", e)
-        raise HTTPException(status_code=500, detail="Failed to update employee role")
-
-    finally:
-        cursor.close()
-        conn.close()
+    raise HTTPException(
+        status_code=410,
+        detail=(
+            "Direct employee role updates are disabled. "
+            "Remove existing employee assignments first, then use Employee Assignments import."
+        )
+    )
 
 
 @router.put("/employees/{employee_id}")

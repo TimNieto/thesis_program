@@ -1025,23 +1025,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     toast.success("Employee status updated");
   };
 
-  // Update Employee Role
-  const updateEmployeeRole = async (
-    id: number,
-    role: "Host" | "Operator" | "Both" | "Team Leader",
-  ) => {
-    await fetch(
-      `https://backend-production-6e75.up.railway.app/employees/${id}/role`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      },
-    );
-
-    fetchEmployees();
-  };
-
   // Approve/Decline Request
   const updateRequestStatus = (id: string, status: "approved" | "denied") => {
     setRequests(
@@ -1416,53 +1399,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       </TableRow>
                     ) : (
                       [...employees]
-                        .sort((a, b) => {
-                          const rolePriority: Record<string, number> = {
-                            "Team Leader": 1,
-                            Host: 2,
-                            Operator: 3,
-                            Both: 4,
-                          };
-
-                          return (
-                            (rolePriority[a.role] || 99) -
-                            (rolePriority[b.role] || 99)
-                          );
-                        })
+                        .sort((a, b) => a.name.localeCompare(b.name))
                         .map((employee) => (
                           <TableRow key={employee.id}>
                             <TableCell className="font-medium">
                               {employee.name}
                             </TableCell>
-                            <TableCell>
-                              <Select
-                                value={employee.role}
-                                onValueChange={(value) =>
-                                  updateEmployeeRole(
-                                    employee.id,
-                                    value as
-                                      | "Host"
-                                      | "Operator"
-                                      | "Both"
-                                      | "Team Leader",
-                                  )
-                                }
-                              >
-                                <SelectTrigger className="w-[180px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Team Leader">
-                                    Team Leader
-                                  </SelectItem>
-                                  <SelectItem value="Host">Host</SelectItem>
-                                  <SelectItem value="Operator">
-                                    Operator
-                                  </SelectItem>
-                                  <SelectItem value="Both">Both</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
+                            <TableCell>{employee.role || "None"}</TableCell>
                             <TableCell>
                               <Badge
                                 variant={
