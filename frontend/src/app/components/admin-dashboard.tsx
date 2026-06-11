@@ -916,12 +916,55 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       .values(),
   ).flatMap((group) => [group.departmentRow, ...group.roleRows]);
 
-  const assignedEmployees = employees.filter((employee) => {
-    const hasRole =
-      employee.role && employee.role.trim() !== "" && employee.role !== "None";
+  const groupedEmployeeAssignmentRows = employees
+    .filter((employee) => {
+      const hasRole =
+        employee.role &&
+        employee.role.trim() !== "" &&
+        employee.role !== "None";
 
-    return hasRole;
-  });
+      return hasRole;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((employee) => {
+      const roles = String(employee.role || "")
+        .split(",")
+        .map((role) => role.trim())
+        .filter((role) => role && role !== "None");
+
+      const departments =
+        Array.isArray(employee.departments) && employee.departments.length > 0
+          ? employee.departments
+          : String(employee.department_name || "")
+              .split(",")
+              .map((department) => department.trim())
+              .filter((department) => department && department !== "None");
+
+      return [
+        {
+          display_key: `employee-assignment-group-${employee.id}`,
+          row_type: "employee" as const,
+          employee_id: employee.id,
+          employee_name: employee.name,
+          department_name: "",
+          role_name: "",
+          status: employee.status,
+        },
+        ...roles.map((role, index) => {
+          const roleKey = role.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+          return {
+            display_key: `employee-assignment-${employee.id}-${index}-${roleKey}`,
+            row_type: "assignment" as const,
+            employee_id: employee.id,
+            employee_name: employee.name,
+            department_name: departments[index] || departments[0] || "None",
+            role_name: role,
+            status: employee.status,
+          };
+        }),
+      ];
+    });
 
   // Add Employee
   const handleAddEmployee = async () => {
@@ -2230,7 +2273,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableHeader>
 
                   <TableBody>
-                    {assignedEmployees.length === 0 ? (
+                    {groupedEmployeeAssignmentRows.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={5}
@@ -2241,39 +2284,56 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      assignedEmployees.map((employee) => (
-                        <TableRow
-                          key={`assignment-${employee.id}`}
-                          className="h-12"
-                        >
+                      groupedEmployeeAssignmentRows.map((row) => (
+                        <TableRow key={row.display_key} className="h-12">
                           <TableCell className="font-medium truncate">
-                            {employee.name}
+                            {row.row_type === "employee"
+                              ? row.employee_name
+                              : ""}
                           </TableCell>
 
-                          <TableCell className="truncate">
-                            {employee.department_name || "None"}
+                          <TableCell
+                            className={
+                              row.row_type === "assignment"
+                                ? "truncate pl-6"
+                                : "truncate text-gray-400"
+                            }
+                          >
+                            {row.row_type === "assignment"
+                              ? row.department_name
+                              : ""}
                           </TableCell>
 
-                          <TableCell className="truncate">
-                            {employee.role || "None"}
+                          <TableCell
+                            className={
+                              row.row_type === "assignment"
+                                ? "font-medium truncate"
+                                : "truncate text-gray-400"
+                            }
+                          >
+                            {row.row_type === "assignment" ? row.role_name : ""}
                           </TableCell>
 
                           <TableCell>
-                            {renderStatusBadge(employee.status)}
+                            {row.row_type === "assignment"
+                              ? renderStatusBadge(row.status)
+                              : ""}
                           </TableCell>
 
                           <TableCell className={actionCellClass}>
-                            <Button
-                              size="sm"
-                              className={dangerSmallButtonClass}
-                              onClick={() =>
-                                toast.info(
-                                  "Remove employee assignment is frontend-only for now",
-                                )
-                              }
-                            >
-                              Remove
-                            </Button>
+                            {row.row_type === "assignment" && (
+                              <Button
+                                size="sm"
+                                className={dangerSmallButtonClass}
+                                onClick={() =>
+                                  toast.info(
+                                    "Remove employee assignment is frontend-only for now",
+                                  )
+                                }
+                              >
+                                Remove
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
