@@ -357,14 +357,12 @@ def add_employee(data: dict):
     cursor = conn.cursor()
 
     try:
-        name = data.get("name", "").strip()
-        nickname = data.get("nickname", "").strip()
-        email = data.get("email", "").strip().lower()
-        contact_number = data.get("contactNumber", "").strip()
+        name = str(data.get("name") or "").strip()
+        nickname = str(data.get("nickname") or "").strip()
+        email = str(data.get("email") or "").strip().lower()
+        contact_number = str(data.get("contactNumber") or "").strip()
         created_by = data.get("created_by")
         company_id = data.get("company_id")
-
-        role = data.get("role", "").strip()
 
         if not name:
             raise HTTPException(status_code=400, detail="Full name is required")
@@ -382,7 +380,7 @@ def add_employee(data: dict):
             if not created_by:
                 raise HTTPException(
                     status_code=400,
-                    detail="company_id or created_by is required"
+                    detail="Unable to identify your company. Please sign in again."
                 )
 
             cursor.execute("""
@@ -405,17 +403,51 @@ def add_employee(data: dict):
         cursor.execute("""
             SELECT employee_id, employment_status
             FROM employees
-            WHERE LOWER(email) = LOWER(%s)
-            AND company_id = %s
-        """, (email, company_id))
+            WHERE company_id = %s
+            AND LOWER(email) = LOWER(%s)
+            LIMIT 1
+        """, (company_id, email))
 
-        existing = cursor.fetchone()
+        existing_by_email = cursor.fetchone()
 
-        if existing and existing[1] == "Active":
-            raise HTTPException(status_code=400, detail="Employee already exists")
+        if existing_by_email and existing_by_email[1] == "Active":
+            raise HTTPException(
+                status_code=400,
+                detail="Employee email already exists"
+            )
 
-        if existing:
-            employee_id = existing[0]
+        employee_id_to_exclude = existing_by_email[0] if existing_by_email else None
+
+        if employee_id_to_exclude:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE company_id = %s
+                AND contact_number = %s
+                AND employment_status = 'Active'
+                AND employee_id <> %s
+                LIMIT 1
+            """, (company_id, contact_number, employee_id_to_exclude))
+        else:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE company_id = %s
+                AND contact_number = %s
+                AND employment_status = 'Active'
+                LIMIT 1
+            """, (company_id, contact_number))
+
+        existing_contact = cursor.fetchone()
+
+        if existing_contact:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee contact number already exists"
+            )
+
+        if existing_by_email:
+            employee_id = existing_by_email[0]
 
             cursor.execute("""
                 UPDATE employees
@@ -468,115 +500,6 @@ def add_employee(data: dict):
             employee_id = cursor.fetchone()[0]
             message = "Employee added"
 
-        # Optional role assignment, if frontend sends role.
-        role_key_map = {
-            "Host": ["host"],
-            "Operator": ["operator"],
-            "Both": ["host", "operator"],
-            "Team Leader": ["hr_manager"],
-            "HR Manager": ["hr_manager"],
-        }
-
-        role_keys = role_key_map.get(role, [])
-
-        if role_keys:
-            cursor.execute("""
-                DELETE FROM employee_roles
-                WHERE employee_id = %s
-                AND company_id = %s
-            """, (employee_id, company_id))
-
-            for role_key in role_keys:
-                cursor.execute("""
-                    SELECT role_id
-                    FROM roles
-                    WHERE company_id = %s
-                    AND role_key = %s
-                    AND is_active = TRUE
-                    LIMIT 1
-                """, (company_id, role_key))
-
-                role_row = cursor.fetchone()
-
-                if role_row:
-                    cursor.execute("""
-                        INSERT INTO employee_roles (
-                            employee_id,
-                            role_id,
-                            company_id
-                        )
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (employee_id, role_id)
-                        DO NOTHING
-                    """, (employee_id, role_row[0], company_id))
-
-            role_rows = cursor.fetchall()
-            role_map = {role_key: role_id for role_id, role_key in role_rows}
-
-            cursor.execute("""
-                DELETE FROM account_preferences
-                WHERE employee_id = %s
-                AND company_id = %s
-            """, (employee_id, company_id))
-
-            for account_name in host_accounts:
-                cursor.execute("""
-                    SELECT account_id
-                    FROM accounts
-                    WHERE company_id = %s
-                    AND LOWER(account_name) = LOWER(%s)
-                    AND is_active = TRUE
-                """, (company_id, account_name))
-
-                account = cursor.fetchone()
-
-                if account and role_map.get("host"):
-                    cursor.execute("""
-                        INSERT INTO account_preferences (
-                            employee_id,
-                            account_id,
-                            role_id,
-                            company_id
-                        )
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (employee_id, account_id, role_id)
-                        DO NOTHING
-                    """, (
-                        employee_id,
-                        account[0],
-                        role_map["host"],
-                        company_id
-                    ))
-
-            for account_name in operator_accounts:
-                cursor.execute("""
-                    SELECT account_id
-                    FROM accounts
-                    WHERE company_id = %s
-                    AND LOWER(account_name) = LOWER(%s)
-                    AND is_active = TRUE
-                """, (company_id, account_name))
-
-                account = cursor.fetchone()
-
-                if account and role_map.get("operator"):
-                    cursor.execute("""
-                        INSERT INTO account_preferences (
-                            employee_id,
-                            account_id,
-                            role_id,
-                            company_id
-                        )
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (employee_id, account_id, role_id)
-                        DO NOTHING
-                    """, (
-                        employee_id,
-                        account[0],
-                        role_map["operator"],
-                        company_id
-                    ))
-
         conn.commit()
 
         return {
@@ -591,7 +514,10 @@ def add_employee(data: dict):
     except Exception as e:
         conn.rollback()
         print("ERROR adding employee:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to add employee"
+        )
 
     finally:
         cursor.close()
@@ -612,7 +538,7 @@ async def import_employees(
         if not company_id:
             raise HTTPException(
                 status_code=400,
-                detail="company_id is required"
+                detail="Unable to identify your company. Please sign in again."
             )
 
         if not file.filename.lower().endswith(".csv"):
@@ -664,6 +590,7 @@ async def import_employees(
         rows = []
         errors = []
         csv_emails = set()
+        csv_contact_numbers = set()
 
         for row_number, row in enumerate(reader, start=2):
             normalized_row = {
@@ -699,6 +626,12 @@ async def import_employees(
 
             if not contact_number:
                 errors.append(f"Row {row_number}: contact_number is required")
+            elif contact_number in csv_contact_numbers:
+                errors.append(
+                    f"Row {row_number}: duplicate contact_number in CSV: {contact_number}"
+                )
+            else:
+                csv_contact_numbers.add(contact_number)
 
             rows.append({
                 "row_number": row_number,
@@ -736,15 +669,37 @@ async def import_employees(
 
         existing_active_emails = cursor.fetchall()
 
-        if existing_active_emails:
+        cursor.execute("""
+            SELECT contact_number
+            FROM employees
+            WHERE company_id = %s
+            AND contact_number = ANY(%s::text[])
+            AND employment_status = 'Active'
+        """, (
+            company_id,
+            list(csv_contact_numbers)
+        ))
+
+        existing_active_contacts = cursor.fetchall()
+
+        duplicate_errors = []
+
+        duplicate_errors.extend([
+            f"Employee email already exists: {row[0]}"
+            for row in existing_active_emails
+        ])
+
+        duplicate_errors.extend([
+            f"Employee contact number already exists: {row[0]}"
+            for row in existing_active_contacts
+        ])
+
+        if duplicate_errors:
             raise HTTPException(
                 status_code=400,
                 detail={
                     "message": "Invalid employee import data",
-                    "errors": [
-                        f"Employee already exists: {row[0]}"
-                        for row in existing_active_emails
-                    ]
+                    "errors": duplicate_errors
                 }
             )
 
