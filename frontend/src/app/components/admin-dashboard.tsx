@@ -1972,10 +1972,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[25%]">Department</TableHead>
-                      <TableHead className="w-[25%]">Role Name</TableHead>
-                      <TableHead className="w-[22%]">Role Key</TableHead>
-                      <TableHead className="w-[12%]">Status</TableHead>
+                      <TableHead className="w-[22%]">Department</TableHead>
+                      <TableHead className="w-[22%]">Role Name</TableHead>
+                      <TableHead className="w-[20%]">Role Key</TableHead>
+                      <TableHead className="w-[12%]">Admin</TableHead>
+                      <TableHead className="w-[10%]">Status</TableHead>
                       <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1984,7 +1985,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     {groupedRoleRows.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="text-center text-gray-500 py-6"
                         >
                           No roles found. Use Add Role or Import CSV to add
@@ -2012,6 +2013,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                           <TableCell className="truncate">
                             {row.row_type === "role" ? row.role_key : ""}
+                          </TableCell>
+
+                          <TableCell>
+                            {row.row_type === "role" ? (
+                              <Badge
+                                variant={row.is_admin ? "default" : "secondary"}
+                              >
+                                {row.is_admin ? "Yes" : "No"}
+                              </Badge>
+                            ) : (
+                              ""
+                            )}
                           </TableCell>
 
                           <TableCell>
