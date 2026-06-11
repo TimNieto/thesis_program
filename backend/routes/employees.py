@@ -1,7 +1,9 @@
 #---------------------------------------------
 # backend/routes/employees.py
 
-from fastapi import APIRouter, HTTPException
+import csv
+import io
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db.database import get_connection
 from passlib.hash import bcrypt
 from services.notification_service import create_notification
@@ -607,7 +609,251 @@ def add_employee(data: dict):
         cursor.close()
         conn.close()
 
+@router.post("/employees-import")
+async def import_employees(
+    company_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
 
+    created_employees = 0
+    reactivated_employees = 0
+
+    try:
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. Only .csv files are allowed."
+            )
+
+        content = await file.read()
+
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File must be UTF-8 encoded."
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File is empty."
+            )
+
+        normalized_headers = [
+            str(header).strip().lower().replace(" ", "_")
+            for header in reader.fieldnames
+            if header
+        ]
+
+        required_headers = [
+            "full_name",
+            "nickname",
+            "email",
+            "contact_number"
+        ]
+
+        if normalized_headers != required_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid CSV file. Required exact header: "
+                    "full_name,nickname,email,contact_number"
+                )
+            )
+
+        rows = []
+        errors = []
+        csv_emails = set()
+
+        for row_number, row in enumerate(reader, start=2):
+            normalized_row = {
+                str(key).strip().lower().replace(" ", "_"): value
+                for key, value in row.items()
+                if key
+            }
+
+            full_name = str(normalized_row.get("full_name") or "").strip()
+            nickname = str(normalized_row.get("nickname") or "").strip()
+            email = str(normalized_row.get("email") or "").strip().lower()
+            contact_number = str(
+                normalized_row.get("contact_number") or ""
+            ).strip()
+
+            if not full_name and not nickname and not email and not contact_number:
+                continue
+
+            if not full_name:
+                errors.append(f"Row {row_number}: full_name is required")
+
+            if not nickname:
+                errors.append(f"Row {row_number}: nickname is required")
+
+            if not email:
+                errors.append(f"Row {row_number}: email is required")
+            elif "@" not in email:
+                errors.append(f"Row {row_number}: valid email is required")
+            elif email in csv_emails:
+                errors.append(f"Row {row_number}: duplicate email in CSV: {email}")
+            else:
+                csv_emails.add(email)
+
+            if not contact_number:
+                errors.append(f"Row {row_number}: contact_number is required")
+
+            rows.append({
+                "row_number": row_number,
+                "full_name": full_name,
+                "nickname": nickname,
+                "email": email,
+                "contact_number": contact_number
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid employee import data",
+                    "errors": errors
+                }
+            )
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV has no valid employee rows"
+            )
+
+        cursor.execute("""
+            SELECT email
+            FROM employees
+            WHERE company_id = %s
+            AND LOWER(email) = ANY(%s::text[])
+            AND employment_status = 'Active'
+        """, (
+            company_id,
+            list(csv_emails)
+        ))
+
+        existing_active_emails = cursor.fetchall()
+
+        if existing_active_emails:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid employee import data",
+                    "errors": [
+                        f"Employee already exists: {row[0]}"
+                        for row in existing_active_emails
+                    ]
+                }
+            )
+
+        for item in rows:
+            cursor.execute("""
+                SELECT employee_id, employment_status
+                FROM employees
+                WHERE company_id = %s
+                AND LOWER(email) = LOWER(%s)
+                LIMIT 1
+            """, (
+                company_id,
+                item["email"]
+            ))
+
+            existing_employee = cursor.fetchone()
+
+            if existing_employee:
+                employee_id = existing_employee[0]
+
+                cursor.execute("""
+                    UPDATE employees
+                    SET
+                        full_name = %s,
+                        nickname = %s,
+                        email = %s,
+                        password = %s,
+                        employment_status = 'Active',
+                        contact_number = %s,
+                        joined_date = CURRENT_DATE,
+                        updated_at = NOW()
+                    WHERE employee_id = %s
+                    AND company_id = %s
+                """, (
+                    item["full_name"],
+                    item["nickname"],
+                    item["email"],
+                    hash_password("1234"),
+                    item["contact_number"],
+                    employee_id,
+                    company_id
+                ))
+
+                reactivated_employees += 1
+
+            else:
+                cursor.execute("""
+                    INSERT INTO employees (
+                        full_name,
+                        nickname,
+                        email,
+                        password,
+                        employment_status,
+                        contact_number,
+                        joined_date,
+                        company_id
+                    )
+                    VALUES (%s, %s, %s, %s, 'Active', %s, CURRENT_DATE, %s)
+                """, (
+                    item["full_name"],
+                    item["nickname"],
+                    item["email"],
+                    hash_password("1234"),
+                    item["contact_number"],
+                    company_id
+                ))
+
+                created_employees += 1
+
+        conn.commit()
+
+        return {
+            "message": "Employees imported successfully",
+            "summary": {
+                "created_employees": created_employees,
+                "reactivated_employees": reactivated_employees,
+                "total_rows": len(rows)
+            }
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("IMPORT EMPLOYEES ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+        
 @router.delete("/employees/{employee_id}")
 def delete_employee(employee_id: int):
     conn = get_connection()

@@ -181,7 +181,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const IMPORT_ENDPOINTS: Record<ImportCategory, string | null> = {
     departments: "/account-department-import",
     roles: "/staffing-roles-import",
-    employees: null,
+    employees: "/employees-import",
     employeeAssignments: null,
     shifts: null,
     staffing: null,
