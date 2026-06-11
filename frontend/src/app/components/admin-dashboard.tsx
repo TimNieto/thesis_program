@@ -64,6 +64,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+interface EmployeeAssignmentRow {
+  employee_role_id: number;
+  role_id: number;
+  role_key?: string;
+  role_name: string;
+  is_admin: boolean;
+  department_id: number;
+  department_name: string;
+}
+
 interface Employee {
   id: number;
   name: string;
@@ -80,7 +90,31 @@ interface Employee {
 
   account_names?: string;
   accounts?: string[];
+
+  assignments?: EmployeeAssignmentRow[];
 }
+
+type EmployeeAssignmentDisplayRow =
+  | {
+      display_key: string;
+      row_type: "employee";
+      employee_id: number;
+      employee_name: string;
+      department_name: "";
+      role_name: "";
+      status: "Active" | "Inactive";
+    }
+  | {
+      display_key: string;
+      row_type: "assignment";
+      employee_id: number;
+      employee_name: string;
+      employee_role_id: number;
+      department_name: string;
+      role_name: string;
+      status: "Active" | "Inactive";
+      is_admin: boolean;
+    };
 
 interface AccountDepartmentRow {
   department_id: number;
@@ -213,6 +247,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newRoleDepartmentName, setNewRoleDepartmentName] = useState("");
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleIsAdmin, setNewRoleIsAdmin] = useState("no");
+
+  const [isAddAssignmentOpen, setIsAddAssignmentOpen] = useState(false);
+  const [newAssignmentEmployeeId, setNewAssignmentEmployeeId] = useState("");
+  const [newAssignmentDepartmentName, setNewAssignmentDepartmentName] =
+    useState("");
+  const [newAssignmentRoleName, setNewAssignmentRoleName] = useState("");
 
   const [isAccountDepartmentDialogOpen, setIsAccountDepartmentDialogOpen] =
     useState(false);
@@ -810,6 +850,71 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const resetAddAssignmentForm = () => {
+    setNewAssignmentEmployeeId("");
+    setNewAssignmentDepartmentName("");
+    setNewAssignmentRoleName("");
+  };
+
+  const handleAddAssignmentSubmit = async () => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!newAssignmentEmployeeId) {
+        throw new Error("Please select an employee");
+      }
+
+      if (!newAssignmentDepartmentName) {
+        throw new Error("Please select a department");
+      }
+
+      if (!newAssignmentRoleName) {
+        throw new Error("Please select a role");
+      }
+
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/employee-assignments",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            employee_id: Number(newAssignmentEmployeeId),
+            department_name: newAssignmentDepartmentName,
+            role_name: newAssignmentRoleName,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : data?.detail?.message || "Failed to add employee assignment",
+        );
+      }
+
+      await fetchEmployees();
+
+      resetAddAssignmentForm();
+      setIsAddAssignmentOpen(false);
+
+      toast.success(data?.message || "Employee assignment added");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to add employee assignment",
+      );
+    }
+  };
+
   const tableClass = "table-fixed w-full";
 
   const actionCellClass = "w-[140px] text-right";
@@ -916,55 +1021,59 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       .values(),
   ).flatMap((group) => [group.departmentRow, ...group.roleRows]);
 
-  const groupedEmployeeAssignmentRows = employees
-    .filter((employee) => {
-      const hasRole =
-        employee.role &&
-        employee.role.trim() !== "" &&
-        employee.role !== "None";
+  const activeAssignmentRoleOptions = staffingRoles
+    .filter((role) => {
+      if (!newAssignmentDepartmentName) {
+        return false;
+      }
 
-      return hasRole;
+      return (
+        String(role.department_name || "").toLowerCase() ===
+        newAssignmentDepartmentName.toLowerCase()
+      );
     })
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .flatMap((employee) => {
-      const roles = String(employee.role || "")
-        .split(",")
-        .map((role) => role.trim())
-        .filter((role) => role && role !== "None");
+    .sort((a, b) =>
+      String(a.role_name || "").localeCompare(String(b.role_name || "")),
+    );
 
-      const departments =
-        Array.isArray(employee.departments) && employee.departments.length > 0
-          ? employee.departments
-          : String(employee.department_name || "")
-              .split(",")
-              .map((department) => department.trim())
-              .filter((department) => department && department !== "None");
+  const groupedEmployeeAssignmentRows: EmployeeAssignmentDisplayRow[] =
+    employees
+      .filter((employee) => {
+        return (
+          Array.isArray(employee.assignments) && employee.assignments.length > 0
+        );
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap((employee) => {
+        const assignments = [...(employee.assignments || [])].sort((a, b) =>
+          `${a.department_name}-${a.role_name}`.localeCompare(
+            `${b.department_name}-${b.role_name}`,
+          ),
+        );
 
-      return [
-        {
-          display_key: `employee-assignment-group-${employee.id}`,
-          row_type: "employee" as const,
-          employee_id: employee.id,
-          employee_name: employee.name,
-          department_name: "",
-          role_name: "",
-          status: employee.status,
-        },
-        ...roles.map((role, index) => {
-          const roleKey = role.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-          return {
-            display_key: `employee-assignment-${employee.id}-${index}-${roleKey}`,
+        return [
+          {
+            display_key: `employee-assignment-group-${employee.id}`,
+            row_type: "employee" as const,
+            employee_id: employee.id,
+            employee_name: employee.name,
+            department_name: "" as const,
+            role_name: "" as const,
+            status: employee.status,
+          },
+          ...assignments.map((assignment) => ({
+            display_key: `employee-assignment-${assignment.employee_role_id}`,
             row_type: "assignment" as const,
             employee_id: employee.id,
             employee_name: employee.name,
-            department_name: departments[index] || departments[0] || "None",
-            role_name: role,
+            employee_role_id: assignment.employee_role_id,
+            department_name: assignment.department_name,
+            role_name: assignment.role_name,
             status: employee.status,
-          };
-        }),
-      ];
-    });
+            is_admin: assignment.is_admin,
+          })),
+        ];
+      });
 
   // Add Employee
   const handleAddEmployee = async () => {
@@ -1117,6 +1226,45 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     if (confirm("Are you sure you want to remove this assignment?")) {
       setAssignments(assignments.filter((a) => a.id !== id));
       toast.success("Assignment removed");
+    }
+  };
+
+  const handleRemoveEmployeeAssignment = async (employeeRoleId: number) => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      const confirmed = confirm(
+        "Are you sure you want to remove this employee assignment?",
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/employee-assignments/${employeeRoleId}?company_id=${currentUser.company_id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to remove employee assignment");
+      }
+
+      await fetchEmployees();
+
+      toast.success(data?.message || "Employee assignment removed");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to remove employee assignment",
+      );
     }
   };
 
@@ -2242,15 +2390,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       e.currentTarget.value = "";
                     }}
                   />
-
                   <Button
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      toast.info(
-                        "Manual employee assignment add is frontend-only for now",
-                      )
-                    }
+                    onClick={() => {
+                      resetAddAssignmentForm();
+                      setIsAddAssignmentOpen(true);
+                    }}
                   >
                     <Plus className="size-4" />
                     Add Assignment
@@ -2319,15 +2465,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               ? renderStatusBadge(row.status)
                               : ""}
                           </TableCell>
-
                           <TableCell className={actionCellClass}>
                             {row.row_type === "assignment" && (
                               <Button
                                 size="sm"
                                 className={dangerSmallButtonClass}
                                 onClick={() =>
-                                  toast.info(
-                                    "Remove employee assignment is frontend-only for now",
+                                  handleRemoveEmployeeAssignment(
+                                    row.employee_role_id,
                                   )
                                 }
                               >
@@ -3414,7 +3559,129 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Add Employee Assignment Dialog */}
+      <Dialog
+        open={isAddAssignmentOpen}
+        onOpenChange={(open) => {
+          setIsAddAssignmentOpen(open);
 
+          if (!open) {
+            resetAddAssignmentForm();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Employee Assignment</DialogTitle>
+            <DialogDescription>
+              Assign an existing active employee to an active department and
+              role.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Employee</Label>
+              <Select
+                value={newAssignmentEmployeeId}
+                onValueChange={setNewAssignmentEmployeeId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {[...employees]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((employee) => (
+                      <SelectItem key={employee.id} value={String(employee.id)}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Department</Label>
+              <Select
+                value={newAssignmentDepartmentName}
+                onValueChange={(value) => {
+                  setNewAssignmentDepartmentName(value);
+                  setNewAssignmentRoleName("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {activeDepartmentOptions.map((departmentName) => (
+                    <SelectItem key={departmentName} value={departmentName}>
+                      {departmentName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select
+                value={newAssignmentRoleName}
+                onValueChange={setNewAssignmentRoleName}
+                disabled={!newAssignmentDepartmentName}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      newAssignmentDepartmentName
+                        ? "Select role"
+                        : "Select department first"
+                    }
+                  />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {activeAssignmentRoleOptions.length === 0 ? (
+                    <SelectItem value="__no_roles_found__" disabled>
+                      No roles found
+                    </SelectItem>
+                  ) : (
+                    activeAssignmentRoleOptions.map((role) => (
+                      <SelectItem
+                        key={
+                          role.staffing_role_id ??
+                          role.role_id ??
+                          role.role_name
+                        }
+                        value={role.role_name}
+                      >
+                        {role.role_name}
+                        {role.is_admin ? " — Admin" : " — Non-admin"}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetAddAssignmentForm();
+                setIsAddAssignmentOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button onClick={handleAddAssignmentSubmit}>Add Assignment</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Add Role Dialog */}
       <Dialog open={isAddRoleOpen} onOpenChange={setIsAddRoleOpen}>
         <DialogContent>

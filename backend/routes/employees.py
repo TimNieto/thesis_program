@@ -106,26 +106,60 @@ def get_employees(company_id: int | None = None):
             emp_company_id = row[7]
 
             cursor.execute("""
-                SELECT r.role_key, r.role_name
+                SELECT
+                    er.employee_role_id,
+                    r.role_id,
+                    r.role_key,
+                    r.role_name,
+                    r.is_admin,
+                    d.department_id,
+                    d.department_name
                 FROM employee_roles er
                 JOIN roles r
                     ON er.role_id = r.role_id
                     AND er.company_id = r.company_id
+                JOIN departments d
+                    ON r.department_id = d.department_id
+                    AND r.company_id = d.company_id
                 WHERE er.employee_id = %s
                 AND er.company_id = %s
+                AND er.is_active = TRUE
                 AND r.is_active = TRUE
-                ORDER BY r.role_id
+                AND d.is_active = TRUE
+                ORDER BY d.department_name, r.role_name
             """, (employee_id, emp_company_id))
 
-            role_rows = cursor.fetchall()
-            role_keys = [r[0] for r in role_rows]
-            role_names = [r[1] for r in role_rows]
+            assignment_role_rows = cursor.fetchall()
+
+            assignments = [
+                {
+                    "employee_role_id": assignment_row[0],
+                    "role_id": assignment_row[1],
+                    "role_key": assignment_row[2],
+                    "role_name": assignment_row[3],
+                    "is_admin": bool(assignment_row[4]),
+                    "department_id": assignment_row[5],
+                    "department_name": assignment_row[6],
+                }
+                for assignment_row in assignment_role_rows
+            ]
+
+            role_names = [
+                assignment["role_name"]
+                for assignment in assignments
+                if assignment["role_name"]
+            ]
 
             display_role = get_display_role(role_names)
 
+            department_names = sorted({
+                assignment["department_name"]
+                for assignment in assignments
+                if assignment["department_name"]
+            })
+
             cursor.execute("""
                 SELECT DISTINCT
-                    d.department_name,
                     a.account_name
                 FROM employee_roles er
 
@@ -144,24 +178,20 @@ def get_employees(company_id: int | None = None):
 
                 WHERE er.employee_id = %s
                 AND er.company_id = %s
+                AND er.is_active = TRUE
                 AND r.is_active = TRUE
                 AND d.is_active = TRUE
+                AND a.account_name IS NOT NULL
 
-                ORDER BY d.department_name, a.account_name
+                ORDER BY a.account_name
             """, (employee_id, emp_company_id))
 
-            assignment_rows = cursor.fetchall()
-
-            department_names = sorted({
-                department_name
-                for department_name, account_name in assignment_rows
-                if department_name
-            })
+            account_rows = cursor.fetchall()
 
             account_names = sorted({
-                account_name
-                for department_name, account_name in assignment_rows
-                if account_name
+                account_row[0]
+                for account_row in account_rows
+                if account_row[0]
             })
 
             employees.append({
@@ -179,6 +209,7 @@ def get_employees(company_id: int | None = None):
                 "contactNumber": contact_number,
                 "department_name": ", ".join(department_names) if department_names else "None",
                 "departments": department_names,
+                "assignments": assignments,
                 "company_id": emp_company_id
             })
 
@@ -214,20 +245,49 @@ def get_employee(employee_id: int):
         emp_company_id = row[4]
 
         cursor.execute("""
-            SELECT r.role_key, r.role_name
+            SELECT
+                er.employee_role_id,
+                r.role_id,
+                r.role_key,
+                r.role_name,
+                r.is_admin,
+                d.department_id,
+                d.department_name
             FROM employee_roles er
             JOIN roles r
                 ON er.role_id = r.role_id
                 AND er.company_id = r.company_id
+            JOIN departments d
+                ON r.department_id = d.department_id
+                AND r.company_id = d.company_id
             WHERE er.employee_id = %s
             AND er.company_id = %s
+            AND er.is_active = TRUE
             AND r.is_active = TRUE
-            ORDER BY r.role_id
+            AND d.is_active = TRUE
+            ORDER BY d.department_name, r.role_name
         """, (employee_id, emp_company_id))
 
-        role_rows = cursor.fetchall()
-        role_keys = [r[0] for r in role_rows]
-        role_names = [r[1] for r in role_rows]
+        assignment_rows = cursor.fetchall()
+
+        assignments = [
+            {
+                "employee_role_id": assignment_row[0],
+                "role_id": assignment_row[1],
+                "role_key": assignment_row[2],
+                "role_name": assignment_row[3],
+                "is_admin": bool(assignment_row[4]),
+                "department_id": assignment_row[5],
+                "department_name": assignment_row[6],
+            }
+            for assignment_row in assignment_rows
+        ]
+
+        role_names = [
+            assignment["role_name"]
+            for assignment in assignments
+            if assignment["role_name"]
+        ]
 
         display_role = get_display_role(role_names)
 
@@ -237,6 +297,7 @@ def get_employee(employee_id: int):
             "email": row[2],
             "role": display_role,
             "contactNumber": row[3],
+            "assignments": assignments,
             "company_id": emp_company_id
         }
 
@@ -1065,7 +1126,7 @@ async def import_employee_assignments(
             role_is_admin = bool(role[1])
 
             cursor.execute("""
-                SELECT employee_role_id
+                SELECT employee_role_id, is_active
                 FROM employee_roles
                 WHERE company_id = %s
                 AND employee_id = %s
@@ -1074,13 +1135,20 @@ async def import_employee_assignments(
             """, (company_id, employee_id, role_id))
 
             existing_assignment = cursor.fetchone()
+            inactive_employee_role_id = None
 
             if existing_assignment:
-                errors.append(
-                    f"Row {row_number}: employee assignment already exists: "
-                    f"{employee_name} / {department_name} / {role_name}"
-                )
-                continue
+                existing_employee_role_id = existing_assignment[0]
+                existing_is_active = bool(existing_assignment[1])
+
+                if existing_is_active:
+                    errors.append(
+                        f"Row {row_number}: employee assignment already exists: "
+                        f"{employee_name} / {department_name} / {role_name}"
+                    )
+                    continue
+
+                inactive_employee_role_id = existing_employee_role_id
 
             # Check the employee's existing active assignments.
             # Existing roles decide the employee's department and admin classification.
@@ -1098,6 +1166,7 @@ async def import_employee_assignments(
                     AND r.company_id = d.company_id
                 WHERE er.company_id = %s
                 AND er.employee_id = %s
+                AND er.is_active = TRUE
                 AND r.is_active = TRUE
                 AND d.is_active = TRUE
                 ORDER BY d.department_name
@@ -1189,7 +1258,8 @@ async def import_employee_assignments(
             validated_assignments.append({
                 "employee_id": employee_id,
                 "role_id": role_id,
-                "company_id": company_id
+                "company_id": company_id,
+                "inactive_employee_role_id": inactive_employee_role_id
             })
 
         if errors:
@@ -1202,18 +1272,30 @@ async def import_employee_assignments(
             )
 
         for assignment in validated_assignments:
-            cursor.execute("""
-                INSERT INTO employee_roles (
-                    employee_id,
-                    role_id,
-                    company_id
-                )
-                VALUES (%s, %s, %s)
-            """, (
-                assignment["employee_id"],
-                assignment["role_id"],
-                assignment["company_id"]
-            ))
+            if assignment["inactive_employee_role_id"]:
+                cursor.execute("""
+                    UPDATE employee_roles
+                    SET is_active = TRUE
+                    WHERE employee_role_id = %s
+                    AND company_id = %s
+                """, (
+                    assignment["inactive_employee_role_id"],
+                    assignment["company_id"]
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO employee_roles (
+                        employee_id,
+                        role_id,
+                        company_id,
+                        is_active
+                    )
+                    VALUES (%s, %s, %s, TRUE)
+                """, (
+                    assignment["employee_id"],
+                    assignment["role_id"],
+                    assignment["company_id"]
+                ))
 
             created_assignments += 1
 
@@ -1237,6 +1319,366 @@ async def import_employee_assignments(
         raise HTTPException(
             status_code=500,
             detail="Failed to import employee assignments"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.post("/employee-assignments")
+def add_employee_assignment(data: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = data.get("company_id")
+        employee_id = data.get("employee_id")
+        department_name = normalize_title_text(data.get("department_name"))
+        role_name = normalize_title_text(data.get("role_name"))
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to identify your company. Please sign in again."
+            )
+
+        if not employee_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee is required"
+            )
+
+        if not department_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Department is required"
+            )
+
+        if not role_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Role is required"
+            )
+
+        cursor.execute("""
+            SELECT employee_id, full_name
+            FROM employees
+            WHERE employee_id = %s
+            AND company_id = %s
+            AND employment_status = 'Active'
+            LIMIT 1
+        """, (employee_id, company_id))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(
+                status_code=400,
+                detail="Active employee not found"
+            )
+
+        employee_id = employee[0]
+        employee_name = employee[1]
+
+        cursor.execute("""
+            SELECT department_id, department_name
+            FROM departments
+            WHERE company_id = %s
+            AND LOWER(department_name) = LOWER(%s)
+            AND is_active = TRUE
+            LIMIT 1
+        """, (company_id, department_name))
+
+        department = cursor.fetchone()
+
+        if not department:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Active department not found: {department_name}"
+            )
+
+        department_id = department[0]
+        department_name = department[1]
+
+        cursor.execute("""
+            SELECT role_id, role_name, is_admin
+            FROM roles
+            WHERE company_id = %s
+            AND department_id = %s
+            AND LOWER(role_name) = LOWER(%s)
+            AND is_active = TRUE
+            LIMIT 1
+        """, (company_id, department_id, role_name))
+
+        role = cursor.fetchone()
+
+        if not role:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Active role not found under department "
+                    f"'{department_name}': {role_name}"
+                )
+            )
+
+        role_id = role[0]
+        role_name = role[1]
+        role_is_admin = bool(role[2])
+
+        cursor.execute("""
+            SELECT employee_role_id, is_active
+            FROM employee_roles
+            WHERE company_id = %s
+            AND employee_id = %s
+            AND role_id = %s
+            LIMIT 1
+        """, (company_id, employee_id, role_id))
+
+        existing_assignment = cursor.fetchone()
+        inactive_employee_role_id = None
+
+        if existing_assignment:
+            existing_employee_role_id = existing_assignment[0]
+            existing_is_active = bool(existing_assignment[1])
+
+            if existing_is_active:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Employee assignment already exists: "
+                        f"{employee_name} / {department_name} / {role_name}"
+                    )
+                )
+
+            inactive_employee_role_id = existing_employee_role_id
+
+        cursor.execute("""
+            SELECT DISTINCT
+                r.department_id,
+                d.department_name,
+                r.is_admin
+            FROM employee_roles er
+            JOIN roles r
+                ON er.role_id = r.role_id
+                AND er.company_id = r.company_id
+            JOIN departments d
+                ON r.department_id = d.department_id
+                AND r.company_id = d.company_id
+            WHERE er.company_id = %s
+            AND er.employee_id = %s
+            AND er.is_active = TRUE
+            AND r.is_active = TRUE
+            AND d.is_active = TRUE
+            ORDER BY d.department_name
+        """, (company_id, employee_id))
+
+        existing_role_rows = cursor.fetchall()
+
+        existing_department_ids = {
+            row[0]
+            for row in existing_role_rows
+        }
+
+        existing_department_names = {
+            row[1]
+            for row in existing_role_rows
+        }
+
+        existing_admin_values = {
+            bool(row[2])
+            for row in existing_role_rows
+        }
+
+        if len(existing_department_ids) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Employee already has roles in multiple departments. "
+                    f"Remove existing assignments first: {employee_name}"
+                )
+            )
+
+        if len(existing_admin_values) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Employee already has mixed admin and non-admin roles. "
+                    f"Remove existing assignments first: {employee_name}"
+                )
+            )
+
+        if existing_department_ids:
+            existing_department_id = next(iter(existing_department_ids))
+            existing_department_name = next(iter(existing_department_names))
+
+            if existing_department_id != department_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Employee already belongs to department "
+                        f"'{existing_department_name}'. Remove existing roles "
+                        f"first before assigning to '{department_name}': "
+                        f"{employee_name}"
+                    )
+                )
+
+        if existing_admin_values:
+            existing_is_admin = next(iter(existing_admin_values))
+
+            if existing_is_admin != role_is_admin:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Employee already has "
+                        f"{'admin' if existing_is_admin else 'non-admin'} "
+                        f"role access. Remove existing roles first before "
+                        f"assigning a "
+                        f"{'admin' if role_is_admin else 'non-admin'} role: "
+                        f"{employee_name}"
+                    )
+                )
+
+        if inactive_employee_role_id:
+            cursor.execute("""
+                UPDATE employee_roles
+                SET is_active = TRUE
+                WHERE employee_role_id = %s
+                AND company_id = %s
+            """, (
+                inactive_employee_role_id,
+                company_id
+            ))
+
+            employee_role_id = inactive_employee_role_id
+            message = "Employee assignment reactivated successfully"
+
+        else:
+            cursor.execute("""
+                INSERT INTO employee_roles (
+                    employee_id,
+                    role_id,
+                    company_id,
+                    is_active
+                )
+                VALUES (%s, %s, %s, TRUE)
+                RETURNING employee_role_id
+            """, (
+                employee_id,
+                role_id,
+                company_id
+            ))
+
+            employee_role_id = cursor.fetchone()[0]
+            message = "Employee assignment added successfully"
+
+        conn.commit()
+
+        return {
+            "message": message,
+            "assignment": {
+                "employee_role_id": employee_role_id,
+                "employee_id": employee_id,
+                "employee_name": employee_name,
+                "department_name": department_name,
+                "role_id": role_id,
+                "role_name": role_name,
+                "is_admin": role_is_admin
+            }
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("ADD EMPLOYEE ASSIGNMENT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to add employee assignment"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.delete("/employee-assignments/{employee_role_id}")
+def remove_employee_assignment(employee_role_id: int, company_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT
+                er.employee_role_id,
+                er.is_active,
+                e.full_name,
+                d.department_name,
+                r.role_name
+            FROM employee_roles er
+            JOIN employees e
+                ON er.employee_id = e.employee_id
+                AND er.company_id = e.company_id
+            JOIN roles r
+                ON er.role_id = r.role_id
+                AND er.company_id = r.company_id
+            JOIN departments d
+                ON r.department_id = d.department_id
+                AND r.company_id = d.company_id
+            WHERE er.employee_role_id = %s
+            AND er.company_id = %s
+            LIMIT 1
+        """, (employee_role_id, company_id))
+
+        assignment = cursor.fetchone()
+
+        if not assignment:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee assignment not found"
+            )
+
+        is_active = bool(assignment[1])
+        employee_name = assignment[2]
+        department_name = assignment[3]
+        role_name = assignment[4]
+
+        if not is_active:
+            return {
+                "message": (
+                    f"Employee assignment already inactive: "
+                    f"{employee_name} / {department_name} / {role_name}"
+                )
+            }
+
+        cursor.execute("""
+            UPDATE employee_roles
+            SET is_active = FALSE
+            WHERE employee_role_id = %s
+            AND company_id = %s
+        """, (employee_role_id, company_id))
+
+        conn.commit()
+
+        return {
+            "message": (
+                f"Employee assignment removed: "
+                f"{employee_name} / {department_name} / {role_name}"
+            )
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("REMOVE EMPLOYEE ASSIGNMENT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to remove employee assignment"
         )
 
     finally:
@@ -1273,6 +1715,7 @@ def delete_employee(employee_id: int):
             FROM employee_roles
             WHERE employee_id = %s
             AND company_id = %s
+            AND is_active = TRUE
         """, (employee_id, company_id))
 
         assignment_count = cursor.fetchone()[0]

@@ -132,9 +132,14 @@ def login(data: LoginRequest):
             JOIN roles r
                 ON er.role_id = r.role_id
                 AND er.company_id = r.company_id
+            JOIN departments d
+                ON r.department_id = d.department_id
+                AND r.company_id = d.company_id
             WHERE er.employee_id = %s
             AND er.company_id = %s
+            AND er.is_active = TRUE
             AND r.is_active = TRUE
+            AND d.is_active = TRUE
             ORDER BY r.role_name
             """,
             (employee_id, company_id),
