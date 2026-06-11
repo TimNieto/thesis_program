@@ -1654,6 +1654,184 @@ def add_employee_assignment(data: dict):
         conn.close()
 
 
+@router.get("/employee-assignments/{employee_role_id}/deactivation-preview")
+def preview_employee_assignment_deactivation(
+    employee_role_id: int,
+    company_id: int
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT
+                er.employee_role_id,
+                er.employee_id,
+                er.role_id,
+                er.is_active,
+                e.full_name,
+                d.department_name,
+                r.role_name
+            FROM employee_roles er
+            JOIN employees e
+                ON er.employee_id = e.employee_id
+                AND er.company_id = e.company_id
+            JOIN roles r
+                ON er.role_id = r.role_id
+                AND er.company_id = r.company_id
+            JOIN departments d
+                ON r.department_id = d.department_id
+                AND r.company_id = d.company_id
+            WHERE er.employee_role_id = %s
+            AND er.company_id = %s
+            LIMIT 1
+        """, (
+            employee_role_id,
+            company_id
+        ))
+
+        assignment = cursor.fetchone()
+
+        if not assignment:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee assignment not found"
+            )
+
+        employee_id = assignment[1]
+        role_id = assignment[2]
+        is_active = bool(assignment[3])
+        employee_name = assignment[4]
+        department_name = assignment[5]
+        role_name = assignment[6]
+
+        if not is_active:
+            return {
+                "assignment": {
+                    "employee_name": employee_name,
+                    "department_name": department_name,
+                    "role_name": role_name,
+                },
+                "cleanup": {
+                    "employee_assignment_deactivated": 0,
+                    "account_preferences_disabled": 0,
+                    "future_schedule_slots_unassigned": 0,
+                    "coverage_requests_cancelled": 0,
+                    "shift_applications_cancelled": 0,
+                    "emergency_cover_targets_cancelled": 0,
+                    "historical_finalized_assignments_changed": 0,
+                }
+            }
+
+        cursor.execute("""
+            SELECT
+                gs.schedule_id
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            WHERE gs.company_id = %s
+            AND gs.employee_id = %s
+            AND gs.role_id = %s
+            AND gs.is_archived = FALSE
+            AND s.shift_date >= CURRENT_DATE
+        """, (
+            company_id,
+            employee_id,
+            role_id
+        ))
+
+        affected_schedule_ids = [
+            row[0]
+            for row in cursor.fetchall()
+        ]
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM account_preferences
+            WHERE company_id = %s
+            AND employee_id = %s
+            AND role_id = %s
+            AND is_active = TRUE
+        """, (
+            company_id,
+            employee_id,
+            role_id
+        ))
+
+        account_preferences_count = cursor.fetchone()[0]
+
+        affected_coverage_request_ids = []
+
+        if affected_schedule_ids:
+            cursor.execute("""
+                SELECT coverage_request_id
+                FROM coverage_requests
+                WHERE company_id = %s
+                AND schedule_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_schedule_ids
+            ))
+
+            affected_coverage_request_ids = [
+                row[0]
+                for row in cursor.fetchall()
+            ]
+
+        shift_application_count = 0
+        emergency_target_count = 0
+
+        if affected_coverage_request_ids:
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM shift_applications
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_coverage_request_ids
+            ))
+
+            shift_application_count = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM emergency_cover_targets
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                affected_coverage_request_ids
+            ))
+
+            emergency_target_count = cursor.fetchone()[0]
+
+        return {
+            "assignment": {
+                "employee_name": employee_name,
+                "department_name": department_name,
+                "role_name": role_name,
+            },
+            "cleanup": {
+                "employee_assignment_deactivated": 1,
+                "account_preferences_disabled": account_preferences_count,
+                "future_schedule_slots_unassigned": len(affected_schedule_ids),
+                "coverage_requests_cancelled": len(affected_coverage_request_ids),
+                "shift_applications_cancelled": shift_application_count,
+                "emergency_cover_targets_cancelled": emergency_target_count,
+                "historical_finalized_assignments_changed": 0,
+            }
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @router.delete("/employee-assignments/{employee_role_id}")
 def deactivate_employee_assignment(employee_role_id: int, company_id: int):
     conn = get_connection()

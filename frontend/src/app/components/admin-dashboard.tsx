@@ -1235,8 +1235,37 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         throw new Error("No company selected");
       }
 
+      const previewRes = await fetch(
+        `https://backend-production-6e75.up.railway.app/employee-assignments/${employeeRoleId}/deactivation-preview?company_id=${currentUser.company_id}`,
+      );
+
+      const previewData = await previewRes.json().catch(() => null);
+
+      if (!previewRes.ok) {
+        throw new Error(
+          previewData?.detail || "Failed to load deactivation impact",
+        );
+      }
+
+      const assignment = previewData.assignment;
+      const cleanup = previewData.cleanup;
+
       const confirmed = confirm(
-        "Are you sure you want to deactivate this employee assignment?",
+        [
+          "Deactivate this employee assignment?",
+          "",
+          `${assignment.employee_name}`,
+          `${assignment.department_name} / ${assignment.role_name}`,
+          "",
+          "Affected records:",
+          `- Employee assignment deactivated: ${cleanup.employee_assignment_deactivated}`,
+          `- Account preferences disabled: ${cleanup.account_preferences_disabled}`,
+          `- Future schedule slots unassigned: ${cleanup.future_schedule_slots_unassigned}`,
+          `- Coverage requests cancelled: ${cleanup.coverage_requests_cancelled}`,
+          `- Shift applications cancelled: ${cleanup.shift_applications_cancelled}`,
+          `- Emergency cover targets cancelled: ${cleanup.emergency_cover_targets_cancelled}`,
+          `- Historical finalized assignments changed: ${cleanup.historical_finalized_assignments_changed}`,
+        ].join("\n"),
       );
 
       if (!confirmed) {
