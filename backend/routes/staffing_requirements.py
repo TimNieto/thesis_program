@@ -152,15 +152,8 @@ def create_staffing_role(payload: dict):
     try:
         company_id = payload.get("company_id", 1)
         role_name = normalize_name(payload.get("role_name", ""))
-        department_name = payload.get("department_name", "Default Department").strip()
-        is_admin_value = payload.get("is_admin", False)
-
-        if isinstance(is_admin_value, bool):
-            is_admin = is_admin_value
-        elif isinstance(is_admin_value, str):
-            is_admin = is_admin_value.strip().lower() == "yes"
-        else:
-            is_admin = False
+        department_name = normalize_name(payload.get("department_name", ""))
+        is_admin_value = payload.get("is_admin")
 
         if not role_name:
             raise HTTPException(
@@ -169,7 +162,36 @@ def create_staffing_role(payload: dict):
             )
 
         if not department_name:
-            department_name = "Default Department"
+            raise HTTPException(
+                status_code=400,
+                detail="Department is required"
+            )
+
+        if is_admin_value is None or is_admin_value == "":
+            raise HTTPException(
+                status_code=400,
+                detail="Admin role value is required"
+            )
+
+        if isinstance(is_admin_value, bool):
+            is_admin = is_admin_value
+        elif isinstance(is_admin_value, str):
+            normalized_is_admin = is_admin_value.strip().lower()
+
+            if normalized_is_admin == "yes":
+                is_admin = True
+            elif normalized_is_admin == "no":
+                is_admin = False
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Admin role value must be yes or no"
+                )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Admin role value must be yes or no"
+            )
 
         role_key = normalize_role_key(role_name)
 
@@ -271,7 +293,6 @@ def create_staffing_role(payload: dict):
 
             role_id = cursor.fetchone()[0]
 
-
         conn.commit()
 
         return {
@@ -279,7 +300,8 @@ def create_staffing_role(payload: dict):
             "role_id": role_id,
             "staffing_role_id": role_id,
             "department_id": department_id,
-            "department_name": department_name
+            "department_name": department_name,
+            "is_admin": is_admin
         }
 
     except HTTPException:

@@ -697,7 +697,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const url = isAccount
-        ? `https://backend-production-6e75.up.railway.app/accounts/${row.account_id}`
+        ? `https://backend-production-6e75.up.railway.app/accounts/${row.account_id}?company_id=${currentUser.company_id}`
         : `https://backend-production-6e75.up.railway.app/departments/${row.department_id}?company_id=${currentUser.company_id}`;
 
       const res = await fetch(url, {

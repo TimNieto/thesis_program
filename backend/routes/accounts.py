@@ -232,12 +232,13 @@ def create_account(payload: dict):
         allow_partial_staffing = payload.get("allow_partial_staffing", False)
         operator_policy = payload.get("operator_policy", "required")
 
-        # Ensure department exists.
+        # Department must already exist and be active.
         cursor.execute("""
             SELECT department_id
             FROM departments
             WHERE company_id = %s
             AND LOWER(department_name) = LOWER(%s)
+            AND is_active = TRUE
             LIMIT 1
         """, (
             company_id,
@@ -246,35 +247,16 @@ def create_account(payload: dict):
 
         department_row = cursor.fetchone()
 
-        if department_row:
-            department_id = department_row[0]
-
-            cursor.execute("""
-                UPDATE departments
-                SET is_active = TRUE,
-                    updated_at = NOW()
-                WHERE department_id = %s
-                AND company_id = %s
-            """, (
-                department_id,
-                company_id
-            ))
-
-        else:
-            cursor.execute("""
-                INSERT INTO departments (
-                    company_id,
-                    department_name,
-                    is_active
+        if not department_row:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Department '{department_name}' does not exist. "
+                    "Create it first in Account / Department Data."
                 )
-                VALUES (%s, %s, TRUE)
-                RETURNING department_id
-            """, (
-                company_id,
-                department_name
-            ))
+            )
 
-            department_id = cursor.fetchone()[0]
+        department_id = department_row[0]
 
         # Check duplicate account under same company.
         cursor.execute("""
@@ -447,23 +429,105 @@ def update_account(account_id: int, payload: dict):
 
 
 @router.delete("/accounts/{account_id}")
-def delete_account(account_id: int):
+def delete_account(account_id: int, company_id: int):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
         cursor.execute("""
-            UPDATE accounts
-            SET is_active = FALSE,
-                updated_at = NOW()
+            SELECT account_id
+            FROM accounts
             WHERE account_id = %s
-        """, (account_id,))
+            AND company_id = %s
+            AND is_active = TRUE
+            LIMIT 1
+        """, (
+            account_id,
+            company_id
+        ))
 
-        if cursor.rowcount == 0:
+        account_row = cursor.fetchone()
+
+        if not account_row:
             raise HTTPException(
                 status_code=404,
                 detail="Account not found"
             )
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM account_preferences ap
+            JOIN employees e
+                ON e.employee_id = ap.employee_id
+                AND e.company_id = ap.company_id
+            WHERE ap.account_id = %s
+            AND ap.company_id = %s
+            AND LOWER(e.employment_status) = 'active'
+        """, (
+            account_id,
+            company_id
+        ))
+
+        active_employee_count = cursor.fetchone()[0]
+
+        if active_employee_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot deactivate account. "
+                    f"{active_employee_count} active employee(s) are assigned to this account."
+                )
+            )
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM shift_templates
+            WHERE account_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+        """, (
+            account_id,
+            company_id
+        ))
+
+        active_shift_template_count = cursor.fetchone()[0]
+
+        if active_shift_template_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Deactivate active shift templates under this account first"
+            )
+
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM shift_staffing_requirements
+            WHERE account_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+        """, (
+            account_id,
+            company_id
+        ))
+
+        active_staffing_requirement_count = cursor.fetchone()[0]
+
+        if active_staffing_requirement_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Deactivate active staffing requirements under this account first"
+            )
+
+        cursor.execute("""
+            UPDATE accounts
+            SET is_active = FALSE,
+                updated_at = NOW()
+            WHERE account_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+        """, (
+            account_id,
+            company_id
+        ))
 
         conn.commit()
 
@@ -585,7 +649,7 @@ def delete_department(department_id: int, company_id: int):
         cursor.close()
         conn.close()
 
-        
+
 @router.post("/account-department-import")
 async def import_account_department_data(
     company_id: int = Form(...),
