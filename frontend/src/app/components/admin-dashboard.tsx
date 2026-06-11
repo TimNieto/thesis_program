@@ -251,6 +251,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<number | null>(null);
 
+  const [accountDepartmentToDeactivate, setAccountDepartmentToDeactivate] =
+    useState<AccountDepartmentRow | null>(null);
+
+  const [roleToDeactivate, setRoleToDeactivate] = useState<any | null>(null);
+
   const [selectedEmployeeForDayOff, setSelectedEmployeeForDayOff] = useState<
     number | null
   >(null);
@@ -685,14 +690,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       const isAccount = row.account_id !== null;
 
-      const confirmMessage = isAccount
-        ? `Deactivate account "${row.account_name}"?`
-        : `Deactivate department "${row.department_name}"?`;
-
-      if (!confirm(confirmMessage)) {
-        return;
-      }
-
       const url = isAccount
         ? `https://backend-production-6e75.up.railway.app/accounts/${row.account_id}?company_id=${currentUser.company_id}`
         : `https://backend-production-6e75.up.railway.app/departments/${row.department_id}?company_id=${currentUser.company_id}`;
@@ -715,6 +712,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       toast.success(data?.message || "Deactivated successfully");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to deactivate");
+    } finally {
+      setAccountDepartmentToDeactivate(null);
     }
   };
 
@@ -781,10 +780,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         throw new Error("Invalid role");
       }
 
-      if (!confirm(`Deactivate role "${role.role_name}"?`)) {
-        return;
-      }
-
       const res = await fetch(
         `https://backend-production-6e75.up.railway.app/staffing-roles/${roleId}?company_id=${currentUser.company_id}`,
         {
@@ -805,6 +800,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       toast.error(
         err instanceof Error ? err.message : "Failed to deactivate role",
       );
+    } finally {
+      setRoleToDeactivate(null);
     }
   };
 
@@ -1016,14 +1013,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       await fetchEmployees();
 
-      setIsConfirmDeleteOpen(false);
-      setEmployeeToDelete(null);
-
       toast.success(data?.message || "Employee deactivated");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to deactivate employee",
       );
+    } finally {
+      setIsConfirmDeleteOpen(false);
+      setEmployeeToDelete(null);
     }
   };
 
@@ -1906,7 +1903,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               size="sm"
                               className={dangerSmallButtonClass}
                               onClick={() =>
-                                handleDeactivateAccountDepartment(row)
+                                setAccountDepartmentToDeactivate(row)
                               }
                             >
                               Deactivate
@@ -2056,7 +2053,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               <Button
                                 size="sm"
                                 className={dangerSmallButtonClass}
-                                onClick={() => handleDeactivateRole(row)}
+                                onClick={() => setRoleToDeactivate(row)}
                               >
                                 Deactivate
                               </Button>
@@ -3130,6 +3127,93 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </Button>
 
             <Button variant="destructive" onClick={confirmRemoveEmployee}>
+              Yes, Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Deactivate Account / Department Dialog */}
+      <Dialog
+        open={accountDepartmentToDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAccountDepartmentToDeactivate(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Deactivate{" "}
+              {accountDepartmentToDeactivate?.account_id !== null
+                ? "Account"
+                : "Department"}
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this{" "}
+              {accountDepartmentToDeactivate?.account_id !== null
+                ? "account"
+                : "department"}
+              ? Related setup data will be preserved.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAccountDepartmentToDeactivate(null)}
+            >
+              No
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (accountDepartmentToDeactivate) {
+                  handleDeactivateAccountDepartment(
+                    accountDepartmentToDeactivate,
+                  );
+                }
+              }}
+            >
+              Yes, Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Deactivate Role Dialog */}
+      <Dialog
+        open={roleToDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRoleToDeactivate(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Role</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this role? Related setup data
+              will be preserved.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleToDeactivate(null)}>
+              No
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (roleToDeactivate) {
+                  handleDeactivateRole(roleToDeactivate);
+                }
+              }}
+            >
               Yes, Deactivate
             </Button>
           </DialogFooter>
