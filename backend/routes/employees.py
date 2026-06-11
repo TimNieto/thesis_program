@@ -2291,28 +2291,56 @@ def update_availability(data: dict):
         shift_template_id = data.get("shift_template_id")
 
         if not shift_template_id:
-            preferred_shift = str(data.get("preferred_shift", "")).strip().upper()
-
-            cursor.execute("""
-                SELECT shift_template_id
-                FROM shift_templates
-                WHERE company_id = %s
-                AND UPPER(shift_name) = %s
-                AND is_active = TRUE
-                LIMIT 1
-            """, (company_id, preferred_shift))
-
-            row = cursor.fetchone()
-
-            if not row:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Invalid shift template"
-                )
-
-            shift_template_id = row[0]
+            raise HTTPException(
+                status_code=400,
+                detail="shift_template_id is required"
+            )
 
         shift_template_id = int(shift_template_id)
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE employee_id = %s
+            AND company_id = %s
+            AND employment_status = 'Active'
+            LIMIT 1
+        """, (
+            employee_id,
+            company_id
+        ))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee does not exist or is inactive"
+            )
+
+        cursor.execute("""
+            SELECT st.shift_template_id
+            FROM shift_templates st
+            JOIN accounts a
+                ON st.account_id = a.account_id
+                AND st.company_id = a.company_id
+            WHERE st.shift_template_id = %s
+            AND st.company_id = %s
+            AND st.is_active = TRUE
+            AND a.is_active = TRUE
+            LIMIT 1
+        """, (
+            shift_template_id,
+            company_id
+        ))
+
+        template = cursor.fetchone()
+
+        if not template:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid shift template"
+            )
 
         cursor.execute("""
             SELECT availability_id

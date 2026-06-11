@@ -218,7 +218,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     roles: "/staffing-roles-import",
     employees: "/employees-import",
     employeeAssignments: "/employee-assignments-import",
-    shifts: null,
+    shifts: "/shift-templates-import",
     staffing: null,
   };
 
@@ -347,6 +347,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       const data = await res.json();
 
       const orderedShifts = (Array.isArray(data) ? data : []).sort((a, b) => {
+        const accountCompare = String(a.account_name || "").localeCompare(
+          String(b.account_name || ""),
+        );
+
+        if (accountCompare !== 0) {
+          return accountCompare;
+        }
+
         const aTime = String(a.start_time || "00:00:00");
         const bTime = String(b.start_time || "00:00:00");
 
@@ -1307,36 +1315,41 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const isSlotUnavailable = (
     employeeId: number,
     day: string,
-    shift: string,
+    shiftTemplateId: number | string,
   ): boolean => {
     const emp = employeeAvailability[employeeId];
 
-    // ❗ No employee record → UNAVAILABLE
     if (!emp) return true;
 
     const dayData = emp[day.toLowerCase()];
 
-    // ❗ No day → UNAVAILABLE
     if (!dayData) return true;
 
-    const shiftData = dayData[String(shift).toLowerCase()];
+    const shiftData = dayData[String(shiftTemplateId)];
 
-    // ❗ No shift → UNAVAILABLE
     if (shiftData === undefined) return true;
 
-    // ❗ false = unavailable → return true (grey)
     return !shiftData;
   };
 
   const toggleSlotAvailability = async (
     employeeId: number,
     day: string,
-    shift: string,
+    shift: any,
   ) => {
-    // 🔥 STEP 1: determine current state
-    const isCurrentlyUnavailable = isSlotUnavailable(employeeId, day, shift);
+    const shiftTemplateId = Number(shift.shift_template_id);
 
-    // 🔥 STEP 2: send to backend FIRST
+    if (!shiftTemplateId) {
+      toast.error("Invalid shift template");
+      return;
+    }
+
+    const isCurrentlyUnavailable = isSlotUnavailable(
+      employeeId,
+      day,
+      shiftTemplateId,
+    );
+
     try {
       await fetch(
         "https://backend-production-6e75.up.railway.app/availability",
@@ -1349,10 +1362,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             employee_id: employeeId,
             company_id: currentUser.company_id,
             day_of_week: day.toLowerCase(),
-            preferred_shift: shift.toLowerCase(),
-            shift_template_id:
-              shiftTemplates.find((s) => s.shift_name === shift)
-                ?.shift_template_id || null,
+            shift_template_id: shiftTemplateId,
+            preferred_shift: shift.shift_name,
             is_available: isCurrentlyUnavailable,
           }),
         },
@@ -1361,7 +1372,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       await fetchAvailability();
     } catch (err) {
       console.error("Failed to update availability", err);
-      return; // ❗ stop if backend fails
+      toast.error("Failed to update availability");
     }
   };
 
@@ -1385,24 +1396,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       data.forEach((row: any) => {
         if (!row.day_of_week) return;
+        if (!row.shift_template_id) return;
 
         const empId = Number(row.employee_id);
         const day = String(row.day_of_week).toLowerCase();
-
-        const matchedShift =
-          shiftTemplates.find(
-            (shift) =>
-              Number(shift.shift_template_id) === Number(row.shift_template_id),
-          ) ||
-          shiftTemplates.find(
-            (shift) =>
-              String(shift.shift_name).toLowerCase() ===
-              String(row.preferred_shift || "").toLowerCase(),
-          );
-
-        if (!matchedShift) return;
-
-        const shiftKey = String(matchedShift.shift_name).toLowerCase();
+        const shiftKey = String(row.shift_template_id);
 
         if (!transformed[empId]) {
           transformed[empId] = {};
@@ -1478,6 +1476,27 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const getShiftInfo = (code: string) => {
     return shiftTemplates.find((s) => s.shift_name === code);
+  };
+
+  const getShiftDisplayOrder = (targetShift: any) => {
+    const sameAccountShifts = shiftTemplates
+      .filter(
+        (shift) => Number(shift.account_id) === Number(targetShift.account_id),
+      )
+      .sort((a, b) => {
+        const aTime = String(a.start_time || "00:00:00");
+        const bTime = String(b.start_time || "00:00:00");
+
+        return aTime.localeCompare(bTime);
+      });
+
+    const index = sameAccountShifts.findIndex(
+      (shift) =>
+        Number(shift.shift_template_id) ===
+        Number(targetShift.shift_template_id),
+    );
+
+    return index >= 0 ? index + 1 : 1;
   };
 
   if (currentUser.role.toLowerCase() !== "admin") {
@@ -1763,31 +1782,36 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                       {shiftTemplates.map((shift) => (
                         <div
-                          key={shift.shift_name}
+                          key={`dayoff-shift-${shift.shift_template_id}`}
                           className="grid grid-cols-8 gap-2 mt-2"
                         >
                           <div className="p-3 font-medium bg-gray-100 rounded flex flex-col justify-center">
                             <div>
-                              {shift.shift_name} - {shift.name}
+                              {shift.account_name
+                                ? `${shift.account_name} - `
+                                : ""}
+                              {shift.shift_name}
                             </div>
                             <div className="text-xs text-gray-600">
-                              {shift.time}
+                              {(shift.start_time || "").slice(0, 5)} -{" "}
+                              {(shift.end_time || "").slice(0, 5)}
                             </div>
                           </div>
                           {DAYS.map((day) => {
                             const isUnavailable = isSlotUnavailable(
                               selectedEmployeeForDayOff,
                               day,
-                              shift.shift_name,
+                              shift.shift_template_id,
                             );
+
                             return (
                               <div
-                                key={`${day}-${shift.shift_name}`}
+                                key={`${day}-${shift.shift_template_id}`}
                                 onClick={() =>
                                   toggleSlotAvailability(
                                     selectedEmployeeForDayOff,
                                     day,
-                                    shift.shift_name,
+                                    shift,
                                   )
                                 }
                                 className={`
@@ -2547,7 +2571,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     onClick={() =>
                       downloadImportTemplate(
                         "shifts",
-                        "shift_name,start_time,end_time,display_order,fatigue_penalty,difficulty_weight,is_overnight,status",
+                        "account_name,shift_name,start_time,end_time",
                       )
                     }
                   >
@@ -2600,6 +2624,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Account</TableHead>
                       <TableHead>Shift Name</TableHead>
                       <TableHead>Start Time</TableHead>
                       <TableHead>End Time</TableHead>
@@ -2609,12 +2634,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
-
                   <TableBody>
                     {shiftTemplates.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={7}
+                          colSpan={8}
                           className="text-center text-gray-500 py-6"
                         >
                           No shift templates found. Use Add Shift or Import CSV
@@ -2624,6 +2648,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     ) : (
                       shiftTemplates.map((shift, index) => (
                         <TableRow key={`shift-${shift.shift_template_id}`}>
+                          <TableCell className="font-medium">
+                            {shift.account_name || "-"}
+                          </TableCell>
+
                           <TableCell className="font-medium">
                             {shift.shift_name}
                           </TableCell>
@@ -2636,9 +2664,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             {shift.is_overnight ? "Yes" : "No"}
                           </TableCell>
 
-                          <TableCell>
-                            {shift.display_order ?? index + 1}
-                          </TableCell>
+                          <TableCell>{getShiftDisplayOrder(shift)}</TableCell>
 
                           <TableCell>
                             <Badge>Active</Badge>
@@ -3554,12 +3580,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   {/* SHIFTS GRID */}
                   {shiftTemplates.map((shift) => (
                     <div
-                      key={shift.shift_name}
+                      key={`availability-shift-${shift.shift_template_id}`}
                       className="grid grid-cols-8 gap-2 mt-2 text-sm"
                     >
                       {/* SHIFT LABEL */}
                       <div className="p-2 bg-gray-100 rounded">
-                        {shift.shift_name} - {shift.name}
+                        <div>
+                          {shift.account_name ? `${shift.account_name} - ` : ""}
+                          {shift.shift_name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {(shift.start_time || "").slice(0, 5)} -{" "}
+                          {(shift.end_time || "").slice(0, 5)}
+                        </div>
                       </div>
 
                       {/* CELLS */}
@@ -3567,17 +3600,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         const isUnavailable = isSlotUnavailable(
                           selectedEmployeeForAvailability.id,
                           day,
-                          shift.shift_name,
+                          shift.shift_template_id,
                         );
 
                         return (
                           <div
-                            key={`${day}-${shift.shift_name}`}
+                            key={`${day}-${shift.shift_template_id}`}
                             onClick={() =>
                               toggleSlotAvailability(
                                 selectedEmployeeForAvailability.id,
                                 day,
-                                shift.shift_name,
+                                shift,
                               )
                             }
                             className={`p-2 rounded border cursor-pointer text-xs
