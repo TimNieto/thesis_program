@@ -113,7 +113,14 @@ export default function App() {
             <div className="flex items-center gap-3">
               <Calendar className="size-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl">Schedule Manager</h1>
+                <p className="text-xs uppercase tracking-wide text-gray-500">
+                  Schedule Manager
+                </p>
+
+                <h1 className="text-2xl font-semibold leading-tight">
+                  {user.company_name || "No company selected"}
+                </h1>
+
                 <p className="text-sm text-gray-600">
                   Welcome, {user.name} ({user.displayRole})
                 </p>
