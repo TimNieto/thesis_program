@@ -3658,7 +3658,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         value={role.role_name}
                       >
                         {role.role_name}
-                        {role.is_admin ? " — Admin" : " — Non-admin"}
+                        {role.is_admin ? " — Admin" : ""}
                       </SelectItem>
                     ))
                   )}
