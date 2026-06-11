@@ -915,6 +915,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       .values(),
   ).flatMap((group) => [group.departmentRow, ...group.roleRows]);
 
+  const assignedEmployees = employees.filter((employee) => {
+    const hasRole =
+      employee.role && employee.role.trim() !== "" && employee.role !== "None";
+
+    return hasRole;
+  });
+
   // Add Employee
   const handleAddEmployee = async () => {
     if (!newEmployeeName.trim()) {
@@ -2266,7 +2273,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableHeader>
 
                   <TableBody>
-                    {employees.length === 0 ? (
+                    {assignedEmployees.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={6}
@@ -2277,7 +2284,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      employees.map((employee) => (
+                      assignedEmployees.map((employee) => (
                         <TableRow
                           key={`assignment-${employee.id}`}
                           className="h-12"

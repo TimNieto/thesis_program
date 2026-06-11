@@ -44,20 +44,8 @@ def normalize_list(value):
     return cleaned
 
 
-def get_display_role(role_keys, role_names):
-    if "hr_manager" in role_keys or "admin" in role_keys:
-        return "Team Leader"
-
-    if "host" in role_keys and "operator" in role_keys:
-        return "Both"
-
-    if "host" in role_keys:
-        return "Host"
-
-    if "operator" in role_keys:
-        return "Operator"
-
-    return ", ".join(role_names) if role_names else "Employee"
+def get_display_role(role_names):
+    return ", ".join(role_names) if role_names else "None"
 
 
 @router.get("/employees")
@@ -124,7 +112,7 @@ def get_employees(company_id: int | None = None):
             role_keys = [r[0] for r in role_rows]
             role_names = [r[1] for r in role_rows]
 
-            display_role = get_display_role(role_keys, role_names)
+            display_role = get_display_role(role_names)
 
             cursor.execute("""
                 SELECT DISTINCT
@@ -231,7 +219,7 @@ def get_employee(employee_id: int):
         role_keys = [r[0] for r in role_rows]
         role_names = [r[1] for r in role_rows]
 
-        display_role = get_display_role(role_keys, role_names)
+        display_role = get_display_role(role_names)
 
         return {
             "id": row[0],
@@ -853,7 +841,7 @@ async def import_employees(
         cursor.close()
         conn.close()
 
-        
+
 @router.delete("/employees/{employee_id}")
 def delete_employee(employee_id: int):
     conn = get_connection()
