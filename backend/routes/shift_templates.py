@@ -1106,6 +1106,29 @@ def delete_shift_template(
             )
 
         cursor.execute("""
+            SELECT COUNT(*)
+            FROM shift_staffing_requirements
+            WHERE company_id = %s
+            AND shift_template_id = %s
+            AND is_active = TRUE
+        """, (
+            company_id,
+            shift_template_id
+        ))
+
+        active_staffing_requirement_count = cursor.fetchone()[0]
+
+        if active_staffing_requirement_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot deactivate shift. "
+                    f"{active_staffing_requirement_count} active staffing "
+                    f"requirement(s) use this shift."
+                )
+            )
+
+        cursor.execute("""
             UPDATE shift_templates
             SET
                 is_active = FALSE,
@@ -1120,7 +1143,7 @@ def delete_shift_template(
         conn.commit()
 
         return {
-            "message": "Shift template deleted successfully",
+            "message": "Shift template deactivated successfully",
             "shift_template_id": row[0],
             "shift_name": row[1],
             "account_name": row[2],

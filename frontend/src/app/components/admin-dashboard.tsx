@@ -972,6 +972,46 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const handleDeactivateShift = async (shift: any) => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      const shiftTemplateId = shift.shift_template_id;
+
+      if (!shiftTemplateId) {
+        throw new Error("Invalid shift template");
+      }
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/shift-templates/${shiftTemplateId}?company_id=${currentUser.company_id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : data?.detail?.message || "Failed to deactivate shift",
+        );
+      }
+
+      await fetchShiftTemplates();
+      await fetchStaffingRequirements();
+
+      toast.success(data?.message || "Shift deactivated");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to deactivate shift",
+      );
+    }
+  };
+
   const handleAddAssignmentSubmit = async () => {
     try {
       if (!currentUser.company_id) {
@@ -2837,13 +2877,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           <TableCell className={actionCellClass}>
                             {row.row_type === "shift" && (
                               <Button
-                                variant="outline"
                                 size="sm"
-                                onClick={() =>
-                                  toast.info(
-                                    "Deactivate shift is frontend-only for now",
-                                  )
-                                }
+                                className={dangerSmallButtonClass}
+                                onClick={() => handleDeactivateShift(row)}
                               >
                                 Deactivate
                               </Button>
