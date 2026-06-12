@@ -270,6 +270,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
+  const [isAddShiftOpen, setIsAddShiftOpen] = useState(false);
+  const [newShiftAccountId, setNewShiftAccountId] = useState("");
+  const [newShiftName, setNewShiftName] = useState("");
+  const [newShiftStartTime, setNewShiftStartTime] = useState("");
+  const [newShiftEndTime, setNewShiftEndTime] = useState("");
+
   const [staffingRoles, setStaffingRoles] = useState<any[]>([]);
   const [staffingRequirements, setStaffingRequirements] = useState<any[]>([]);
 
@@ -899,6 +905,73 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     setNewAssignmentRoleName("");
   };
 
+  const resetAddShiftForm = () => {
+    setNewShiftAccountId("");
+    setNewShiftName("");
+    setNewShiftStartTime("");
+    setNewShiftEndTime("");
+  };
+
+  const handleAddShiftSubmit = async () => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!newShiftAccountId) {
+        throw new Error("Please select an account");
+      }
+
+      if (!newShiftName.trim()) {
+        throw new Error("Shift name is required");
+      }
+
+      if (!newShiftStartTime || !newShiftEndTime) {
+        throw new Error("Start and end time are required");
+      }
+
+      if (newShiftStartTime === newShiftEndTime) {
+        throw new Error("Start and end time cannot be identical");
+      }
+
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/shift-templates",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            account_id: Number(newShiftAccountId),
+            shift_name: newShiftName,
+            start_time: newShiftStartTime,
+            end_time: newShiftEndTime,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : data?.detail?.message || "Failed to add shift",
+        );
+      }
+
+      await fetchShiftTemplates();
+
+      resetAddShiftForm();
+      setIsAddShiftOpen(false);
+
+      toast.success(data?.message || "Shift added");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add shift");
+    }
+  };
+
   const handleAddAssignmentSubmit = async () => {
     try {
       if (!currentUser.company_id) {
@@ -1022,6 +1095,28 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }, new Map<number, string>())
       .values(),
   ).sort((a, b) => a.localeCompare(b));
+
+  const activeShiftAccountOptions = accountDepartmentRows
+    .filter((row) => {
+      return (
+        row.department_is_active &&
+        row.account_id !== null &&
+        row.account_is_active
+      );
+    })
+    .sort((a, b) => {
+      const departmentCompare = String(a.department_name || "").localeCompare(
+        String(b.department_name || ""),
+      );
+
+      if (departmentCompare !== 0) {
+        return departmentCompare;
+      }
+
+      return String(a.account_name || "").localeCompare(
+        String(b.account_name || ""),
+      );
+    });
 
   const groupedRoleRows = Array.from(
     staffingRoles
@@ -2651,13 +2746,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       e.currentTarget.value = "";
                     }}
                   />
-
                   <Button
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      toast.info("Manual shift add is frontend-only for now")
-                    }
+                    onClick={() => {
+                      resetAddShiftForm();
+                      setIsAddShiftOpen(true);
+                    }}
                   >
                     <Plus className="size-4" />
                     Add Shift
@@ -3738,6 +3833,107 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           <DialogFooter>
             <Button onClick={() => setIsAvailabilityDialogOpen(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Add Shift Dialog */}
+      <Dialog
+        open={isAddShiftOpen}
+        onOpenChange={(open) => {
+          setIsAddShiftOpen(open);
+
+          if (!open) {
+            resetAddShiftForm();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Shift</DialogTitle>
+            <DialogDescription>
+              Add a shift template under an active account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Account</Label>
+
+              <Select
+                value={newShiftAccountId}
+                onValueChange={setNewShiftAccountId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {activeShiftAccountOptions.map((account) => (
+                    <SelectItem
+                      key={`shift-account-${account.account_id}`}
+                      value={String(account.account_id)}
+                    >
+                      {account.department_name} / {account.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {activeShiftAccountOptions.length === 0 && (
+                <p className="text-xs text-red-500">
+                  No active accounts found. Add an active account first.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Shift Name</Label>
+
+              <Input
+                value={newShiftName}
+                onChange={(e) => setNewShiftName(e.target.value)}
+                placeholder="e.g. MORNING"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Start-End Time</Label>
+
+              <div className="flex items-center gap-2">
+                <Input
+                  type="time"
+                  value={newShiftStartTime}
+                  onChange={(e) => setNewShiftStartTime(e.target.value)}
+                />
+
+                <span className="text-gray-500">-</span>
+
+                <Input
+                  type="time"
+                  value={newShiftEndTime}
+                  onChange={(e) => setNewShiftEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetAddShiftForm();
+                setIsAddShiftOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={handleAddShiftSubmit}
+              disabled={activeShiftAccountOptions.length === 0}
+            >
+              Save Shift
             </Button>
           </DialogFooter>
         </DialogContent>
