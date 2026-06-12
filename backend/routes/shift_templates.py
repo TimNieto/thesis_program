@@ -1149,6 +1149,7 @@ def delete_shift_template(
             "account_name": row[2],
         }
 
+
     except HTTPException:
         conn.rollback()
         raise
