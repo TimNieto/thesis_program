@@ -8,7 +8,6 @@ from db.database import get_connection
 
 router = APIRouter()
 
-
 def normalize_role_key(role_name: str) -> str:
     return role_name.strip().lower().replace(" ", "_")
 
