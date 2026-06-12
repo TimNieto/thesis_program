@@ -306,25 +306,284 @@ def get_employee(employee_id: int):
         conn.close()
 
 
+@router.put("/employees/{employee_id}/roles")
+def override_employee_roles(employee_id: int, payload: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+        role_ids = payload.get("role_ids") or []
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if not isinstance(role_ids, list) or len(role_ids) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Select at least one role"
+            )
+
+        role_ids = [int(role_id) for role_id in role_ids]
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE employee_id = %s
+            AND company_id = %s
+            AND employment_status = 'Active'
+            LIMIT 1
+        """, (
+            employee_id,
+            company_id
+        ))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee not found under this company"
+            )
+
+        cursor.execute("""
+            SELECT
+                r.role_id,
+                r.department_id,
+                r.is_admin
+            FROM roles r
+            JOIN departments d
+                ON r.department_id = d.department_id
+                AND r.company_id = d.company_id
+            WHERE r.company_id = %s
+            AND r.role_id = ANY(%s::int[])
+            AND r.is_active = TRUE
+            AND d.is_active = TRUE
+        """, (
+            company_id,
+            role_ids
+        ))
+
+        role_rows = cursor.fetchall()
+
+        if len(role_rows) != len(set(role_ids)):
+            raise HTTPException(
+                status_code=400,
+                detail="One or more selected roles are invalid"
+            )
+
+        department_ids = {row[1] for row in role_rows}
+        admin_flags = {bool(row[2]) for row in role_rows}
+
+        if len(department_ids) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected roles must belong to one department only"
+            )
+
+        if len(admin_flags) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot mix admin and non-admin roles"
+            )
+
+        selected_is_admin = next(iter(admin_flags))
+
+        cursor.execute("""
+            UPDATE employee_roles
+            SET is_active = FALSE
+            WHERE company_id = %s
+            AND employee_id = %s
+            AND role_id <> ALL(%s::int[])
+            AND is_active = TRUE
+        """, (
+            company_id,
+            employee_id,
+            role_ids
+        ))
+
+        for role_id in role_ids:
+            cursor.execute("""
+                INSERT INTO employee_roles (
+                    employee_id,
+                    role_id,
+                    company_id,
+                    is_active
+                )
+                VALUES (%s, %s, %s, TRUE)
+                ON CONFLICT (
+                    company_id,
+                    employee_id,
+                    role_id
+                )
+                DO UPDATE SET
+                    is_active = TRUE
+            """, (
+                employee_id,
+                role_id,
+                company_id
+            ))
+
+        if selected_is_admin:
+            cursor.execute("""
+                UPDATE account_preferences
+                SET is_active = FALSE
+                WHERE company_id = %s
+                AND employee_id = %s
+                AND is_active = TRUE
+            """, (
+                company_id,
+                employee_id
+            ))
+        else:
+            cursor.execute("""
+                UPDATE account_preferences
+                SET is_active = FALSE
+                WHERE company_id = %s
+                AND employee_id = %s
+                AND role_id <> ALL(%s::int[])
+                AND is_active = TRUE
+            """, (
+                company_id,
+                employee_id,
+                role_ids
+            ))
+
+        conn.commit()
+
+        return {
+            "message": "Employee roles updated",
+            "employee_id": employee_id,
+            "role_ids": role_ids,
+            "is_admin": selected_is_admin
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("OVERRIDE EMPLOYEE ROLES ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to override employee roles"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.get("/employees/{employee_id}/account-preferences")
+def get_employee_account_preferences(employee_id: int, company_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE employee_id = %s
+            AND company_id = %s
+            AND employment_status = 'Active'
+            LIMIT 1
+        """, (
+            employee_id,
+            company_id
+        ))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee not found under this company"
+            )
+
+        cursor.execute("""
+            SELECT
+                ap.account_id,
+                a.account_name,
+                ap.role_id,
+                r.role_name,
+                ap.department_id,
+                d.department_name
+            FROM account_preferences ap
+            JOIN accounts a
+                ON ap.account_id = a.account_id
+                AND ap.company_id = a.company_id
+            JOIN roles r
+                ON ap.role_id = r.role_id
+                AND ap.company_id = r.company_id
+            JOIN departments d
+                ON ap.department_id = d.department_id
+                AND ap.company_id = d.company_id
+            WHERE ap.employee_id = %s
+            AND ap.company_id = %s
+            AND ap.is_active = TRUE
+            AND a.is_active = TRUE
+            AND r.is_active = TRUE
+            AND d.is_active = TRUE
+            ORDER BY d.department_name, a.account_name, r.role_name
+        """, (
+            employee_id,
+            company_id
+        ))
+
+        return [
+            {
+                "account_id": row[0],
+                "account_name": row[1],
+                "role_id": row[2],
+                "role_name": row[3],
+                "department_id": row[4],
+                "department_name": row[5],
+            }
+            for row in cursor.fetchall()
+        ]
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @router.put("/employees/{employee_id}/account-preferences")
 def update_employee_account_preferences(employee_id: int, data: dict):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
+        company_id = data.get("company_id")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
         cursor.execute("""
             SELECT company_id
             FROM employees
             WHERE employee_id = %s
+            AND company_id = %s
             AND employment_status = 'Active'
-        """, (employee_id,))
+            LIMIT 1
+        """, (
+            employee_id,
+            company_id
+        ))
 
         employee = cursor.fetchone()
 
         if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
-
-        company_id = employee[0]
+            raise HTTPException(
+                status_code=404,
+                detail="Employee not found under this company"
+            )
 
         preferences = (
             data.get("preferences")
@@ -339,7 +598,6 @@ def update_employee_account_preferences(employee_id: int, data: dict):
                 detail="preferences must be a list"
             )
 
-        # Soft-disable old preferences first.
         cursor.execute("""
             UPDATE account_preferences
             SET is_active = FALSE
@@ -396,6 +654,7 @@ def update_employee_account_preferences(employee_id: int, data: dict):
                     AND role_id = %s
                     AND department_id = %s
                     AND is_active = TRUE
+                    AND is_admin = FALSE
                     LIMIT 1
                 """, (
                     company_id,
@@ -410,6 +669,7 @@ def update_employee_account_preferences(employee_id: int, data: dict):
                     AND department_id = %s
                     AND LOWER(role_name) = LOWER(%s)
                     AND is_active = TRUE
+                    AND is_admin = FALSE
                     LIMIT 1
                 """, (
                     company_id,
@@ -423,6 +683,30 @@ def update_employee_account_preferences(employee_id: int, data: dict):
                 continue
 
             role_id = role[0]
+
+            cursor.execute("""
+                SELECT 1
+                FROM employee_roles er
+                JOIN roles r
+                    ON er.role_id = r.role_id
+                    AND er.company_id = r.company_id
+                WHERE er.company_id = %s
+                AND er.employee_id = %s
+                AND er.role_id = %s
+                AND er.is_active = TRUE
+                AND r.is_active = TRUE
+                AND r.is_admin = FALSE
+                LIMIT 1
+            """, (
+                company_id,
+                employee_id,
+                role_id
+            ))
+
+            active_employee_role = cursor.fetchone()
+
+            if not active_employee_role:
+                continue
 
             cursor.execute("""
                 INSERT INTO account_preferences (

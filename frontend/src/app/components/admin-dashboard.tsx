@@ -306,6 +306,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newEmployeeContactNumber, setNewEmployeeContactNumber] = useState("");
   const [newEmployeeNickname, setNewEmployeeNickname] = useState("");
 
+  const [isRoleOverrideOpen, setIsRoleOverrideOpen] = useState(false);
+const [selectedEmployeeForRoles, setSelectedEmployeeForRoles] =
+  useState<Employee | null>(null);
+
+const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+
+const [accountRolePrefs, setAccountRolePrefs] = useState<
+  Record<number, Record<number, boolean>>
+>({});
+
   const [accounts, setAccounts] = useState<any[]>([]);
   const [accountDepartmentRows, setAccountDepartmentRows] = useState<
     AccountDepartmentRow[]
@@ -477,6 +487,40 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     } catch (err) {
       console.error("Failed to load account/department data", err);
       setAccountDepartmentRows([]);
+    }
+  };
+
+  const fetchEmployeeAccountPreferences = async (employeeId: number) => {
+    if (!currentUser.company_id) return {};
+
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/employees/${employeeId}/account-preferences?company_id=${currentUser.company_id}`,
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to load account preferences");
+      }
+
+      const matrix: Record<number, Record<number, boolean>> = {};
+
+      for (const pref of Array.isArray(data) ? data : []) {
+        const accountId = Number(pref.account_id);
+        const roleId = Number(pref.role_id);
+
+        if (!matrix[accountId]) {
+          matrix[accountId] = {};
+        }
+
+        matrix[accountId][roleId] = true;
+      }
+
+      return matrix;
+    } catch (err) {
+      console.error("Failed to load account preferences", err);
+      return {};
     }
   };
 
@@ -1284,6 +1328,117 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const openRoleOverrideDialog = async (employee: Employee) => {
+    setSelectedEmployeeForRoles(employee);
+
+    const existingRoleIds = (employee.assignments || []).map((assignment) =>
+      Number(assignment.role_id),
+    );
+
+    setSelectedRoleIds(existingRoleIds);
+
+    const prefs = await fetchEmployeeAccountPreferences(employee.id);
+    setAccountRolePrefs(prefs);
+
+    setIsRoleOverrideOpen(true);
+  };
+
+  const buildAccountPreferencePayload = () => {
+    const preferences: any[] = [];
+
+    for (const account of roleDepartmentAccounts) {
+      const accountId = Number(account.account_id);
+
+      for (const role of selectedNonAdminRoles) {
+        const roleId = Number(role.role_id);
+
+        if (accountRolePrefs[accountId]?.[roleId]) {
+          preferences.push({
+            account_name: account.account_name,
+            role_id: roleId,
+          });
+        }
+      }
+    }
+
+    return preferences;
+  };
+
+  const handleSaveRoleOverride = async () => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!selectedEmployeeForRoles) {
+        throw new Error("No employee selected");
+      }
+
+      if (selectedRoleIds.length === 0) {
+        throw new Error("Please select at least one role");
+      }
+
+      const roleRes = await fetch(
+        `https://backend-production-6e75.up.railway.app/employees/${selectedEmployeeForRoles.id}/roles`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            role_ids: selectedRoleIds,
+          }),
+        },
+      );
+
+      const roleData = await roleRes.json().catch(() => null);
+
+      if (!roleRes.ok) {
+        throw new Error(roleData?.detail || "Failed to update roles");
+      }
+
+      const hasAdminRole = selectedRoles.some((role) => Boolean(role.is_admin));
+
+      if (!hasAdminRole) {
+        const prefsRes = await fetch(
+          `https://backend-production-6e75.up.railway.app/employees/${selectedEmployeeForRoles.id}/account-preferences`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              company_id: currentUser.company_id,
+              preferences: buildAccountPreferencePayload(),
+            }),
+          },
+        );
+
+        const prefsData = await prefsRes.json().catch(() => null);
+
+        if (!prefsRes.ok) {
+          throw new Error(
+            prefsData?.detail || "Failed to update account preferences",
+          );
+        }
+      }
+
+      await fetchEmployees();
+
+      setIsRoleOverrideOpen(false);
+      setSelectedEmployeeForRoles(null);
+      setSelectedRoleIds([]);
+      setAccountRolePrefs({});
+
+      toast.success("Employee roles updated");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update employee roles",
+      );
+    }
+  };
+
   const tableClass = "table-fixed w-full";
 
   const actionCellClass = "w-[140px] text-right";
@@ -1504,6 +1659,57 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         ];
       });
 
+      const selectedRoles = staffingRoles.filter((role) =>
+        selectedRoleIds.includes(Number(role.role_id)),
+      );
+
+      const selectedDepartmentName =
+        selectedRoles.length > 0 ? selectedRoles[0].department_name : null;
+
+      const selectedIsAdmin =
+        selectedRoles.length > 0 ? Boolean(selectedRoles[0].is_admin) : null;
+
+      const selectedNonAdminRoles = selectedRoles.filter(
+        (role) => !Boolean(role.is_admin),
+      );
+
+      const rolesByDepartment = staffingRoles.reduce(
+        (groups: Record<string, any[]>, role) => {
+          const department = role.department_name || "None";
+
+          if (!groups[department]) {
+            groups[department] = [];
+          }
+
+          groups[department].push(role);
+
+          return groups;
+        },
+        {},
+      );
+
+      const isRoleCheckboxDisabled = (role: any) => {
+        if (selectedRoles.length === 0) return false;
+
+        const roleDepartment = role.department_name || "None";
+        const roleIsAdmin = Boolean(role.is_admin);
+
+        if (roleDepartment !== selectedDepartmentName) return true;
+        if (roleIsAdmin !== selectedIsAdmin) return true;
+
+        return false;
+      };
+
+      const roleDepartmentAccounts = accountDepartmentRows.filter((row) => {
+        if (!selectedDepartmentName) return false;
+
+        return (
+          row.account_id &&
+          row.account_name &&
+          row.department_name === selectedDepartmentName
+        );
+      });
+
   const groupedShiftTemplateRows = Array.from(
     shiftTemplates
       .reduce(
@@ -1544,6 +1750,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       )
       .values(),
   ).flatMap((group) => [group.departmentRow, ...group.shiftRows]);
+
+
 
   type StaffingRequirementDisplayRow =
     | {
@@ -2356,6 +2564,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 >
                                   <CalendarOff className="size-4" />
                                   Availability
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openRoleOverrideDialog(employee)}
+                                  className="gap-2"
+                                >
+                                  <UserSquare2 className="size-4" />
+                                  Roles
                                 </Button>
                                 <Button
                                   variant="destructive"
@@ -3966,6 +4183,162 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               Cancel
             </Button>
             <Button onClick={handleAddEmployee}>Add Employee</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Role Override Dialog */}
+      <Dialog open={isRoleOverrideOpen} onOpenChange={setIsRoleOverrideOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Roles & Account Preferences</DialogTitle>
+            <DialogDescription>
+              Override employee roles and configure account scheduling permissions.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedEmployeeForRoles && (
+            <div className="space-y-6">
+              <div>
+                <p className="font-medium">{selectedEmployeeForRoles.name}</p>
+                <p className="text-sm text-gray-500">
+                  Current role: {selectedEmployeeForRoles.role || "None"}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Role Override</h3>
+
+                {Object.entries(rolesByDepartment).map(([department, roles]) => (
+                  <div key={department} className="border rounded-lg p-4 space-y-3">
+                    <div className="font-medium">{department}</div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {roles.map((role: any) => {
+                        const roleId = Number(role.role_id);
+                        const checked = selectedRoleIds.includes(roleId);
+                        const disabled = isRoleCheckboxDisabled(role);
+
+                        return (
+                          <label
+                            key={roleId}
+                            className={`flex items-center gap-2 rounded border p-3 ${
+                              disabled ? "opacity-50" : ""
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={disabled}
+                              onChange={(event) => {
+                                const isChecked = event.target.checked;
+
+                                setSelectedRoleIds((prev) => {
+                                  if (isChecked) {
+                                    return [...prev, roleId];
+                                  }
+
+                                  return prev.filter((id) => id !== roleId);
+                                });
+                              }}
+                            />
+
+                            <span>
+                              {role.role_name}
+                              {role.is_admin && (
+                                <span className="ml-2 text-xs text-blue-600">
+                                  Admin access
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedIsAdmin === true && (
+                <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-600">
+                  Admin roles are not schedule roles. Account preferences are disabled
+                  for admin-role employees.
+                </div>
+              )}
+
+              {selectedIsAdmin === false && selectedNonAdminRoles.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Account Preferences</h3>
+
+                  <div className="overflow-x-auto border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account</TableHead>
+                          {selectedNonAdminRoles.map((role) => (
+                            <TableHead key={role.role_id}>{role.role_name}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+
+                      <TableBody>
+                        {roleDepartmentAccounts.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={1 + selectedNonAdminRoles.length}
+                              className="text-center text-gray-500 py-6"
+                            >
+                              No accounts found under this department.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          roleDepartmentAccounts.map((account) => (
+                            <TableRow key={account.account_id}>
+                              <TableCell>{account.account_name}</TableCell>
+
+                              {selectedNonAdminRoles.map((role) => {
+                                const accountId = Number(account.account_id);
+                                const roleId = Number(role.role_id);
+
+                                return (
+                                  <TableCell key={roleId}>
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        accountRolePrefs[accountId]?.[roleId] || false
+                                      }
+                                      onChange={(event) => {
+                                        const checked = event.target.checked;
+
+                                        setAccountRolePrefs((prev) => ({
+                                          ...prev,
+                                          [accountId]: {
+                                            ...(prev[accountId] || {}),
+                                            [roleId]: checked,
+                                          },
+                                        }));
+                                      }}
+                                    />
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRoleOverrideOpen(false)}>
+              Cancel
+            </Button>
+
+            <Button onClick={handleSaveRoleOverride}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
