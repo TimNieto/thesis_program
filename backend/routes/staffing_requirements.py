@@ -1149,15 +1149,17 @@ async def import_staffing_requirements(
                     INSERT INTO shift_staffing_requirements (
                         company_id,
                         account_id,
+                        department_id,
                         shift_template_id,
                         role_id,
                         required_count,
                         is_active
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (
                     company_id,
                     account_id,
+                    department_id,
                     shift_template_id,
                     role_id,
                     required_count,
