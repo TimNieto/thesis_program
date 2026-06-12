@@ -242,6 +242,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     isEmployeeAssignmentsTemplatePreviewOpen,
     setIsEmployeeAssignmentsTemplatePreviewOpen,
   ] = useState(false);
+  const [
+    isShiftTemplatesTemplatePreviewOpen,
+    setIsShiftTemplatesTemplatePreviewOpen,
+  ] = useState(false);
 
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
   const [newRoleDepartmentName, setNewRoleDepartmentName] = useState("");
@@ -2617,17 +2621,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      downloadImportTemplate(
-                        "shifts",
-                        "account_name,shift_name,start_time,end_time",
-                      )
-                    }
+                    onClick={() => setIsShiftTemplatesTemplatePreviewOpen(true)}
                   >
                     <Download className="size-4" />
-                    Template
+                    View Template
                   </Button>
-
                   <Button
                     variant="outline"
                     size="sm"
@@ -3740,6 +3738,49 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           <DialogFooter>
             <Button onClick={() => setIsAvailabilityDialogOpen(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Shift Templates Template Preview Dialog */}
+      <Dialog
+        open={isShiftTemplatesTemplatePreviewOpen}
+        onOpenChange={setIsShiftTemplatesTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Shift Configuration CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. Accounts must already
+              exist.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/shift-templates-template.png"
+              alt="Shift Configuration CSV template preview"
+              className="w-full h-auto"
+            />
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>
+              Required columns: account_name, shift_name, start_time, end_time.
+            </p>
+            <p>Accepted: same shift name can exist under different accounts.</p>
+            <p>
+              Rejected: duplicate active shift name or overlapping shift time
+              inside the same account.
+            </p>
+            <p>Time format: 24-hour time such as 03:00, 15:00, or 15:00:00.</p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setIsShiftTemplatesTemplatePreviewOpen(false)}
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
