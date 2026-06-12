@@ -324,6 +324,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const [roleToDeactivate, setRoleToDeactivate] = useState<any | null>(null);
 
+  const [shiftToDeactivate, setShiftToDeactivate] = useState<any | null>(null);
+
   const [assignmentToDeactivate, setAssignmentToDeactivate] = useState<
     number | null
   >(null);
@@ -1069,13 +1071,19 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
-  const handleDeactivateShift = async (shift: any) => {
+  const handleDeactivateShift = (shift: any) => {
+    setShiftToDeactivate(shift);
+  };
+
+  const confirmDeactivateShift = async () => {
+    if (!shiftToDeactivate) return;
+
     try {
       if (!currentUser.company_id) {
         throw new Error("No company selected");
       }
 
-      const shiftTemplateId = shift.shift_template_id;
+      const shiftTemplateId = shiftToDeactivate.shift_template_id;
 
       if (!shiftTemplateId) {
         throw new Error("Invalid shift template");
@@ -1106,6 +1114,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       toast.error(
         err instanceof Error ? err.message : "Failed to deactivate shift",
       );
+    } finally {
+      setShiftToDeactivate(null);
     }
   };
 
@@ -4070,6 +4080,68 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               variant="destructive"
               onClick={confirmDeactivateEmployeeAssignment}
             >
+              Yes, Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Confirm Deactivate Shift Dialog */}
+      <Dialog
+        open={shiftToDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShiftToDeactivate(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Shift</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this shift? This shift cannot
+              be deactivated if active staffing requirements use it.
+            </DialogDescription>
+          </DialogHeader>
+
+          {shiftToDeactivate && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-md border bg-gray-50 p-3 text-sm">
+                <p className="font-medium">
+                  {shiftToDeactivate.account_name} —{" "}
+                  {shiftToDeactivate.shift_name}
+                </p>
+                <p className="text-gray-600">
+                  {shiftToDeactivate.department_name || "No department"} /{" "}
+                  {String(shiftToDeactivate.start_time || "").slice(0, 5)} -{" "}
+                  {String(shiftToDeactivate.end_time || "").slice(0, 5)}
+                </p>
+              </div>
+
+              <div className="rounded-md border p-3 text-sm space-y-2">
+                <p className="font-medium">Deactivation rule</p>
+
+                <div className="flex justify-between gap-4">
+                  <span>Active staffing requirements using this shift</span>
+                  <span className="font-medium">Must be 0</span>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <span>Historical records</span>
+                  <span className="font-medium">Preserved</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShiftToDeactivate(null)}
+            >
+              No
+            </Button>
+
+            <Button variant="destructive" onClick={confirmDeactivateShift}>
               Yes, Deactivate
             </Button>
           </DialogFooter>
