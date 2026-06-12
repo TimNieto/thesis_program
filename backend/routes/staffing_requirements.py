@@ -709,116 +709,190 @@ def update_staffing_requirements(payload: dict):
         company_id = payload.get("company_id", 1)
         requirements = payload.get("requirements", [])
 
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
         if not isinstance(requirements, list):
             raise HTTPException(
                 status_code=400,
                 detail="requirements must be a list"
             )
 
-        for item in requirements:
+        if not requirements:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one staffing requirement is required"
+            )
+
+        for index, item in enumerate(requirements, start=1):
+            account_id = item.get("account_id")
             shift_template_id = item.get("shift_template_id")
             role_id = item.get("role_id") or item.get("staffing_role_id")
-            account_id = item.get("account_id")
-            required_count = item.get("required_count")
+            required_count_raw = item.get("required_count")
 
-            if not shift_template_id or not role_id:
+            if not account_id:
                 raise HTTPException(
                     status_code=400,
-                    detail="Missing shift_template_id or staffing_role_id"
+                    detail=f"Requirement {index}: account_id is required"
                 )
 
-            if required_count is None:
+            if not shift_template_id:
                 raise HTTPException(
                     status_code=400,
-                    detail="required_count is required"
+                    detail=f"Requirement {index}: shift_template_id is required"
                 )
 
-            required_count = int(required_count)
+            if not role_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Requirement {index}: role_id is required"
+                )
+
+            if required_count_raw is None or str(required_count_raw).strip() == "":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Requirement {index}: required_count is required"
+                )
+
+            try:
+                required_count = int(str(required_count_raw).strip())
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Requirement {index}: required_count must be a whole number"
+                )
 
             if required_count < 0:
                 raise HTTPException(
                     status_code=400,
-                    detail="required_count cannot be negative"
+                    detail=f"Requirement {index}: required_count cannot be negative"
                 )
 
-            # If account_id is provided, update one account only.
-            if account_id:
-                cursor.execute("""
-                    INSERT INTO shift_staffing_requirements (
-                        company_id,
-                        account_id,
-                        shift_template_id,
-                        role_id,
-                        required_count,
-                        is_active
-                    )
-                    VALUES (%s, %s, %s, %s, %s, TRUE)
+            cursor.execute("""
+                SELECT
+                    a.account_id,
+                    a.account_name,
+                    d.department_id,
+                    d.department_name
+                FROM accounts a
+                JOIN departments d
+                    ON a.department_id = d.department_id
+                    AND a.company_id = d.company_id
+                WHERE a.company_id = %s
+                AND a.account_id = %s
+                AND a.is_active = TRUE
+                AND d.is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                account_id
+            ))
 
-                    ON CONFLICT (
-                        company_id,
-                        account_id,
-                        shift_template_id,
-                        role_id
-                    )
+            account_row = cursor.fetchone()
 
-                    DO UPDATE SET
-                        required_count = EXCLUDED.required_count,
-                        is_active = TRUE,
-                        updated_at = NOW()
-                """, (
+            if not account_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Requirement {index}: active account does not exist"
+                )
+
+            account_id = account_row[0]
+            department_id = account_row[2]
+
+            cursor.execute("""
+                SELECT
+                    shift_template_id,
+                    shift_name
+                FROM shift_templates
+                WHERE company_id = %s
+                AND account_id = %s
+                AND shift_template_id = %s
+                AND is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                account_id,
+                shift_template_id
+            ))
+
+            shift_row = cursor.fetchone()
+
+            if not shift_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Requirement {index}: active shift does not exist "
+                        "under the selected account"
+                    )
+                )
+
+            cursor.execute("""
+                SELECT
+                    role_id,
+                    role_name
+                FROM roles
+                WHERE company_id = %s
+                AND department_id = %s
+                AND role_id = %s
+                AND is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                department_id,
+                role_id
+            ))
+
+            role_row = cursor.fetchone()
+
+            if not role_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Requirement {index}: active role does not exist "
+                        "under the selected account's department"
+                    )
+                )
+
+            cursor.execute("""
+                INSERT INTO shift_staffing_requirements (
+                    company_id,
+                    account_id,
+                    department_id,
+                    shift_template_id,
+                    role_id,
+                    required_count,
+                    is_active
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, TRUE)
+
+                ON CONFLICT (
                     company_id,
                     account_id,
                     shift_template_id,
-                    role_id,
-                    required_count
-                ))
+                    role_id
+                )
 
-            # If account_id is missing, apply the same count to all active accounts.
-            else:
-                cursor.execute("""
-                    SELECT account_id
-                    FROM accounts
-                    WHERE company_id = %s
-                    AND is_active = TRUE
-                """, (company_id,))
-
-                accounts = cursor.fetchall()
-
-                for account in accounts:
-                    cursor.execute("""
-                        INSERT INTO shift_staffing_requirements (
-                            company_id,
-                            account_id,
-                            shift_template_id,
-                            role_id,
-                            required_count,
-                            is_active
-                        )
-                        VALUES (%s, %s, %s, %s, %s, TRUE)
-
-                        ON CONFLICT (
-                            company_id,
-                            account_id,
-                            shift_template_id,
-                            role_id
-                        )
-
-                        DO UPDATE SET
-                            required_count = EXCLUDED.required_count,
-                            is_active = TRUE,
-                            updated_at = NOW()
-                    """, (
-                        company_id,
-                        account[0],
-                        shift_template_id,
-                        role_id,
-                        required_count
-                    ))
+                DO UPDATE SET
+                    department_id = EXCLUDED.department_id,
+                    required_count = EXCLUDED.required_count,
+                    is_active = TRUE,
+                    updated_at = NOW()
+            """, (
+                company_id,
+                account_id,
+                department_id,
+                shift_template_id,
+                role_id,
+                required_count
+            ))
 
         conn.commit()
 
         return {
-            "message": "Staffing requirements saved"
+            "message": "Staffing requirement saved"
         }
 
     except HTTPException:
@@ -833,11 +907,10 @@ def update_staffing_requirements(payload: dict):
             detail=str(e)
         )
 
-
-
     finally:
         cursor.close()
         conn.close()
+        
 
 @router.post("/staffing-requirements-import")
 async def import_staffing_requirements(

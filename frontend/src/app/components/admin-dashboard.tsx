@@ -283,6 +283,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [staffingRoles, setStaffingRoles] = useState<any[]>([]);
   const [staffingRequirements, setStaffingRequirements] = useState<any[]>([]);
 
+  const [isAddRequirementOpen, setIsAddRequirementOpen] = useState(false);
+  const [newRequirementAccountId, setNewRequirementAccountId] = useState("");
+  const [newRequirementShiftTemplateId, setNewRequirementShiftTemplateId] =
+    useState("");
+  const [newRequirementRoleId, setNewRequirementRoleId] = useState("");
+  const [newRequirementRequiredCount, setNewRequirementRequiredCount] =
+    useState("");
+
   const [isLoading, setIsLoading] = useState(true);
 
   const [requests, setRequests] = useState<Request[]>([]);
@@ -916,6 +924,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     setNewShiftEndTime("");
   };
 
+  const resetAddRequirementForm = () => {
+    setNewRequirementAccountId("");
+    setNewRequirementShiftTemplateId("");
+    setNewRequirementRoleId("");
+    setNewRequirementRequiredCount("");
+  };
+
   const handleAddShiftSubmit = async () => {
     try {
       if (!currentUser.company_id) {
@@ -973,6 +988,84 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       toast.success(data?.message || "Shift added");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add shift");
+    }
+  };
+
+  const handleAddRequirementSubmit = async () => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!newRequirementAccountId) {
+        throw new Error("Please select an account");
+      }
+
+      if (!newRequirementShiftTemplateId) {
+        throw new Error("Please select a shift");
+      }
+
+      if (!newRequirementRoleId) {
+        throw new Error("Please select a role");
+      }
+
+      if (!newRequirementRequiredCount.trim()) {
+        throw new Error("Required count is required");
+      }
+
+      const requiredCount = Number(newRequirementRequiredCount);
+
+      if (!Number.isInteger(requiredCount)) {
+        throw new Error("Required count must be a whole number");
+      }
+
+      if (requiredCount < 0) {
+        throw new Error("Required count cannot be negative");
+      }
+
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/staffing-requirements",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            requirements: [
+              {
+                account_id: Number(newRequirementAccountId),
+                shift_template_id: Number(newRequirementShiftTemplateId),
+                role_id: Number(newRequirementRoleId),
+                required_count: requiredCount,
+              },
+            ],
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : data?.detail?.message || "Failed to save staffing requirement",
+        );
+      }
+
+      await fetchStaffingRequirements();
+
+      resetAddRequirementForm();
+      setIsAddRequirementOpen(false);
+
+      toast.success(data?.message || "Staffing requirement saved");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to save staffing requirement",
+      );
     }
   };
 
@@ -1161,6 +1254,44 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         String(b.account_name || ""),
       );
     });
+
+  const selectedRequirementAccountInfo = activeShiftAccountOptions.find(
+    (row) => String(row.account_id) === newRequirementAccountId,
+  );
+
+  const activeRequirementShiftOptions = shiftTemplates
+    .filter((shift) => {
+      return String(shift.account_id) === newRequirementAccountId;
+    })
+    .sort((a, b) => {
+      const aTime = String(a.start_time || "00:00:00");
+      const bTime = String(b.start_time || "00:00:00");
+
+      if (aTime !== bTime) {
+        return aTime.localeCompare(bTime);
+      }
+
+      return String(a.shift_name || "").localeCompare(
+        String(b.shift_name || ""),
+      );
+    });
+
+  const activeRequirementRoleOptions = staffingRoles
+    .filter((role) => {
+      if (!selectedRequirementAccountInfo) {
+        return false;
+      }
+
+      return (
+        String(role.department_name || "").toLowerCase() ===
+        String(
+          selectedRequirementAccountInfo.department_name || "",
+        ).toLowerCase()
+      );
+    })
+    .sort((a, b) =>
+      String(a.role_name || "").localeCompare(String(b.role_name || "")),
+    );
 
   const groupedRoleRows = Array.from(
     staffingRoles
@@ -3179,15 +3310,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       e.currentTarget.value = "";
                     }}
                   />
-
                   <Button
                     size="sm"
                     className="gap-2"
-                    onClick={() =>
-                      toast.info(
-                        "Manual staffing requirement add is frontend-only for now",
-                      )
-                    }
+                    onClick={() => {
+                      resetAddRequirementForm();
+                      setIsAddRequirementOpen(true);
+                    }}
                   >
                     <Plus className="size-4" />
                     Add Requirement
@@ -4347,6 +4476,137 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               onClick={() => setIsEmployeeAssignmentsTemplatePreviewOpen(false)}
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Add Staffing Requirement Dialog */}
+      <Dialog
+        open={isAddRequirementOpen}
+        onOpenChange={(open) => {
+          setIsAddRequirementOpen(open);
+
+          if (!open) {
+            resetAddRequirementForm();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Staffing Requirement</DialogTitle>
+            <DialogDescription>
+              Create or update the required count for one account, shift, and
+              role.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Department / Account</Label>
+              <Select
+                value={newRequirementAccountId}
+                onValueChange={(value) => {
+                  setNewRequirementAccountId(value);
+                  setNewRequirementShiftTemplateId("");
+                  setNewRequirementRoleId("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department / account" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {activeShiftAccountOptions.map((row) => (
+                    <SelectItem
+                      key={`requirement-account-${row.account_id}`}
+                      value={String(row.account_id)}
+                    >
+                      {row.department_name} — {row.account_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Shift</Label>
+              <Select
+                value={newRequirementShiftTemplateId}
+                onValueChange={setNewRequirementShiftTemplateId}
+                disabled={!newRequirementAccountId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select shift" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {activeRequirementShiftOptions.map((shift) => (
+                    <SelectItem
+                      key={`requirement-shift-${shift.shift_template_id}`}
+                      value={String(shift.shift_template_id)}
+                    >
+                      {shift.shift_name}{" "}
+                      {shift.start_time && shift.end_time
+                        ? `(${String(shift.start_time).slice(0, 5)} - ${String(
+                            shift.end_time,
+                          ).slice(0, 5)})`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select
+                value={newRequirementRoleId}
+                onValueChange={setNewRequirementRoleId}
+                disabled={!newRequirementAccountId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {activeRequirementRoleOptions.map((role) => (
+                    <SelectItem
+                      key={`requirement-role-${role.role_id}`}
+                      value={String(role.role_id)}
+                    >
+                      {role.role_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Required Count</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="e.g. 2"
+                value={newRequirementRequiredCount}
+                onChange={(e) => setNewRequirementRequiredCount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetAddRequirementForm();
+                setIsAddRequirementOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button onClick={handleAddRequirementSubmit}>
+              Save Requirement
             </Button>
           </DialogFooter>
         </DialogContent>
