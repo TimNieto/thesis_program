@@ -2917,7 +2917,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     onClick={() =>
                       downloadImportTemplate(
                         "staffing",
-                        "account_name,shift_name,role_name,required_count,status",
+                        "account_name,shift_name,role_name,required_count",
                       )
                     }
                   >

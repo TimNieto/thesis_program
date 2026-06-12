@@ -850,7 +850,6 @@ async def import_staffing_requirements(
     created_requirements = 0
     updated_requirements = 0
     reactivated_requirements = 0
-    deactivated_requirements = 0
     errors = []
 
     try:
@@ -894,8 +893,7 @@ async def import_staffing_requirements(
             "account_name",
             "shift_name",
             "role_name",
-            "required_count",
-            "status"
+            "required_count"
         ]
 
         if normalized_headers != required_headers:
@@ -903,7 +901,7 @@ async def import_staffing_requirements(
                 status_code=400,
                 detail=(
                     "Invalid CSV file. Required exact header: "
-                    "account_name,shift_name,role_name,required_count,status"
+                    "account_name,shift_name,role_name,required_count"
                 )
             )
 
@@ -934,16 +932,11 @@ async def import_staffing_requirements(
                 "required_count"
             )
 
-            status = str(
-                get_csv_value(normalized_row, "status")
-            ).strip().lower()
-
             if (
                 not account_name
                 and not shift_name
                 and not role_name
                 and not required_count_raw
-                and not status
             ):
                 continue
 
@@ -977,12 +970,6 @@ async def import_staffing_requirements(
                 )
                 continue
 
-            if status not in ["active", "inactive"]:
-                errors.append(
-                    f"Row {row_number}: status must be Active or Inactive"
-                )
-                continue
-
             csv_key = (
                 account_name.lower(),
                 shift_name.lower(),
@@ -1004,7 +991,7 @@ async def import_staffing_requirements(
                 "shift_name": shift_name,
                 "role_name": role_name,
                 "required_count": required_count,
-                "is_active": status == "active"
+                "is_active": True
             })
 
         if errors:
@@ -1064,6 +1051,7 @@ async def import_staffing_requirements(
                 WHERE company_id = %s
                 AND account_id = %s
                 AND LOWER(shift_name) = LOWER(%s)
+                AND is_active = TRUE
                 LIMIT 1
             """, (
                 company_id,
@@ -1077,7 +1065,7 @@ async def import_staffing_requirements(
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"Row {row_number}: Shift '{shift_name}' does not exist "
+                        f"Row {row_number}: Active shift '{shift_name}' does not exist "
                         f"under account '{account_name}'"
                     )
                 )
@@ -1156,9 +1144,6 @@ async def import_staffing_requirements(
                 if not was_active and is_active:
                     reactivated_requirements += 1
 
-                if was_active and not is_active:
-                    deactivated_requirements += 1
-
             else:
                 cursor.execute("""
                     INSERT INTO shift_staffing_requirements (
@@ -1189,7 +1174,6 @@ async def import_staffing_requirements(
                 "created_requirements": created_requirements,
                 "updated_requirements": updated_requirements,
                 "reactivated_requirements": reactivated_requirements,
-                "deactivated_requirements": deactivated_requirements,
                 "total_rows": len(rows)
             }
         }
