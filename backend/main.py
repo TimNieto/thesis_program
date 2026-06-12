@@ -14,7 +14,8 @@ from routes import (
     staffing_requirements,
     notifications,
     companies,
-    reports
+    reports,
+    import_history
 )
 
 app = FastAPI()
@@ -41,6 +42,7 @@ app.include_router(staffing_requirements.router)
 app.include_router(notifications.router)
 app.include_router(companies.router)
 app.include_router(reports.router)
+app.include_router(import_history.router)
 
 @app.get("/")
 def root():

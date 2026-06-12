@@ -229,6 +229,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     rowCount: number;
     importedAt: string;
     status: "success" | "error";
+    importedBy?: string;
+    errorMessage?: string | null;
   }
 
   const [importRecords, setImportRecords] = useState<ImportRecord[]>([]);
@@ -499,6 +501,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         await fetchStaffingRequirements();
         await fetchAccounts();
         await fetchAccountDepartmentData();
+        await fetchImportHistory();
       } finally {
         setIsLoading(false);
       }
@@ -536,6 +539,64 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const handleRemoveHoliday = (id: string) => {
     setHolidays((prev) => prev.filter((h) => h.id !== id));
     toast.success("Holiday removed");
+  };
+
+  const fetchImportHistory = async () => {
+    try {
+      if (!currentUser.company_id) {
+        setImportRecords([]);
+        return;
+      }
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/import-history?company_id=${currentUser.company_id}&limit=5`,
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to load import history");
+      }
+
+      setImportRecords(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load import history", err);
+      setImportRecords([]);
+    }
+  };
+
+  const saveImportHistory = async (
+    category: ImportCategory,
+    fileName: string,
+    rowCount: number,
+    status: "success" | "error",
+    errorMessage?: string,
+  ) => {
+    if (!currentUser.company_id) {
+      return;
+    }
+
+    try {
+      await fetch("https://backend-production-6e75.up.railway.app/import-history", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_id: currentUser.company_id,
+          imported_by_employee_id: currentUser.id,
+          category,
+          file_name: fileName,
+          row_count: rowCount,
+          status,
+          error_message: errorMessage || null,
+        }),
+      });
+
+      await fetchImportHistory();
+    } catch (err) {
+      console.error("Failed to save import history", err);
+    }
   };
 
   const refreshAfterImport = async (category: ImportCategory) => {
@@ -628,17 +689,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         throw new Error(getImportErrorMessage(data));
       }
 
-      setImportRecords((prev) => [
-        {
-          id: Date.now().toString(),
-          category,
-          fileName: file.name,
-          rowCount: rows.length - 1,
-          importedAt: new Date().toLocaleString(),
-          status: "success",
-        },
-        ...prev,
-      ]);
+      await saveImportHistory(
+        category,
+        file.name,
+        rows.length - 1,
+        "success",
+      );
 
       await refreshAfterImport(category);
 
@@ -646,17 +702,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Import failed";
 
-      setImportRecords((prev) => [
-        {
-          id: Date.now().toString(),
-          category,
-          fileName: file.name,
-          rowCount: 0,
-          importedAt: new Date().toLocaleString(),
-          status: "error",
-        },
-        ...prev,
-      ]);
+      await saveImportHistory(
+        category,
+        file.name,
+        0,
+        "error",
+        msg,
+      );
 
       toast.error(msg);
     }
@@ -3523,7 +3575,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             <CardHeader>
               <CardTitle>Import History</CardTitle>
               <CardDescription>
-                Recently imported CSV files in this session
+                Latest 5 imported CSV files for this company
               </CardDescription>
             </CardHeader>
 
