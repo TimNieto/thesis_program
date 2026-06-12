@@ -233,9 +233,14 @@ def score_employee(employee, shift, role, context):
 
     account = shift["account"].lower()
 
+    account_availability = (
+        availability.get(account)
+        or availability.get("default")
+        or {}
+    )
+
     shift_pref = (
-        availability
-        .get(account, {})
+        account_availability
         .get(day_name, {})
         .get(shift["shift_type"].lower())
     )

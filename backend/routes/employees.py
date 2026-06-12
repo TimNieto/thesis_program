@@ -2699,3 +2699,143 @@ def update_availability(data: dict):
     finally:
         cursor.close()
         conn.close()
+
+@router.post("/availability/global")
+def update_global_availability(data: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        employee_id = int(data["employee_id"])
+        company_id = int(data["company_id"])
+        day_of_week = str(data["day_of_week"]).strip().capitalize()
+        shift_name = str(data.get("shift_name", "")).strip()
+        is_available = bool(data["is_available"])
+
+        if not shift_name:
+            raise HTTPException(
+                status_code=400,
+                detail="shift_name is required"
+            )
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE employee_id = %s
+            AND company_id = %s
+            AND employment_status = 'Active'
+            LIMIT 1
+        """, (
+            employee_id,
+            company_id
+        ))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee does not exist or is inactive"
+            )
+
+        cursor.execute("""
+            SELECT st.shift_template_id
+            FROM shift_templates st
+            JOIN accounts a
+                ON st.account_id = a.account_id
+                AND st.company_id = a.company_id
+            WHERE st.company_id = %s
+            AND LOWER(TRIM(st.shift_name)) = LOWER(TRIM(%s))
+            AND st.is_active = TRUE
+            AND a.is_active = TRUE
+            ORDER BY st.shift_template_id
+        """, (
+            company_id,
+            shift_name
+        ))
+
+        shift_template_rows = cursor.fetchall()
+
+        if not shift_template_rows:
+            raise HTTPException(
+                status_code=400,
+                detail="No active shift templates found for this shift name"
+            )
+
+        for row in shift_template_rows:
+            shift_template_id = row[0]
+
+            cursor.execute("""
+                SELECT availability_id
+                FROM availability
+                WHERE company_id = %s
+                AND employee_id = %s
+                AND LOWER(TRIM(day_of_week)) = LOWER(TRIM(%s))
+                AND shift_template_id = %s
+                LIMIT 1
+            """, (
+                company_id,
+                employee_id,
+                day_of_week,
+                shift_template_id
+            ))
+
+            existing = cursor.fetchone()
+
+            if existing:
+                cursor.execute("""
+                    UPDATE availability
+                    SET
+                        day_of_week = %s,
+                        is_available = %s
+                    WHERE availability_id = %s
+                """, (
+                    day_of_week,
+                    is_available,
+                    existing[0]
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO availability (
+                        employee_id,
+                        company_id,
+                        day_of_week,
+                        shift_template_id,
+                        is_available
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    employee_id,
+                    company_id,
+                    day_of_week,
+                    shift_template_id,
+                    is_available
+                ))
+
+        conn.commit()
+
+        return {
+            "message": "Global availability saved",
+            "employee_id": employee_id,
+            "company_id": company_id,
+            "day_of_week": day_of_week,
+            "shift_name": shift_name,
+            "is_available": is_available,
+            "updated_shift_templates": len(shift_template_rows),
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("ERROR updating global availability:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()

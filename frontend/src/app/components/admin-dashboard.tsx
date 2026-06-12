@@ -1526,6 +1526,37 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
       );
     });
 
+
+  const globalAvailabilityShifts = Array.from(
+    shiftTemplates
+      .reduce((map, shift) => {
+        const shiftName = String(shift.shift_name || "").trim();
+
+        if (!shiftName) return map;
+
+        const key = shiftName.toLowerCase();
+
+        if (!map.has(key)) {
+          map.set(key, {
+            shift_name: shift.shift_name,
+            start_time: shift.start_time,
+            end_time: shift.end_time,
+            representative_shift_template_id: shift.shift_template_id,
+          });
+        }
+
+        return map;
+      }, new Map<string, any>())
+      .values(),
+  ).sort((a, b) => {
+    const aTime = String(a.start_time || "00:00:00");
+    const bTime = String(b.start_time || "00:00:00");
+
+    if (aTime !== bTime) return aTime.localeCompare(bTime);
+
+    return String(a.shift_name || "").localeCompare(String(b.shift_name || ""));
+  });
+
   const selectedRequirementAccountInfo = activeShiftAccountOptions.find(
     (row) => String(row.account_id) === newRequirementAccountId,
   );
@@ -2207,7 +2238,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
   const isSlotUnavailable = (
     employeeId: number,
     day: string,
-    shiftTemplateId: number | string,
+    shiftName: number | string,
   ): boolean => {
     const emp = employeeAvailability[employeeId];
 
@@ -2217,7 +2248,8 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
 
     if (!dayData) return true;
 
-    const shiftData = dayData[String(shiftTemplateId)];
+    const shiftKey = String(shiftName).trim().toLowerCase();
+    const shiftData = dayData[shiftKey];
 
     if (shiftData === undefined) return true;
 
@@ -2229,22 +2261,22 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
     day: string,
     shift: any,
   ) => {
-    const shiftTemplateId = Number(shift.shift_template_id);
+    const shiftName = String(shift.shift_name || "").trim();
 
-    if (!shiftTemplateId) {
-      toast.error("Invalid shift template");
+    if (!shiftName) {
+      toast.error("Invalid shift name");
       return;
     }
 
     const isCurrentlyUnavailable = isSlotUnavailable(
       employeeId,
       day,
-      shiftTemplateId,
+      shiftName,
     );
 
     try {
       await fetch(
-        "https://backend-production-6e75.up.railway.app/availability",
+        "https://backend-production-6e75.up.railway.app/availability/global",
         {
           method: "POST",
           headers: {
@@ -2254,8 +2286,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
             employee_id: employeeId,
             company_id: currentUser.company_id,
             day_of_week: day.toLowerCase(),
-            shift_template_id: shiftTemplateId,
-            preferred_shift: shift.shift_name,
+            shift_name: shiftName,
             is_available: isCurrentlyUnavailable,
           }),
         },
@@ -2288,11 +2319,18 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
 
       data.forEach((row: any) => {
         if (!row.day_of_week) return;
-        if (!row.shift_template_id) return;
+
+        const rawShiftName =
+          row.shift_name ||
+          row.preferred_shift ||
+          row.shift_type ||
+          row.shift_template_name;
+
+        if (!rawShiftName) return;
 
         const empId = Number(row.employee_id);
         const day = String(row.day_of_week).toLowerCase();
-        const shiftKey = String(row.shift_template_id);
+        const shiftKey = String(rawShiftName).trim().toLowerCase();
 
         if (!transformed[empId]) {
           transformed[empId] = {};
@@ -2305,7 +2343,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
         transformed[empId][day][shiftKey] = row.is_available;
       });
 
-      console.log("STRICT AVAILABILITY MAP:", transformed);
+      console.log("GLOBAL AVAILABILITY MAP:", transformed);
 
       setEmployeeAvailability(transformed);
     } catch (err) {
@@ -2636,18 +2674,13 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                         ))}
                       </div>
 
-                      {shiftTemplates.map((shift) => (
+                     {globalAvailabilityShifts.map((shift) => (
                         <div
-                          key={`dayoff-shift-${shift.shift_template_id}`}
+                          key={`availability-shift-${shift.shift_name}`}
                           className="grid grid-cols-8 gap-2 mt-2"
                         >
                           <div className="p-3 font-medium bg-gray-100 rounded flex flex-col justify-center">
-                            <div>
-                              {shift.account_name
-                                ? `${shift.account_name} - `
-                                : ""}
-                              {shift.shift_name}
-                            </div>
+                            <div>{shift.shift_name}</div>
                             <div className="text-xs text-gray-600">
                               {(shift.start_time || "").slice(0, 5)} -{" "}
                               {(shift.end_time || "").slice(0, 5)}
@@ -2657,7 +2690,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                             const isUnavailable = isSlotUnavailable(
                               selectedEmployeeForDayOff,
                               day,
-                              shift.shift_template_id,
+                              shift.shift_name,
                             );
 
                             return (
@@ -4715,17 +4748,14 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                   </div>
 
                   {/* SHIFTS GRID */}
-                  {shiftTemplates.map((shift) => (
+                  {globalAvailabilityShifts.map((shift) => (
                     <div
-                      key={`availability-shift-${shift.shift_template_id}`}
+                      key={`availability-shift-${shift.shift_name}`}
                       className="grid grid-cols-8 gap-2 mt-2 text-sm"
                     >
                       {/* SHIFT LABEL */}
                       <div className="p-2 bg-gray-100 rounded">
-                        <div>
-                          {shift.account_name ? `${shift.account_name} - ` : ""}
-                          {shift.shift_name}
-                        </div>
+                        <div>{shift.shift_name}</div>
                         <div className="text-xs text-gray-500">
                           {(shift.start_time || "").slice(0, 5)} -{" "}
                           {(shift.end_time || "").slice(0, 5)}
@@ -4737,12 +4767,12 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                         const isUnavailable = isSlotUnavailable(
                           selectedEmployeeForAvailability.id,
                           day,
-                          shift.shift_template_id,
+                          shift.shift_name,
                         );
 
                         return (
                           <div
-                            key={`${day}-${shift.shift_template_id}`}
+                            key={`${day}-${shift.shift_name}`}
                             onClick={() =>
                               toggleSlotAvailability(
                                 selectedEmployeeForAvailability.id,
