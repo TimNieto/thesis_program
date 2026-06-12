@@ -246,6 +246,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     isShiftTemplatesTemplatePreviewOpen,
     setIsShiftTemplatesTemplatePreviewOpen,
   ] = useState(false);
+  const [
+    isStaffingRequirementsTemplatePreviewOpen,
+    setIsStaffingRequirementsTemplatePreviewOpen,
+  ] = useState(false);
 
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
   const [newRoleDepartmentName, setNewRoleDepartmentName] = useState("");
@@ -3144,16 +3148,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     size="sm"
                     className="gap-2"
                     onClick={() =>
-                      downloadImportTemplate(
-                        "staffing",
-                        "account_name,shift_name,role_name,required_count",
-                      )
+                      setIsStaffingRequirementsTemplatePreviewOpen(true)
                     }
                   >
                     <Download className="size-4" />
-                    Template
+                    View Template
                   </Button>
-
                   <Button
                     variant="outline"
                     size="sm"
@@ -3198,16 +3198,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Account</TableHead>
-                      <TableHead>Shift</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Required Count</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead className="w-[16%]">Department</TableHead>
+                      <TableHead className="w-[16%]">Account</TableHead>
+                      <TableHead className="w-[16%]">Shift</TableHead>
+                      <TableHead className="w-[24%]">Role</TableHead>
+                      <TableHead className="w-[12%]">Required Count</TableHead>
+                      <TableHead className="w-[8%]">Status</TableHead>
+                      <TableHead className="w-[8%]">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -3229,9 +3229,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               key={row.display_key}
                               className="bg-gray-50 h-12"
                             >
-                              <TableCell colSpan={7} className="font-semibold">
+                              <TableCell className="font-semibold truncate">
                                 {row.department_name}
                               </TableCell>
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
                             </TableRow>
                           );
                         }
@@ -3240,12 +3246,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           return (
                             <TableRow key={row.display_key} className="h-12">
                               <TableCell />
-                              <TableCell
-                                colSpan={6}
-                                className="pl-6 font-medium text-gray-800"
-                              >
+                              <TableCell className="pl-4 font-medium text-gray-800 truncate">
                                 {row.account_name}
                               </TableCell>
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
                             </TableRow>
                           );
                         }
@@ -3255,12 +3263,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             <TableRow key={row.display_key} className="h-12">
                               <TableCell />
                               <TableCell />
-                              <TableCell
-                                colSpan={5}
-                                className="pl-10 font-medium text-gray-700"
-                              >
+                              <TableCell className="pl-4 font-medium text-gray-700 truncate">
                                 {row.shift_name}
                               </TableCell>
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
                             </TableRow>
                           );
                         }
@@ -3273,7 +3282,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             <TableCell />
                             <TableCell />
 
-                            <TableCell className="pl-14">
+                            <TableCell className="pl-4 truncate">
                               {requirement.role_name ||
                                 requirement.role_key ||
                                 "—"}
@@ -4336,6 +4345,55 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           <DialogFooter>
             <Button
               onClick={() => setIsEmployeeAssignmentsTemplatePreviewOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Staffing Requirements Template Preview Dialog */}
+      <Dialog
+        open={isStaffingRequirementsTemplatePreviewOpen}
+        onOpenChange={setIsStaffingRequirementsTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Staffing Requirements CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. Accounts, shifts, and
+              roles must already exist.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/staff-requirements-template.png"
+              alt="Staffing Requirements CSV template preview"
+              className="w-full h-auto"
+            />
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>
+              Required columns: account_name, shift_name, role_name,
+              required_count.
+            </p>
+            <p>
+              Accepted: new requirements, required count updates, and inactive
+              requirements reactivated as active.
+            </p>
+            <p>
+              Rejected: missing account, missing shift under account, missing
+              role under account department, duplicate rows, or invalid
+              required_count.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() =>
+                setIsStaffingRequirementsTemplatePreviewOpen(false)
+              }
             >
               Close
             </Button>
