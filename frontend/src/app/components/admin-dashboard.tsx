@@ -1527,6 +1527,22 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
     });
 
 
+  const getGlobalShiftName = (shift: any) => {
+    const rawShiftName = String(shift.shift_name || "").trim();
+    const accountName = String(shift.account_name || "").trim();
+
+    if (!rawShiftName) return "";
+
+    if (
+      accountName &&
+      rawShiftName.toLowerCase().startsWith(`${accountName.toLowerCase()} - `)
+    ) {
+      return rawShiftName.slice(accountName.length + 3).trim();
+    }
+
+    return rawShiftName;
+  };
+
   const globalAvailabilityShifts = Array.from(
     shiftTemplates
       .reduce((map, shift) => {
@@ -2695,7 +2711,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
 
                             return (
                               <div
-                                key={`${day}-${shift.shift_template_id}`}
+                                key={`${day}-${shift.shift_name}`}
                                 onClick={() =>
                                   toggleSlotAvailability(
                                     selectedEmployeeForDayOff,
