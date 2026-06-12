@@ -326,6 +326,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const [shiftToDeactivate, setShiftToDeactivate] = useState<any | null>(null);
 
+  const [requirementToDeactivate, setRequirementToDeactivate] = useState<
+    any | null
+  >(null);
+
   const [assignmentToDeactivate, setAssignmentToDeactivate] = useState<
     number | null
   >(null);
@@ -1068,6 +1072,56 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           ? err.message
           : "Failed to save staffing requirement",
       );
+    }
+  };
+
+  const handleDeactivateRequirement = (requirement: any) => {
+    setRequirementToDeactivate(requirement);
+  };
+
+  const confirmDeactivateRequirement = async () => {
+    if (!requirementToDeactivate) return;
+
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      const requirementId = requirementToDeactivate.requirement_id;
+
+      if (!requirementId) {
+        throw new Error("Invalid staffing requirement");
+      }
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/staffing-requirements/${requirementId}?company_id=${currentUser.company_id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : data?.detail?.message ||
+                "Failed to deactivate staffing requirement",
+        );
+      }
+
+      await fetchStaffingRequirements();
+
+      toast.success(data?.message || "Staffing requirement deactivated");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to deactivate staffing requirement",
+      );
+    } finally {
+      setRequirementToDeactivate(null);
     }
   };
 
@@ -3346,7 +3400,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       <TableHead className="w-[24%]">Role</TableHead>
                       <TableHead className="w-[12%]">Required Count</TableHead>
                       <TableHead className="w-[8%]">Status</TableHead>
-                      <TableHead className="w-[8%]">Action</TableHead>
+                      <TableHead className={actionCellClass}>Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -3443,17 +3497,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               </Badge>
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className={actionCellClass}>
                               <Button
-                                variant="outline"
                                 size="sm"
+                                className={dangerSmallButtonClass}
                                 onClick={() =>
-                                  toast.info(
-                                    "Remove staffing requirement is frontend-only for now",
-                                  )
+                                  handleDeactivateRequirement(requirement)
                                 }
                               >
-                                Remove
+                                Deactivate
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -4548,6 +4600,74 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               onClick={() => setIsEmployeeAssignmentsTemplatePreviewOpen(false)}
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Confirm Deactivate Staffing Requirement Dialog */}
+      <Dialog
+        open={requirementToDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRequirementToDeactivate(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Staffing Requirement</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate this staffing requirement? It
+              will no longer be used for future staffing calculations.
+              Historical and finalized schedule records will be preserved.
+            </DialogDescription>
+          </DialogHeader>
+
+          {requirementToDeactivate && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-md border bg-gray-50 p-3 text-sm">
+                <p className="font-medium">
+                  {requirementToDeactivate.account_name} —{" "}
+                  {requirementToDeactivate.shift_name}
+                </p>
+                <p className="text-gray-600">
+                  {requirementToDeactivate.role_name ||
+                    requirementToDeactivate.role_key ||
+                    "Role"}{" "}
+                  / Required count:{" "}
+                  {requirementToDeactivate.required_count ?? 0}
+                </p>
+              </div>
+
+              <div className="rounded-md border p-3 text-sm space-y-2">
+                <p className="font-medium">Deactivation effect</p>
+
+                <div className="flex justify-between gap-4">
+                  <span>Future staffing calculations</span>
+                  <span className="font-medium">Excluded</span>
+                </div>
+
+                <div className="flex justify-between gap-4">
+                  <span>Historical finalized schedules</span>
+                  <span className="font-medium">Preserved</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRequirementToDeactivate(null)}
+            >
+              No
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={confirmDeactivateRequirement}
+            >
+              Yes, Deactivate
             </Button>
           </DialogFooter>
         </DialogContent>

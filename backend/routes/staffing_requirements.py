@@ -910,8 +910,76 @@ def update_staffing_requirements(payload: dict):
     finally:
         cursor.close()
         conn.close()
-        
 
+
+@router.delete("/staffing-requirements/{requirement_id}")
+def deactivate_staffing_requirement(requirement_id: int, company_id: int = 1):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT
+                ssr.requirement_id,
+                ssr.is_active
+            FROM shift_staffing_requirements ssr
+            WHERE ssr.requirement_id = %s
+            AND ssr.company_id = %s
+            LIMIT 1
+        """, (
+            requirement_id,
+            company_id
+        ))
+
+        requirement = cursor.fetchone()
+
+        if not requirement:
+            raise HTTPException(
+                status_code=404,
+                detail="Staffing requirement not found"
+            )
+
+        if not requirement[1]:
+            raise HTTPException(
+                status_code=400,
+                detail="Staffing requirement is already inactive"
+            )
+
+        cursor.execute("""
+            UPDATE shift_staffing_requirements
+            SET
+                is_active = FALSE,
+                updated_at = NOW()
+            WHERE requirement_id = %s
+            AND company_id = %s
+        """, (
+            requirement_id,
+            company_id
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "Staffing requirement deactivated"
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("DEACTIVATE STAFFING REQUIREMENT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+        
 @router.post("/staffing-requirements-import")
 async def import_staffing_requirements(
     company_id: int = Form(...),
