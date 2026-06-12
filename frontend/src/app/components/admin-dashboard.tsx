@@ -1294,6 +1294,235 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       .values(),
   ).flatMap((group) => [group.departmentRow, ...group.shiftRows]);
 
+  type StaffingRequirementDisplayRow =
+    | {
+        display_key: string;
+        row_type: "department";
+        department_name: string;
+      }
+    | {
+        display_key: string;
+        row_type: "account";
+        department_name: string;
+        account_name: string;
+      }
+    | {
+        display_key: string;
+        row_type: "shift";
+        department_name: string;
+        account_name: string;
+        shift_name: string;
+      }
+    | {
+        display_key: string;
+        row_type: "requirement";
+        requirement: any;
+      };
+
+  const accountDepartmentLookup = new Map(
+    accountDepartmentRows
+      .filter((row) => row.account_id !== null)
+      .map((row) => [
+        Number(row.account_id),
+        {
+          department_id: row.department_id,
+          department_name: row.department_name,
+          account_name: row.account_name,
+        },
+      ]),
+  );
+
+  const shiftTemplateLookup = new Map(
+    shiftTemplates.map((shift) => [
+      Number(shift.shift_template_id),
+      {
+        start_time: shift.start_time || "00:00:00",
+        shift_name: shift.shift_name || "",
+      },
+    ]),
+  );
+
+  const groupedStaffingRequirementRows: StaffingRequirementDisplayRow[] =
+    Array.from(
+      [...staffingRequirements]
+        .sort((a, b) => {
+          const aAccountInfo = accountDepartmentLookup.get(
+            Number(a.account_id),
+          );
+          const bAccountInfo = accountDepartmentLookup.get(
+            Number(b.account_id),
+          );
+
+          const departmentCompare = String(
+            aAccountInfo?.department_name || a.department_name || "",
+          ).localeCompare(
+            String(bAccountInfo?.department_name || b.department_name || ""),
+          );
+
+          if (departmentCompare !== 0) {
+            return departmentCompare;
+          }
+
+          const accountCompare = String(a.account_name || "").localeCompare(
+            String(b.account_name || ""),
+          );
+
+          if (accountCompare !== 0) {
+            return accountCompare;
+          }
+
+          const aShiftInfo = shiftTemplateLookup.get(
+            Number(a.shift_template_id),
+          );
+          const bShiftInfo = shiftTemplateLookup.get(
+            Number(b.shift_template_id),
+          );
+
+          const shiftTimeCompare = String(
+            aShiftInfo?.start_time || "00:00:00",
+          ).localeCompare(String(bShiftInfo?.start_time || "00:00:00"));
+
+          if (shiftTimeCompare !== 0) {
+            return shiftTimeCompare;
+          }
+
+          const shiftCompare = String(a.shift_name || "").localeCompare(
+            String(b.shift_name || ""),
+          );
+
+          if (shiftCompare !== 0) {
+            return shiftCompare;
+          }
+
+          return String(a.role_name || "").localeCompare(
+            String(b.role_name || ""),
+          );
+        })
+        .reduce(
+          (departmentMap, requirement) => {
+            const accountInfo = accountDepartmentLookup.get(
+              Number(requirement.account_id),
+            );
+
+            const departmentName =
+              accountInfo?.department_name ||
+              requirement.department_name ||
+              "None";
+
+            const departmentKey = String(
+              accountInfo?.department_id ?? departmentName,
+            ).toLowerCase();
+
+            const accountName =
+              requirement.account_name || accountInfo?.account_name || "None";
+
+            const accountKey = String(
+              requirement.account_id ?? accountName,
+            ).toLowerCase();
+
+            const shiftName = requirement.shift_name || "None";
+
+            const shiftKey = String(
+              requirement.shift_template_id ?? shiftName,
+            ).toLowerCase();
+
+            const departmentGroup = departmentMap.get(departmentKey) ?? {
+              departmentName,
+              accounts: new Map<
+                string,
+                {
+                  accountName: string;
+                  shifts: Map<
+                    string,
+                    {
+                      shiftName: string;
+                      requirements: any[];
+                    }
+                  >;
+                }
+              >(),
+            };
+
+            const accountGroup = departmentGroup.accounts.get(accountKey) ?? {
+              accountName,
+              shifts: new Map<
+                string,
+                {
+                  shiftName: string;
+                  requirements: any[];
+                }
+              >(),
+            };
+
+            const shiftGroup = accountGroup.shifts.get(shiftKey) ?? {
+              shiftName,
+              requirements: [],
+            };
+
+            shiftGroup.requirements.push(requirement);
+
+            accountGroup.shifts.set(shiftKey, shiftGroup);
+            departmentGroup.accounts.set(accountKey, accountGroup);
+            departmentMap.set(departmentKey, departmentGroup);
+
+            return departmentMap;
+          },
+          new Map<
+            string,
+            {
+              departmentName: string;
+              accounts: Map<
+                string,
+                {
+                  accountName: string;
+                  shifts: Map<
+                    string,
+                    {
+                      shiftName: string;
+                      requirements: any[];
+                    }
+                  >;
+                }
+              >;
+            }
+          >(),
+        )
+        .values(),
+    ).flatMap((departmentGroup) => [
+      {
+        display_key: `staffing-department-${departmentGroup.departmentName}`,
+        row_type: "department" as const,
+        department_name: departmentGroup.departmentName,
+      },
+      ...Array.from(departmentGroup.accounts.values()).flatMap(
+        (accountGroup) => [
+          {
+            display_key: `staffing-account-${departmentGroup.departmentName}-${accountGroup.accountName}`,
+            row_type: "account" as const,
+            department_name: departmentGroup.departmentName,
+            account_name: accountGroup.accountName,
+          },
+          ...Array.from(accountGroup.shifts.values()).flatMap((shiftGroup) => [
+            {
+              display_key: `staffing-shift-${departmentGroup.departmentName}-${accountGroup.accountName}-${shiftGroup.shiftName}`,
+              row_type: "shift" as const,
+              department_name: departmentGroup.departmentName,
+              account_name: accountGroup.accountName,
+              shift_name: shiftGroup.shiftName,
+            },
+            ...shiftGroup.requirements.map((requirement) => ({
+              display_key: `staffing-requirement-${
+                requirement.requirement_id ??
+                `${requirement.account_id}-${requirement.shift_template_id}-${requirement.role_id}`
+              }`,
+              row_type: "requirement" as const,
+              requirement,
+            })),
+          ]),
+        ],
+      ),
+    ]);
+
   // Add Employee
   const handleAddEmployee = async () => {
     if (!newEmployeeName.trim()) {
@@ -2972,6 +3201,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Department</TableHead>
                       <TableHead>Account</TableHead>
                       <TableHead>Shift</TableHead>
                       <TableHead>Role</TableHead>
@@ -2980,12 +3210,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
-
                   <TableBody>
                     {staffingRequirements.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           className="text-center text-gray-500 py-6"
                         >
                           No staffing requirements found. Import or add staffing
@@ -2993,44 +3222,58 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      [...staffingRequirements]
-                        .sort((a, b) => {
-                          const accountCompare = String(
-                            a.account_name || "",
-                          ).localeCompare(String(b.account_name || ""));
-
-                          if (accountCompare !== 0) {
-                            return accountCompare;
-                          }
-
-                          const shiftCompare = String(
-                            a.shift_name || "",
-                          ).localeCompare(String(b.shift_name || ""));
-
-                          if (shiftCompare !== 0) {
-                            return shiftCompare;
-                          }
-
-                          return String(a.role_name || "").localeCompare(
-                            String(b.role_name || ""),
+                      groupedStaffingRequirementRows.map((row) => {
+                        if (row.row_type === "department") {
+                          return (
+                            <TableRow
+                              key={row.display_key}
+                              className="bg-gray-50 h-12"
+                            >
+                              <TableCell colSpan={7} className="font-semibold">
+                                {row.department_name}
+                              </TableCell>
+                            </TableRow>
                           );
-                        })
-                        .map((requirement) => (
-                          <TableRow
-                            key={`staffing-requirement-${
-                              requirement.requirement_id ??
-                              `${requirement.account_id}-${requirement.shift_template_id}-${requirement.role_id}`
-                            }`}
-                          >
-                            <TableCell className="font-medium">
-                              {requirement.account_name || "—"}
-                            </TableCell>
+                        }
 
-                            <TableCell>
-                              {requirement.shift_name || "—"}
-                            </TableCell>
+                        if (row.row_type === "account") {
+                          return (
+                            <TableRow key={row.display_key} className="h-12">
+                              <TableCell />
+                              <TableCell
+                                colSpan={6}
+                                className="pl-6 font-medium text-gray-800"
+                              >
+                                {row.account_name}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
 
-                            <TableCell>
+                        if (row.row_type === "shift") {
+                          return (
+                            <TableRow key={row.display_key} className="h-12">
+                              <TableCell />
+                              <TableCell />
+                              <TableCell
+                                colSpan={5}
+                                className="pl-10 font-medium text-gray-700"
+                              >
+                                {row.shift_name}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+
+                        const requirement = row.requirement;
+
+                        return (
+                          <TableRow key={row.display_key} className="h-12">
+                            <TableCell />
+                            <TableCell />
+                            <TableCell />
+
+                            <TableCell className="pl-14">
                               {requirement.role_name ||
                                 requirement.role_key ||
                                 "—"}
@@ -3066,7 +3309,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               </Button>
                             </TableCell>
                           </TableRow>
-                        ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
