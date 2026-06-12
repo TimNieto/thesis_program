@@ -267,6 +267,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
 
   const [staffingRoles, setStaffingRoles] = useState<any[]>([]);
+  const [staffingRequirements, setStaffingRequirements] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -385,6 +386,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     try {
       if (!currentUser.company_id) {
         setStaffingRoles([]);
+        setStaffingRequirements([]);
         return;
       }
 
@@ -394,10 +396,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       const data = await res.json();
 
-      setStaffingRoles(data.roles || []);
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to load staffing requirements");
+      }
+
+      setStaffingRoles(Array.isArray(data.roles) ? data.roles : []);
+      setStaffingRequirements(
+        Array.isArray(data.requirements) ? data.requirements : [],
+      );
     } catch (err) {
-      console.error("Failed to load staffing roles", err);
+      console.error("Failed to load staffing requirements", err);
       setStaffingRoles([]);
+      setStaffingRequirements([]);
     }
   };
 
@@ -1494,7 +1504,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const activeEmployees = employees.filter((e) => e.status === "Active").length;
   const pendingRequests = requests.filter((r) => r.status === "pending").length;
   const totalAssignments = assignments.length;
-  const totalSlots = DAYS.length * shiftTemplates.length * staffingRoles.length;
+  const totalRequiredStaffingSlots = staffingRequirements.reduce(
+    (total, requirement) => total + Number(requirement.required_count || 0),
+    0,
+  );
+
+  const totalSlots = DAYS.length * totalRequiredStaffingSlots;
 
   const getRequestTypeColor = (type: string) => {
     const colors = {
@@ -2838,58 +2853,91 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   </TableHeader>
 
                   <TableBody>
-                    {accounts.length === 0 ||
-                    shiftTemplates.length === 0 ||
-                    staffingRoles.length === 0 ? (
+                    {staffingRequirements.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={6}
                           className="text-center text-gray-500 py-6"
                         >
-                          No staffing requirements found. Import accounts,
-                          roles, and shifts first.
+                          No staffing requirements found. Import or add staffing
+                          requirements first.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      accounts.flatMap((account) =>
-                        shiftTemplates.flatMap((shift) =>
-                          staffingRoles.map((role) => (
-                            <TableRow
-                              key={`staffing-${account.id}-${shift.shift_template_id}-${role.staffing_role_id}`}
-                            >
-                              <TableCell className="font-medium">
-                                {account.name}
-                              </TableCell>
+                      [...staffingRequirements]
+                        .sort((a, b) => {
+                          const accountCompare = String(
+                            a.account_name || "",
+                          ).localeCompare(String(b.account_name || ""));
 
-                              <TableCell>{shift.shift_name}</TableCell>
+                          if (accountCompare !== 0) {
+                            return accountCompare;
+                          }
 
-                              <TableCell>
-                                {role.role_name || role.role_key || "Role"}
-                              </TableCell>
+                          const shiftCompare = String(
+                            a.shift_name || "",
+                          ).localeCompare(String(b.shift_name || ""));
 
-                              <TableCell>1</TableCell>
+                          if (shiftCompare !== 0) {
+                            return shiftCompare;
+                          }
 
-                              <TableCell>
-                                <Badge>Active</Badge>
-                              </TableCell>
+                          return String(a.role_name || "").localeCompare(
+                            String(b.role_name || ""),
+                          );
+                        })
+                        .map((requirement) => (
+                          <TableRow
+                            key={`staffing-requirement-${
+                              requirement.requirement_id ??
+                              `${requirement.account_id}-${requirement.shift_template_id}-${requirement.role_id}`
+                            }`}
+                          >
+                            <TableCell className="font-medium">
+                              {requirement.account_name || "—"}
+                            </TableCell>
 
-                              <TableCell>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    toast.info(
-                                      "Remove staffing requirement is frontend-only for now",
-                                    )
-                                  }
-                                >
-                                  Remove
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          )),
-                        ),
-                      )
+                            <TableCell>
+                              {requirement.shift_name || "—"}
+                            </TableCell>
+
+                            <TableCell>
+                              {requirement.role_name ||
+                                requirement.role_key ||
+                                "—"}
+                            </TableCell>
+
+                            <TableCell>
+                              {requirement.required_count ?? 0}
+                            </TableCell>
+
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  requirement.is_active
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {requirement.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  toast.info(
+                                    "Remove staffing requirement is frontend-only for now",
+                                  )
+                                }
+                              >
+                                Remove
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
                     )}
                   </TableBody>
                 </Table>
