@@ -2489,14 +2489,6 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                     Add, remove, or modify employee details
                   </CardDescription>
                 </div>
-                <Button
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => setIsAddEmployeeOpen(true)}
-                >
-                  <Plus className="size-4" />
-                  Add Employee
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -2518,8 +2510,8 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                           colSpan={5}
                           className="text-center text-gray-500 py-6"
                         >
-                          No employees found. Click "Add Employee" to get
-                          started.
+                          No employees found. Import employees to populate
+
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -2557,34 +2549,11 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() =>
-                                    openAvailabilityDialog(employee)
-                                  }
-                                  className="gap-2"
-                                >
-                                  <CalendarOff className="size-4" />
-                                  Availability
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
                                   onClick={() => openRoleOverrideDialog(employee)}
                                   className="gap-2"
                                 >
                                   <UserSquare2 className="size-4" />
                                   Roles
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEmployeeToDelete(employee.id);
-                                    setIsConfirmDeleteOpen(true);
-                                  }}
-                                  className="gap-2"
-                                >
-                                  <UserMinus className="size-4" />
-                                  Deactivate
                                 </Button>
                               </div>
                             </TableCell>
@@ -2597,14 +2566,14 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
             </CardContent>
           </Card>
 
-          {/* Day Offs Section */}
+          {/* Availability Section */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <CalendarOff className="size-5 text-blue-600" />
-                    Day Offs
+                    Employee Availability
                   </CardTitle>
                   <CardDescription>
                     Manage weekly unavailable shifts for employees
@@ -2631,14 +2600,16 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                       <SelectValue placeholder="Select an employee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {employees.map((employee) => (
-                        <SelectItem
-                          key={employee.id}
-                          value={employee.id.toString()}
-                        >
-                          {employee.name}
-                        </SelectItem>
-                      ))}
+                      {[...employees]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((employee) => (
+                          <SelectItem
+                            key={employee.id}
+                            value={employee.id.toString()}
+                          >
+                            {employee.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
