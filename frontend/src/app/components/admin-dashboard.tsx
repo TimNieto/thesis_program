@@ -219,7 +219,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     employees: "/employees-import",
     employeeAssignments: "/employee-assignments-import",
     shifts: "/shift-templates-import",
-    staffing: null,
+    staffing: "/staffing-requirements-import",
   };
 
   interface ImportRecord {

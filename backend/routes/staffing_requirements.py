@@ -833,6 +833,379 @@ def update_staffing_requirements(payload: dict):
             detail=str(e)
         )
 
+
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.post("/staffing-requirements-import")
+async def import_staffing_requirements(
+    company_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    created_requirements = 0
+    updated_requirements = 0
+    reactivated_requirements = 0
+    deactivated_requirements = 0
+    errors = []
+
+    try:
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. Only .csv files are allowed."
+            )
+
+        content = await file.read()
+
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File must be UTF-8 encoded."
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File is empty."
+            )
+
+        normalized_headers = [
+            str(header).strip().lower().replace(" ", "_")
+            for header in reader.fieldnames
+            if header
+        ]
+
+        required_headers = [
+            "account_name",
+            "shift_name",
+            "role_name",
+            "required_count",
+            "status"
+        ]
+
+        if normalized_headers != required_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid CSV file. Required exact header: "
+                    "account_name,shift_name,role_name,required_count,status"
+                )
+            )
+
+        rows = []
+        csv_keys = set()
+
+        for row_number, row in enumerate(reader, start=2):
+            normalized_row = {
+                str(key).strip().lower().replace(" ", "_"): value
+                for key, value in row.items()
+                if key
+            }
+
+            account_name = normalize_name(
+                get_csv_value(normalized_row, "account_name")
+            )
+
+            shift_name = str(
+                get_csv_value(normalized_row, "shift_name")
+            ).strip().upper()
+
+            role_name = normalize_name(
+                get_csv_value(normalized_row, "role_name")
+            )
+
+            required_count_raw = get_csv_value(
+                normalized_row,
+                "required_count"
+            )
+
+            status = str(
+                get_csv_value(normalized_row, "status")
+            ).strip().lower()
+
+            if (
+                not account_name
+                and not shift_name
+                and not role_name
+                and not required_count_raw
+                and not status
+            ):
+                continue
+
+            if not account_name:
+                errors.append(f"Row {row_number}: account_name is required")
+                continue
+
+            if not shift_name:
+                errors.append(f"Row {row_number}: shift_name is required")
+                continue
+
+            if not role_name:
+                errors.append(f"Row {row_number}: role_name is required")
+                continue
+
+            if required_count_raw == "":
+                errors.append(f"Row {row_number}: required_count is required")
+                continue
+
+            try:
+                required_count = int(required_count_raw)
+            except ValueError:
+                errors.append(
+                    f"Row {row_number}: required_count must be a whole number"
+                )
+                continue
+
+            if required_count < 0:
+                errors.append(
+                    f"Row {row_number}: required_count cannot be negative"
+                )
+                continue
+
+            if status not in ["active", "inactive"]:
+                errors.append(
+                    f"Row {row_number}: status must be Active or Inactive"
+                )
+                continue
+
+            csv_key = (
+                account_name.lower(),
+                shift_name.lower(),
+                role_name.lower()
+            )
+
+            if csv_key in csv_keys:
+                errors.append(
+                    f"Row {row_number}: duplicate staffing requirement in CSV: "
+                    f"{account_name} / {shift_name} / {role_name}"
+                )
+                continue
+
+            csv_keys.add(csv_key)
+
+            rows.append({
+                "row_number": row_number,
+                "account_name": account_name,
+                "shift_name": shift_name,
+                "role_name": role_name,
+                "required_count": required_count,
+                "is_active": status == "active"
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid staffing requirement import data",
+                    "errors": errors
+                }
+            )
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV has no valid staffing requirement rows"
+            )
+
+        for item in rows:
+            row_number = item["row_number"]
+            account_name = item["account_name"]
+            shift_name = item["shift_name"]
+            role_name = item["role_name"]
+            required_count = item["required_count"]
+            is_active = item["is_active"]
+
+            cursor.execute("""
+                SELECT
+                    a.account_id,
+                    a.account_name,
+                    a.department_id
+                FROM accounts a
+                WHERE a.company_id = %s
+                AND LOWER(a.account_name) = LOWER(%s)
+                AND a.is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                account_name
+            ))
+
+            account_row = cursor.fetchone()
+
+            if not account_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Row {row_number}: Active account not found: {account_name}"
+                )
+
+            account_id = account_row[0]
+            department_id = account_row[2]
+
+            cursor.execute("""
+                SELECT
+                    shift_template_id,
+                    shift_name
+                FROM shift_templates
+                WHERE company_id = %s
+                AND account_id = %s
+                AND LOWER(shift_name) = LOWER(%s)
+                LIMIT 1
+            """, (
+                company_id,
+                account_id,
+                shift_name
+            ))
+
+            shift_row = cursor.fetchone()
+
+            if not shift_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Row {row_number}: Shift '{shift_name}' does not exist "
+                        f"under account '{account_name}'"
+                    )
+                )
+
+            shift_template_id = shift_row[0]
+
+            cursor.execute("""
+                SELECT
+                    role_id,
+                    role_name
+                FROM roles
+                WHERE company_id = %s
+                AND department_id = %s
+                AND LOWER(role_name) = LOWER(%s)
+                AND is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                department_id,
+                role_name
+            ))
+
+            role_row = cursor.fetchone()
+
+            if not role_row:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Row {row_number}: Active role '{role_name}' not found "
+                        f"under the department of account '{account_name}'"
+                    )
+                )
+
+            role_id = role_row[0]
+
+            cursor.execute("""
+                SELECT
+                    requirement_id,
+                    is_active
+                FROM shift_staffing_requirements
+                WHERE company_id = %s
+                AND account_id = %s
+                AND shift_template_id = %s
+                AND role_id = %s
+                LIMIT 1
+            """, (
+                company_id,
+                account_id,
+                shift_template_id,
+                role_id
+            ))
+
+            existing_requirement = cursor.fetchone()
+
+            if existing_requirement:
+                requirement_id = existing_requirement[0]
+                was_active = existing_requirement[1]
+
+                cursor.execute("""
+                    UPDATE shift_staffing_requirements
+                    SET
+                        required_count = %s,
+                        is_active = %s,
+                        updated_at = NOW()
+                    WHERE requirement_id = %s
+                    AND company_id = %s
+                """, (
+                    required_count,
+                    is_active,
+                    requirement_id,
+                    company_id
+                ))
+
+                updated_requirements += 1
+
+                if not was_active and is_active:
+                    reactivated_requirements += 1
+
+                if was_active and not is_active:
+                    deactivated_requirements += 1
+
+            else:
+                cursor.execute("""
+                    INSERT INTO shift_staffing_requirements (
+                        company_id,
+                        account_id,
+                        shift_template_id,
+                        role_id,
+                        required_count,
+                        is_active
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    company_id,
+                    account_id,
+                    shift_template_id,
+                    role_id,
+                    required_count,
+                    is_active
+                ))
+
+                created_requirements += 1
+
+        conn.commit()
+
+        return {
+            "message": "Staffing requirements imported successfully",
+            "summary": {
+                "created_requirements": created_requirements,
+                "updated_requirements": updated_requirements,
+                "reactivated_requirements": reactivated_requirements,
+                "deactivated_requirements": deactivated_requirements,
+                "total_rows": len(rows)
+            }
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("IMPORT STAFFING REQUIREMENTS ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
     finally:
         cursor.close()
         conn.close()
