@@ -204,7 +204,7 @@ def is_valid_candidate(employee, shift, role, context):
     configured_max_shifts_per_day = int(
         context["settings"].get("max_shifts_per_day") or 1
     )
-    
+
     if not allow_double_shifts:
         max_shifts = 1
     else:
@@ -228,24 +228,69 @@ def is_valid_candidate(employee, shift, role, context):
                 )
                 return False
 
-    days = working_days(employee_id, context)
+    max_consecutive_days = context["settings"].get("max_working_days")
 
-    candidate_day = normalize_date(shift["shift_date"])
+    if max_consecutive_days is not None:
+        max_consecutive_days = int(max_consecutive_days)
 
-    projected_days = set(days)
-    projected_days.add(candidate_day)
+        if max_consecutive_days > 0:
+            projected_consecutive_days = projected_max_consecutive_working_days(
+                employee_id,
+                shift["shift_date"],
+                context
+            )
 
-    max_days = context["settings"]["max_working_days"]
+            if projected_consecutive_days > max_consecutive_days:
+                context["rest_day_failures"] = (
+                    context.get("rest_day_failures", 0) + 1
+                )
 
-    if len(projected_days) > max_days:
-
-        context["rest_day_failures"] = (
-            context.get("rest_day_failures", 0) + 1
-        )
-
-        return False
+                return False
 
     return True
+
+def to_date(value):
+    if isinstance(value, datetime):
+        return value.date()
+
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+        return value
+
+    return datetime.strptime(str(value), "%Y-%m-%d").date()
+
+
+def projected_max_consecutive_working_days(employee_id, candidate_shift_date, context):
+    days = set()
+
+    assignments = context[
+        "context_assignments_by_employee"
+    ].get(employee_id, [])
+
+    for a in assignments:
+        days.add(to_date(a["shift_date"]))
+
+    days.add(to_date(candidate_shift_date))
+
+    sorted_days = sorted(days)
+
+    if not sorted_days:
+        return 0
+
+    longest = 1
+    current = 1
+
+    for i in range(1, len(sorted_days)):
+        previous_day = sorted_days[i - 1]
+        current_day = sorted_days[i]
+
+        if (current_day - previous_day).days == 1:
+            current += 1
+        else:
+            current = 1
+
+        longest = max(longest, current)
+
+    return longest
 
 def working_days(employee_id, context):
     days = set()
