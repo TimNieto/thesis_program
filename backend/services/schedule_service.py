@@ -226,6 +226,34 @@ def fetch_employees(cursor, company_id: int):
 
     return employees
 
+def fetch_holiday_dates(cursor, company_id: int, start_date, end_date):
+    cursor.execute("""
+        SELECT holiday_date
+        FROM company_holidays
+        WHERE company_id = %s
+        AND is_active = TRUE
+        AND holiday_date BETWEEN %s AND %s
+    """, (
+        company_id,
+        start_date,
+        end_date
+    ))
+
+    return {
+        row[0]
+        for row in cursor.fetchall()
+    }
+
+
+def get_next_week_day_dates():
+    start_date, _ = get_next_week_range()
+
+    return {
+        (start_date + timedelta(days=i)).strftime("%A"):
+        start_date + timedelta(days=i)
+        for i in range(7)
+    }
+
 def get_next_week_range():
     today = datetime.today()
 
@@ -269,6 +297,13 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
             AND st.is_active = TRUE
         WHERE s.company_id = %s
         AND s.shift_date BETWEEN %s AND %s
+        AND NOT EXISTS (
+            SELECT 1
+            FROM company_holidays ch
+            WHERE ch.company_id = s.company_id
+            AND ch.holiday_date = s.shift_date
+            AND ch.is_active = TRUE
+        )
         ORDER BY
             s.shift_date,
             a.account_id,
@@ -799,6 +834,16 @@ def ensure_next_week_shifts(cursor, company_id: int):
     days_ahead = 7 - today.weekday()
     next_monday = today + timedelta(days=days_ahead)
 
+    start_date = next_monday.date()
+    end_date = start_date + timedelta(days=6)
+
+    holiday_dates = fetch_holiday_dates(
+        cursor,
+        company_id,
+        start_date,
+        end_date
+    )
+
     cursor.execute("""
         SELECT
             shift_template_id,
@@ -813,6 +858,8 @@ def ensure_next_week_shifts(cursor, company_id: int):
 
     for day_offset in range(7):
         new_date = (next_monday + timedelta(days=day_offset)).date()
+        if new_date in holiday_dates:
+            continue
 
         for template in templates:
             template_id = template[0]
