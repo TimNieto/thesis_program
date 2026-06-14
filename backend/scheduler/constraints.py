@@ -204,7 +204,7 @@ def is_valid_candidate(employee, shift, role, context):
     configured_max_shifts_per_day = int(
         context["settings"].get("max_shifts_per_day") or 1
     )
-
+    
     if not allow_double_shifts:
         max_shifts = 1
     else:
