@@ -80,6 +80,30 @@ interface RolePermissionsState {
   };
 }
 
+const DEFAULT_ROLE_PERMISSIONS: RolePermissionsState = {
+  hrTabs: {
+    adminDashboard: true,
+    companySettings: true,
+    scheduleGenerator: true,
+    coverRequests: true,
+    reports: true,
+    profile: true,
+  },
+  generalTabs: {
+    scheduleGenerator: true,
+    coverRequests: true,
+    profile: true,
+  },
+  companySections: {
+    companyProfile: true,
+    schedulingRules: true,
+    schedulerScoring: true,
+    accountSchedulingPolicies: true,
+    schedulingBehavior: true,
+    notificationPreferences: true,
+  },
+};
+
 export function SuperAdmin() {
   const [companies, setCompanies] = useState<Company[]>([]);
 
@@ -119,29 +143,12 @@ export function SuperAdmin() {
 
   const [activeTab, setActiveTab] = useState("companies");
 
-  const [rolePermissions, setRolePermissions] = useState<RolePermissionsState>({
-    hrTabs: {
-      adminDashboard: true,
-      companySettings: true,
-      scheduleGenerator: true,
-      coverRequests: true,
-      reports: true,
-      profile: true,
-    },
-    generalTabs: {
-      scheduleGenerator: true,
-      coverRequests: true,
-      profile: true,
-    },
-    companySections: {
-      companyProfile: true,
-      schedulingRules: true,
-      schedulerScoring: true,
-      accountSchedulingPolicies: true,
-      schedulingBehavior: true,
-      notificationPreferences: true,
-    },
-  });
+  const [rolePermissions, setRolePermissions] = useState<RolePermissionsState>(
+    DEFAULT_ROLE_PERMISSIONS,
+  );
+
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
 
   // Company Management States
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
@@ -256,6 +263,104 @@ export function SuperAdmin() {
     }
   };
 
+  const fetchPermissions = async (companyId: string) => {
+    try {
+      setLoadingPermissions(true);
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/permissions?company_id=${companyId}`,
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load permissions");
+      }
+
+      const loadedPermissions = data.rolePermissions || {};
+
+      setRolePermissions({
+        hrTabs: {
+          ...DEFAULT_ROLE_PERMISSIONS.hrTabs,
+          ...(loadedPermissions.hrTabs || loadedPermissions.adminTabs || {}),
+        },
+        generalTabs: {
+          ...DEFAULT_ROLE_PERMISSIONS.generalTabs,
+          ...(loadedPermissions.generalTabs || {}),
+        },
+        companySections: {
+          ...DEFAULT_ROLE_PERMISSIONS.companySections,
+          ...(loadedPermissions.companySections || {}),
+        },
+      });
+    } catch (err) {
+      console.error("Failed to load permissions", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load permissions",
+      );
+      setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
+    } finally {
+      setLoadingPermissions(false);
+    }
+  };
+
+  const savePermissions = async () => {
+    if (!selectedCompany) {
+      toast.error("Please select a company first");
+      return;
+    }
+
+    try {
+      setSavingPermissions(true);
+
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/permissions",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: Number(selectedCompany.id),
+            rolePermissions,
+          }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to save permissions");
+      }
+
+      const savedPermissions = data.rolePermissions || {};
+
+      setRolePermissions({
+        hrTabs: {
+          ...DEFAULT_ROLE_PERMISSIONS.hrTabs,
+          ...(savedPermissions.hrTabs || savedPermissions.adminTabs || {}),
+        },
+        generalTabs: {
+          ...DEFAULT_ROLE_PERMISSIONS.generalTabs,
+          ...(savedPermissions.generalTabs || {}),
+        },
+        companySections: {
+          ...DEFAULT_ROLE_PERMISSIONS.companySections,
+          ...(savedPermissions.companySections || {}),
+        },
+      });
+
+      toast.success("Permissions saved successfully");
+    } catch (err) {
+      console.error("Failed to save permissions", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save permissions",
+      );
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
   // Update Role Permission
   const updatePermission = (
     group: keyof RolePermissionsState,
@@ -269,8 +374,6 @@ export function SuperAdmin() {
         [key]: value,
       },
     }));
-
-    toast.success("Permission updated");
   };
 
   const permissionRows = {
@@ -300,9 +403,9 @@ export function SuperAdmin() {
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
     setActiveTab("settings");
+    fetchPermissions(company.id);
     toast.success(`Selected ${company.name}`);
   };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -374,6 +477,7 @@ export function SuperAdmin() {
                 variant="outline"
                 onClick={() => {
                   setSelectedCompany(null);
+                  setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
                   setActiveTab("companies");
                 }}
                 className="gap-2"
@@ -536,16 +640,30 @@ export function SuperAdmin() {
 
         {/* Role Permissions Tab */}
         <TabsContent value="permissions" className="space-y-6">
-          <div>
-            <h3 className="text-2xl">
-              Role Permissions - {selectedCompany?.name}
-            </h3>
-            <p className="text-gray-600">
-              Configure tab access and company settings section access for this
-              company
-            </p>
-          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-2xl">
+                Role Permissions - {selectedCompany?.name}
+              </h3>
+              <p className="text-gray-600">
+                Configure tab access and company settings section access for
+                this company
+              </p>
 
+              {loadingPermissions && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Loading permissions...
+                </p>
+              )}
+            </div>
+
+            <Button
+              onClick={savePermissions}
+              disabled={loadingPermissions || savingPermissions}
+            >
+              {savingPermissions ? "Saving..." : "Save Permissions"}
+            </Button>
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>HR Department Tab Permission</CardTitle>
@@ -563,6 +681,7 @@ export function SuperAdmin() {
                   <Label>{label}</Label>
                   <Switch
                     checked={rolePermissions.hrTabs[key]}
+                    disabled={loadingPermissions || savingPermissions}
                     onCheckedChange={(value) =>
                       updatePermission("hrTabs", key, value)
                     }
@@ -589,6 +708,7 @@ export function SuperAdmin() {
                   <Label>{label}</Label>
                   <Switch
                     checked={rolePermissions.generalTabs[key]}
+                    disabled={loadingPermissions || savingPermissions}
                     onCheckedChange={(value) =>
                       updatePermission("generalTabs", key, value)
                     }
@@ -616,6 +736,7 @@ export function SuperAdmin() {
                   <Label>{label}</Label>
                   <Switch
                     checked={rolePermissions.companySections[key]}
+                    disabled={loadingPermissions || savingPermissions}
                     onCheckedChange={(value) =>
                       updatePermission("companySections", key, value)
                     }

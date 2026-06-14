@@ -4,6 +4,7 @@
 from fastapi import APIRouter, HTTPException
 from db.database import get_connection
 from passlib.hash import bcrypt
+from services.permission_service import ensure_permission_defaults
 
 router = APIRouter()
 
@@ -248,6 +249,8 @@ def create_company(payload: dict):
 
             company_id = cursor.fetchone()[0]
 
+            ensure_permission_defaults(cursor, company_id)
+
             conn.commit()
 
             return {
@@ -274,6 +277,8 @@ def create_company(payload: dict):
         ensure_company_settings(cursor, company_id)
 
         create_default_company_data(cursor, company_id)
+
+        ensure_permission_defaults(cursor, company_id)
 
         conn.commit()
 

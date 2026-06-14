@@ -1,7 +1,7 @@
 // ---------------------------------------------------
 // src/app/app.tsx
 
-import { useState } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { LoginPage } from "@/app/components/login-page";
 import { ScheduleGenerator } from "@/app/components/schedule-generator";
 import { CoverApplication } from "@/app/components/cover-application";
@@ -30,6 +30,80 @@ import {
 } from "lucide-react";
 import { Toaster } from "@/app/components/ui/sonner";
 
+interface AdminTabPermissions {
+  adminDashboard: boolean;
+  companySettings: boolean;
+  scheduleGenerator: boolean;
+  coverRequests: boolean;
+  reports: boolean;
+  profile: boolean;
+}
+
+interface EmployeeTabPermissions {
+  scheduleGenerator: boolean;
+  coverRequests: boolean;
+  profile: boolean;
+}
+
+interface CompanySettingsSectionPermissions {
+  companyProfile: boolean;
+  schedulingRules: boolean;
+  schedulerScoring: boolean;
+  accountSchedulingPolicies: boolean;
+  schedulingBehavior: boolean;
+  notificationPreferences: boolean;
+}
+
+const DEFAULT_ADMIN_TAB_PERMISSIONS: AdminTabPermissions = {
+  adminDashboard: true,
+  companySettings: true,
+  scheduleGenerator: true,
+  coverRequests: true,
+  reports: true,
+  profile: true,
+};
+
+const DEFAULT_EMPLOYEE_TAB_PERMISSIONS: EmployeeTabPermissions = {
+  scheduleGenerator: true,
+  coverRequests: true,
+  profile: true,
+};
+
+const DEFAULT_COMPANY_SECTION_PERMISSIONS: CompanySettingsSectionPermissions = {
+  companyProfile: true,
+  schedulingRules: true,
+  schedulerScoring: true,
+  accountSchedulingPolicies: true,
+  schedulingBehavior: true,
+  notificationPreferences: true,
+};
+
+function PermissionLocked({
+  isEnabled,
+  children,
+}: {
+  isEnabled: boolean;
+  children: ReactNode;
+}) {
+  if (isEnabled) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="relative">
+      <div className="pointer-events-none select-none opacity-40 grayscale">
+        {children}
+      </div>
+
+      <div className="absolute inset-0 z-10 flex items-start justify-center rounded-lg bg-white/60 pt-10">
+        <div className="rounded-md border bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
+          This tab is disabled by company permission.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState({
@@ -41,6 +115,17 @@ export default function App() {
     company_id: null as number | null,
     company_name: null as string | null,
   });
+
+  const [adminTabPermissions, setAdminTabPermissions] =
+    useState<AdminTabPermissions>(DEFAULT_ADMIN_TAB_PERMISSIONS);
+
+  const [employeeTabPermissions, setEmployeeTabPermissions] =
+    useState<EmployeeTabPermissions>(DEFAULT_EMPLOYEE_TAB_PERMISSIONS);
+
+  const [companySectionPermissions, setCompanySectionPermissions] =
+    useState<CompanySettingsSectionPermissions>(
+      DEFAULT_COMPANY_SECTION_PERMISSIONS,
+    );
 
   const handleLogin = (userData: any) => {
     console.log("LOGIN USER:", userData);
@@ -59,7 +144,85 @@ export default function App() {
       company_id: null,
       company_name: null,
     });
+
+    setAdminTabPermissions(DEFAULT_ADMIN_TAB_PERMISSIONS);
+    setEmployeeTabPermissions(DEFAULT_EMPLOYEE_TAB_PERMISSIONS);
+    setCompanySectionPermissions(DEFAULT_COMPANY_SECTION_PERMISSIONS);
   };
+
+  const fetchCompanyPermissions = async (companyId: number) => {
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/permissions?company_id=${companyId}`,
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load permissions");
+      }
+
+      const loadedPermissions = data.rolePermissions || {};
+
+      setAdminTabPermissions({
+        ...DEFAULT_ADMIN_TAB_PERMISSIONS,
+        ...(loadedPermissions.hrTabs || loadedPermissions.adminTabs || {}),
+      });
+
+      setEmployeeTabPermissions({
+        ...DEFAULT_EMPLOYEE_TAB_PERMISSIONS,
+        ...(loadedPermissions.generalTabs || {}),
+      });
+
+      setCompanySectionPermissions({
+        ...DEFAULT_COMPANY_SECTION_PERMISSIONS,
+        ...(loadedPermissions.companySections || {}),
+      });
+    } catch (err) {
+      console.error("Failed to load company permissions", err);
+
+      setAdminTabPermissions(DEFAULT_ADMIN_TAB_PERMISSIONS);
+      setEmployeeTabPermissions(DEFAULT_EMPLOYEE_TAB_PERMISSIONS);
+      setCompanySectionPermissions(DEFAULT_COMPANY_SECTION_PERMISSIONS);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    if (user.role === "super-admin") {
+      return;
+    }
+
+    if (!user.company_id) {
+      return;
+    }
+
+    fetchCompanyPermissions(user.company_id);
+  }, [isAuthenticated, user.role, user.company_id]);
+
+  const isAdminTabEnabled = (tabKey: keyof AdminTabPermissions) =>
+    adminTabPermissions[tabKey] !== false;
+
+  const isEmployeeTabEnabled = (tabKey: keyof EmployeeTabPermissions) =>
+    employeeTabPermissions[tabKey] !== false;
+
+  const isScheduleTabEnabled =
+    user.role === "admin"
+      ? isAdminTabEnabled("scheduleGenerator")
+      : isEmployeeTabEnabled("scheduleGenerator");
+
+  const isCoverTabEnabled =
+    user.role === "admin"
+      ? isAdminTabEnabled("coverRequests")
+      : isEmployeeTabEnabled("coverRequests");
+
+  const isProfileTabEnabled =
+    user.role === "admin"
+      ? isAdminTabEnabled("profile")
+      : isEmployeeTabEnabled("profile");
 
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} />;
@@ -194,47 +357,66 @@ export default function App() {
           {user.role === "admin" && (
             <>
               <TabsContent value="admin">
-                <AdminDashboard currentUser={user} />
+                <PermissionLocked
+                  isEnabled={isAdminTabEnabled("adminDashboard")}
+                >
+                  <AdminDashboard currentUser={user} />
+                </PermissionLocked>
               </TabsContent>
 
               <TabsContent value="settings">
-                <CompanySettings currentUser={user} />
+                <PermissionLocked
+                  isEnabled={isAdminTabEnabled("companySettings")}
+                >
+                  <CompanySettings
+                    currentUser={user}
+                    sectionPermissions={companySectionPermissions}
+                  />
+                </PermissionLocked>
               </TabsContent>
 
               <TabsContent value="reports">
-                <DataReport currentUser={user} />
+                <PermissionLocked isEnabled={isAdminTabEnabled("reports")}>
+                  <DataReport currentUser={user} />
+                </PermissionLocked>
               </TabsContent>
             </>
           )}
 
           <TabsContent value="schedule">
-            <ScheduleGenerator
-              currentUser={user.email}
-              currentUserId={user.id}
-              role={user.role}
-              companyId={user.company_id}
-            />
+            <PermissionLocked isEnabled={isScheduleTabEnabled}>
+              <ScheduleGenerator
+                currentUser={user.email}
+                currentUserId={user.id}
+                role={user.role}
+                companyId={user.company_id}
+              />
+            </PermissionLocked>
           </TabsContent>
 
           <TabsContent value="cover">
-            <CoverApplication
-              currentUser={{
-                employee_id: user.id,
-                name: user.name,
-                company_id: user.company_id,
-              }}
-              role={user.role}
-            />
+            <PermissionLocked isEnabled={isCoverTabEnabled}>
+              <CoverApplication
+                currentUser={{
+                  employee_id: user.id,
+                  name: user.name,
+                  company_id: user.company_id,
+                }}
+                role={user.role}
+              />
+            </PermissionLocked>
           </TabsContent>
 
           <TabsContent value="profile">
-            <EmployeeProfile
-              userId={user.id}
-              role={user.displayRole}
-              onProfileUpdated={() => {
-                console.log("Profile updated");
-              }}
-            />
+            <PermissionLocked isEnabled={isProfileTabEnabled}>
+              <EmployeeProfile
+                userId={user.id}
+                role={user.displayRole}
+                onProfileUpdated={() => {
+                  console.log("Profile updated");
+                }}
+              />
+            </PermissionLocked>
           </TabsContent>
         </Tabs>
       </main>
