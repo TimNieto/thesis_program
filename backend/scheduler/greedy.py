@@ -390,6 +390,9 @@ def try_fill_unfilled_slot(
 
     MAX_REPAIR_DEPTH = 2
 
+    if not shift:
+        return False
+
     if depth >= MAX_REPAIR_DEPTH:
         return False
 
@@ -397,53 +400,84 @@ def try_fill_unfilled_slot(
         pool = employees
     else:
         pool = context["role_pools"].get(role, [])
-    
-    for emp in pool:
 
+    # 1. DIRECT REPAIR
+    # If someone is already valid for this unfilled slot,
+    # assign them immediately. This allows legal double shifts.
+    direct_candidates = [
+        emp for emp in pool
+        if is_valid_candidate(emp, shift, role, context)
+    ]
+
+    if direct_candidates:
+        best = max(
+            direct_candidates,
+            key=lambda emp: score_employee(emp, shift, role, context)
+        )
+
+        assign_employee(best, shift, role, context)
+        return True
+
+    # 2. SWAP / BACKTRACK REPAIR
+    # Try moving an existing assignment away from a candidate,
+    # then use that candidate for this unfilled slot.
+    for emp in pool:
         emp_id = emp["employee_id"]
 
-        if not is_valid_candidate(emp, shift, role, context):
-            continue
+        existing_list = list(
+            context["context_assignments_by_employee"].get(emp_id, [])
+        )
 
-        existing_list = context["context_assignments_by_employee"].get(emp_id, [])
-
-        if not existing_list:
-            assign_employee(emp, shift, role, context)
-            return True
-
-        for existing_assignment in existing_list[:]:
-
+        for existing_assignment in existing_list:
             old_shift = context["shift_map"].get(
                 existing_assignment["shift_id"]
             )
 
             old_role = existing_assignment["role"]
 
+            if not old_shift:
+                continue
+
+            # Temporarily remove employee's old assignment.
             remove_assignment(existing_assignment, context)
 
-            if context["context_flags"].get("relax_role"):
-                replacement_pool = employees
-            else:
-                replacement_pool = context["role_pools"].get(old_role, [])
+            try:
+                # After removing old assignment, can this employee now fill
+                # the unfilled slot?
+                if not is_valid_candidate(emp, shift, role, context):
+                    continue
 
-            replacement_candidates = [
-                e for e in replacement_pool
-                if is_valid_candidate(e, old_shift, old_role, context)
-            ]
+                if context["context_flags"].get("relax_role"):
+                    replacement_pool = employees
+                else:
+                    replacement_pool = context["role_pools"].get(old_role, [])
 
-            if replacement_candidates:
+                replacement_candidates = [
+                    replacement
+                    for replacement in replacement_pool
+                    if replacement["employee_id"] != emp_id
+                    and is_valid_candidate(
+                        replacement,
+                        old_shift,
+                        old_role,
+                        context
+                    )
+                ]
+
+                if not replacement_candidates:
+                    continue
 
                 replacement = max(
                     replacement_candidates,
-                    key=lambda e:
-                        score_employee(
-                            e,
-                            old_shift,
-                            old_role,
-                            context
-                        )
+                    key=lambda replacement: score_employee(
+                        replacement,
+                        old_shift,
+                        old_role,
+                        context
+                    )
                 )
 
+                # Fill the old slot with replacement.
                 assign_employee(
                     replacement,
                     old_shift,
@@ -451,6 +485,7 @@ def try_fill_unfilled_slot(
                     context
                 )
 
+                # Fill the original unfilled slot with the moved employee.
                 assign_employee(
                     emp,
                     shift,
@@ -458,77 +493,31 @@ def try_fill_unfilled_slot(
                     context
                 )
 
-                unresolved = []
+                return True
 
-                for s in shifts:
+            finally:
+                # If the swap did not return True, restore the old assignment
+                # unless it has already been replaced.
+                old_slot_filled = any(
+                    a["shift_id"] == old_shift["shift_id"]
+                    and a["role"] == old_role
+                    for a in context["assignments"]
+                )
 
-                    for req in s.get("staffing_requirements", []):
+                new_slot_filled_by_emp = any(
+                    a["shift_id"] == shift["shift_id"]
+                    and a["role"] == role
+                    and a["employee_id"] == emp_id
+                    for a in context["assignments"]
+                )
 
-                        r = req["role_key"]
-
-                        required = req.get("required_count", 0) or 0
-
-                        if required <= 0:
-                            continue
-
-                        current_count = len([
-                            a for a in context["assignments"]
-                            if (
-                                a["shift_id"] == s["shift_id"]
-                                and a["role"] == r
-                            )
-                        ])
-
-                        if current_count < required:
-
-                            unresolved.append({
-                                "shift_id": s["shift_id"],
-                                "role": r
-                            })
-
-                success = True
-
-                for missing in unresolved:
-
-                    repaired = try_fill_unfilled_slot(
-                        missing,
-                        employees,
-                        shifts,
-                        context,
-                        depth + 1
+                if not new_slot_filled_by_emp and not old_slot_filled:
+                    assign_employee(
+                        context["employee_map"][emp_id],
+                        old_shift,
+                        old_role,
+                        context
                     )
-
-                    if not repaired:
-                        success = False
-                        break
-
-                if success:
-                    return True
-
-                remove_assignment(
-                    {
-                        "shift_id": old_shift["shift_id"],
-                        "employee_id": replacement["employee_id"],
-                        "role": old_role
-                    },
-                    context
-                )
-
-                remove_assignment(
-                    {
-                        "shift_id": shift["shift_id"],
-                        "employee_id": emp["employee_id"],
-                        "role": role
-                    },
-                    context
-                )
-
-            assign_employee(
-                context["employee_map"][existing_assignment["employee_id"]],
-                old_shift,
-                old_role,
-                context
-            )
 
     return False
 
