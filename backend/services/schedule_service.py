@@ -11,14 +11,22 @@ from datetime import datetime, timedelta
 def fetch_shift_templates(cursor, company_id: int):
     cursor.execute("""
         SELECT
-            shift_template_id,
-            shift_name,
-            start_time,
-            end_time
-        FROM shift_templates
-        WHERE company_id = %s
-        AND is_active = TRUE
-        ORDER BY start_time
+            st.shift_template_id,
+            st.account_id,
+            a.account_name,
+            st.shift_name,
+            st.start_time,
+            st.end_time
+        FROM shift_templates st
+        JOIN accounts a
+            ON st.account_id = a.account_id
+            AND st.company_id = a.company_id
+        WHERE st.company_id = %s
+        AND st.is_active = TRUE
+        AND a.is_active = TRUE
+        ORDER BY
+            a.account_id,
+            st.start_time
     """, (company_id,))
 
     rows = cursor.fetchall()
@@ -26,9 +34,11 @@ def fetch_shift_templates(cursor, company_id: int):
     return [
         {
             "shift_template_id": r[0],
-            "shift_name": r[1],
-            "start_time": r[2],
-            "end_time": r[3]
+            "account_id": r[1],
+            "account_name": r[2],
+            "shift_name": r[3],
+            "start_time": r[4],
+            "end_time": r[5],
         }
         for r in rows
     ]
@@ -638,6 +648,9 @@ def generate_weekly_schedule(company_id: int):
                     grouped[account_name][day] = {}
 
                 for template in shift_templates:
+                    if template["account_name"] != account_name:
+                        continue
+
                     shift_name = template["shift_name"]
 
                     if shift_name not in grouped[account_name][day]:
@@ -760,6 +773,9 @@ def get_generated_schedule(company_id: int):
                     grouped[account_name][day] = {}
 
                 for template in shift_templates:
+                    if template["account_name"] != account_name:
+                        continue
+
                     shift_name = template["shift_name"]
 
                     if shift_name not in grouped[account_name][day]:
