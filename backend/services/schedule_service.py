@@ -783,21 +783,13 @@ def ensure_next_week_shifts(cursor, company_id: int):
     next_monday = today + timedelta(days=days_ahead)
 
     cursor.execute("""
-        SELECT account_id
-        FROM accounts
-        WHERE company_id = %s
-        AND is_active = TRUE
-        ORDER BY account_id ASC
-    """, (company_id,))
-
-    accounts = cursor.fetchall()
-
-    cursor.execute("""
-        SELECT shift_template_id
+        SELECT
+            shift_template_id,
+            account_id
         FROM shift_templates
         WHERE company_id = %s
         AND is_active = TRUE
-        ORDER BY start_time
+        ORDER BY account_id, start_time
     """, (company_id,))
 
     templates = cursor.fetchall()
@@ -805,33 +797,31 @@ def ensure_next_week_shifts(cursor, company_id: int):
     for day_offset in range(7):
         new_date = (next_monday + timedelta(days=day_offset)).date()
 
-        for account in accounts:
-            account_id = account[0]
+        for template in templates:
+            template_id = template[0]
+            account_id = template[1]
 
-            for template in templates:
-                template_id = template[0]
-
-                cursor.execute("""
-                    INSERT INTO shifts (
-                        shift_date,
-                        account_id,
-                        shift_template_id,
-                        company_id
-                    )
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (
-                        shift_date,
-                        account_id,
-                        shift_template_id,
-                        company_id
-                    )
-                    DO NOTHING
-                """, (
-                    new_date,
+            cursor.execute("""
+                INSERT INTO shifts (
+                    shift_date,
                     account_id,
-                    template_id,
+                    shift_template_id,
                     company_id
-                ))
+                )
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (
+                    shift_date,
+                    account_id,
+                    shift_template_id,
+                    company_id
+                )
+                DO NOTHING
+            """, (
+                new_date,
+                account_id,
+                template_id,
+                company_id
+            ))
 
 
 def cleanup_pending_deleted_accounts(cursor):
