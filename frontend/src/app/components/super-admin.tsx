@@ -666,9 +666,9 @@ export function SuperAdmin() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>HR Department Tab Permission</CardTitle>
+              <CardTitle>Admin Employee Tab Permissions</CardTitle>
               <CardDescription>
-                Control which admin tabs HR Department users can access
+                Control which tabs admin employees can access
               </CardDescription>
             </CardHeader>
 
@@ -693,9 +693,9 @@ export function SuperAdmin() {
 
           <Card>
             <CardHeader>
-              <CardTitle>General Employee Tab Permission</CardTitle>
+              <CardTitle>Non-Admin Employee Tab Permissions</CardTitle>
               <CardDescription>
-                Control which employee tabs General Employee users can access
+                Control which tabs non-admin employees can access
               </CardDescription>
             </CardHeader>
 
@@ -720,9 +720,9 @@ export function SuperAdmin() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Company Settings Section Permission</CardTitle>
+              <CardTitle>Company Settings Section Permissions</CardTitle>
               <CardDescription>
-                Control which Company Settings sections HR Department users can
+                Control which Company Settings sections admin employees can
                 access
               </CardDescription>
             </CardHeader>
