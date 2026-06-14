@@ -265,6 +265,7 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
         JOIN shift_templates st
             ON s.shift_template_id = st.shift_template_id
             AND s.company_id = st.company_id
+            AND s.account_id = st.account_id
             AND st.is_active = TRUE
         WHERE s.company_id = %s
         AND s.shift_date BETWEEN %s AND %s

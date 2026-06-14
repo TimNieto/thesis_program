@@ -199,9 +199,16 @@ def is_valid_candidate(employee, shift, role, context):
     if already_assigned_same_time(employee_id, shift, context):
         return False
     
-    allow_double_shifts = context["settings"]["allow_double_shifts"]
+    allow_double_shifts = context["settings"].get("allow_double_shifts", False)
 
-    max_shifts = 2 if allow_double_shifts else 1
+    configured_max_shifts_per_day = int(
+        context["settings"].get("max_shifts_per_day") or 1
+    )
+
+    if not allow_double_shifts:
+        max_shifts = 1
+    else:
+        max_shifts = max(1, configured_max_shifts_per_day)
 
     if assigned_count_same_day(employee_id, shift, context) >= max_shifts:
         return False
