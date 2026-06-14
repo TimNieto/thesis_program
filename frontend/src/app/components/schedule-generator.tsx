@@ -608,6 +608,39 @@ export function ScheduleGenerator({
     link.click();
   };
 
+  const normalizeKey = (value: any) =>
+  String(value || "").trim().toLowerCase();
+
+const getShiftTemplatesForAccount = (livestream: string) => {
+  const accountKey = normalizeKey(livestream);
+
+  return shiftTemplates
+    .filter(
+      (shift) => normalizeKey(shift.account_name) === accountKey,
+    )
+    .sort((a, b) => {
+      const aTime = String(a.start_time || "00:00:00");
+      const bTime = String(b.start_time || "00:00:00");
+
+      if (aTime !== bTime) return aTime.localeCompare(bTime);
+
+      return String(a.shift_name || "").localeCompare(
+        String(b.shift_name || ""),
+      );
+    });
+};
+
+const getShiftTemplateForAccount = (
+  livestream: string,
+  shiftName: string,
+) => {
+  return shiftTemplates.find(
+    (shift) =>
+      normalizeKey(shift.account_name) === normalizeKey(livestream) &&
+      normalizeKey(shift.shift_name) === normalizeKey(shiftName),
+  );
+};
+
   const generateSchedule = async () => {
     try {
       const res = await fetch(
@@ -640,7 +673,7 @@ export function ScheduleGenerator({
         DAYS.forEach((day) => {
           const shifts = days[day] || {};
 
-          shiftTemplates.forEach((shift) => {
+          getShiftTemplatesForAccount(livestream).forEach((shift) => {
             const shiftData = shifts[shift.shift_name] || {};
 
             Object.entries(shiftData).forEach(([roleKey, employees]: any) => {
@@ -799,33 +832,30 @@ export function ScheduleGenerator({
     }
   };
 
-  const getVisibleShifts = (livestream: string) => {
-    if (scheduleMode === "preview") {
-      return shiftTemplates;
-    }
+const getVisibleShifts = (livestream: string) => {
+  const accountShifts = getShiftTemplatesForAccount(livestream);
 
-    const savedShiftNames = Array.from(
-      new Set(
-        assignments
-          .filter((a) => a.livestream === livestream)
-          .map((a) => a.shift),
-      ),
-    );
+  if (accountShifts.length > 0) {
+    return accountShifts;
+  }
 
-    return savedShiftNames.map(
-      (shiftName) =>
-        shiftTemplates.find((s) => s.shift_name === shiftName) || {
-          shift_name: shiftName,
-          start_time: "",
-          end_time: "",
-        },
-    );
-  };
+  const savedShiftNames = Array.from(
+    new Set(
+      assignments
+        .filter((a) => a.livestream === livestream)
+        .map((a) => a.shift),
+    ),
+  );
+
+  return savedShiftNames.map((shiftName) => ({
+    shift_name: shiftName,
+    start_time: "",
+    end_time: "",
+  }));
+};
 
   const getRoleRowsForShift = (livestream: string, shiftName: string) => {
-    const shiftTemplate = shiftTemplates.find(
-      (s) => s.shift_name === shiftName,
-    );
+    const shiftTemplate = getShiftTemplateForAccount(livestream, shiftName);
 
     if (shiftTemplate) {
       const shiftTemplateId = Number(shiftTemplate.shift_template_id);
@@ -914,7 +944,19 @@ export function ScheduleGenerator({
       <Card>
         <CardContent className="pt-6">
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            {shiftTemplates.map((shift) => (
+            {Array.from(
+              shiftTemplates
+                .reduce((map, shift) => {
+                  const key = normalizeKey(shift.shift_name);
+
+                  if (!map.has(key)) {
+                    map.set(key, shift);
+                  }
+
+                  return map;
+                }, new Map<string, any>())
+                .values(),
+            ).map((shift) => (
               <div key={shift.shift_name} className="flex items-center gap-2">
                 <div
                   className={`w-10 h-10 rounded border-2 ${getShiftColor(shift.shift_name)} flex items-center justify-center`}
