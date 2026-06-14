@@ -410,9 +410,24 @@ def try_fill_unfilled_slot(
     ]
 
     if direct_candidates:
+        def repair_score(emp):
+            emp_id = emp["employee_id"]
+
+            score = score_employee(emp, shift, role, context)
+
+            # During repair only, prefer a legal double-shift candidate
+            # if double shifting is enabled and the employee already works that day.
+            if (
+                context["settings"].get("allow_double_shifts")
+                and assigned_count_same_day(emp_id, shift, context) > 0
+            ):
+                score += 100
+
+            return score
+
         best = max(
             direct_candidates,
-            key=lambda emp: score_employee(emp, shift, role, context)
+            key=repair_score
         )
 
         assign_employee(best, shift, role, context)

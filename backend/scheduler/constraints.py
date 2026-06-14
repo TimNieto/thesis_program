@@ -208,7 +208,7 @@ def is_valid_candidate(employee, shift, role, context):
     if not allow_double_shifts:
         max_shifts = 1
     else:
-        max_shifts = max(1, configured_max_shifts_per_day)
+        max_shifts = max(2, configured_max_shifts_per_day)
 
     if assigned_count_same_day(employee_id, shift, context) >= max_shifts:
         return False
