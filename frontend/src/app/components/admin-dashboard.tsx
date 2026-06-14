@@ -197,10 +197,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     date: string;
   }
 
-  const [holidays, setHolidays] = useState<Holiday[]>([
-    { id: "1", name: "New Year's Day", date: "2025-01-01" },
-    { id: "2", name: "Christmas Day", date: "2025-12-25" },
-  ]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
 
   const [newHolidayName, setNewHolidayName] = useState("");
   const [newHolidayDate, setNewHolidayDate] = useState("");
@@ -490,6 +487,37 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
     }
   };
 
+  const fetchHolidays = async () => {
+    if (!currentUser.company_id) {
+      setHolidays([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/holidays?company_id=${currentUser.company_id}`,
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to load holidays");
+      }
+
+      setHolidays(
+        (Array.isArray(data) ? data : []).map((holiday: any) => ({
+          id: String(holiday.holiday_id),
+          name: holiday.holiday_name,
+          date: holiday.holiday_date,
+        })),
+      );
+    } catch (err) {
+      console.error("Failed to load holidays", err);
+      setHolidays([]);
+    }
+  };
+
+
   const fetchEmployeeAccountPreferences = async (employeeId: number) => {
     if (!currentUser.company_id) return {};
 
@@ -546,6 +574,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
         await fetchAccounts();
         await fetchAccountDepartmentData();
         await fetchImportHistory();
+        await fetchHolidays();
       } finally {
         setIsLoading(false);
       }
