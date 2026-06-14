@@ -206,6 +206,105 @@ def replay_assignment(context, assignment):
     context["assignment_counts"][emp_id] += 1
     context["context_assignments_by_employee"][emp_id].append(assignment)
 
+def reindex_slot_indexes(assignments):
+    counters = defaultdict(int)
+    cleaned = []
+
+    for assignment in assignments:
+        key = (
+            assignment["shift_id"],
+            assignment["role"].lower()
+        )
+
+        updated = copy.deepcopy(assignment)
+        updated["slot_index"] = counters[key]
+
+        counters[key] += 1
+        cleaned.append(updated)
+
+    return cleaned
+
+
+def validate_individual_constraints(
+    individual,
+    employees,
+    shifts,
+    availability,
+    leaves,
+    absences,
+    settings,
+    account_settings,
+    history_scores
+):
+    shift_map = {
+        s["shift_id"]: s
+        for s in shifts
+    }
+
+    context = prepare_context(
+        employees,
+        shifts,
+        availability,
+        leaves,
+        absences,
+        settings,
+        account_settings
+    )
+
+    context["shift_map"] = shift_map
+    context["remaining_shifts"] = shifts.copy()
+
+    valid_assignments = []
+
+    sorted_assignments = sorted(
+        individual.get("assignments", []),
+        key=lambda a: (
+            a.get("shift_id", 0),
+            str(a.get("role", "")).lower(),
+            a.get("slot_index", 0)
+        )
+    )
+
+    for assignment in sorted_assignments:
+        shift = shift_map.get(assignment["shift_id"])
+
+        if not shift:
+            continue
+
+        employee = context["employee_map"].get(
+            assignment.get("employee_id")
+        )
+
+        if not employee:
+            continue
+
+        role = assignment["role"]
+
+        if not is_valid_candidate(
+            employee,
+            shift,
+            role,
+            context
+        ):
+            continue
+
+        cleaned_assignment = copy.deepcopy(assignment)
+        cleaned_assignment["shift_date"] = shift["shift_date"]
+        cleaned_assignment["shift_type"] = shift["shift_type"]
+        cleaned_assignment["account"] = shift["account"]
+
+        replay_assignment(context, cleaned_assignment)
+        valid_assignments.append(cleaned_assignment)
+
+    individual["assignments"] = reindex_slot_indexes(valid_assignments)
+
+    return evaluate_schedule(
+        individual,
+        history_scores,
+        shifts,
+        account_settings
+    )
+
 
 def make_assignment(employee, shift, role, slot_index=0):
     return {
@@ -443,12 +542,36 @@ def generate_schedule(
     print("GREEDY SEED UNFILLED:", len(seed.get("unfilled_slots", [])))
     print("GREEDY SEED UNFILLED DETAILS:", seed.get("unfilled_slots", []))
 
+    seed = validate_individual_constraints(
+        seed,
+        employees,
+        shifts,
+        availability,
+        leaves,
+        absences,
+        settings,
+        account_settings,
+        history_scores
+    )
+
     population = [seed]
 
     # 2. generate mutated greedy-based population
     while len(population) < POPULATION_SIZE:
         mutated = mutate_schedule(
             seed,
+            employees,
+            shifts,
+            availability,
+            leaves,
+            absences,
+            settings,
+            account_settings,
+            history_scores
+        )
+
+        mutated = validate_individual_constraints(
+            mutated,
             employees,
             shifts,
             availability,
@@ -485,7 +608,31 @@ def generate_schedule(
                 account_settings
             )
 
+            child = validate_individual_constraints(
+                child,
+                employees,
+                shifts,
+                availability,
+                leaves,
+                absences,
+                settings,
+                account_settings,
+                history_scores
+            )
+
             child = mutate_schedule(
+                child,
+                employees,
+                shifts,
+                availability,
+                leaves,
+                absences,
+                settings,
+                account_settings,
+                history_scores
+            )
+
+            child = validate_individual_constraints(
                 child,
                 employees,
                 shifts,
@@ -500,6 +647,22 @@ def generate_schedule(
             next_population.append(child)
 
         population = next_population
+
+
+    population = [
+        validate_individual_constraints(
+            individual,
+            employees,
+            shifts,
+            availability,
+            leaves,
+            absences,
+            settings,
+            account_settings,
+            history_scores
+        )
+        for individual in population
+    ]
 
     best = max(
         population,
