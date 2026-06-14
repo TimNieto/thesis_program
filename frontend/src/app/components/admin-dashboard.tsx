@@ -583,7 +583,12 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
     loadAdminData();
   }, [currentUser.role, currentUser.company_id]);
 
-  const handleAddHoliday = () => {
+  const handleAddHoliday = async () => {
+    if (!currentUser.company_id) {
+      toast.error("No company selected");
+      return;
+    }
+
     if (!newHolidayName.trim()) {
       toast.error("Please enter a holiday name");
       return;
@@ -594,24 +599,75 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
       return;
     }
 
-    setHolidays((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        name: newHolidayName.trim(),
-        date: newHolidayDate,
-      },
-    ]);
+    try {
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/holidays",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            holiday_name: newHolidayName.trim(),
+            holiday_date: newHolidayDate,
+          }),
+        },
+      );
 
-    setNewHolidayName("");
-    setNewHolidayDate("");
+      const data = await res.json().catch(() => null);
 
-    toast.success("Holiday added");
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to save holiday");
+      }
+
+      setNewHolidayName("");
+      setNewHolidayDate("");
+
+      await fetchHolidays();
+
+      toast.success(data?.message || "Holiday added");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add holiday");
+    }
   };
 
-  const handleRemoveHoliday = (id: string) => {
-    setHolidays((prev) => prev.filter((h) => h.id !== id));
-    toast.success("Holiday removed");
+  const handleRemoveHoliday = async (id: string) => {
+    if (!currentUser.company_id) {
+      toast.error("No company selected");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to remove this holiday?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/holidays/${id}?company_id=${currentUser.company_id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to remove holiday");
+      }
+
+      await fetchHolidays();
+
+      toast.success(data?.message || "Holiday removed");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to remove holiday",
+      );
+    }
   };
 
   const fetchImportHistory = async () => {
