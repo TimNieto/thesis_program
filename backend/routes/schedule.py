@@ -1886,3 +1886,174 @@ def save_schedule(payload: dict = Body(...)):
     finally:
         cursor.close()
         conn.close()
+
+@router.patch("/generated-schedule/{schedule_id}/employee")
+def update_generated_schedule_employee(
+    schedule_id: int,
+    payload: dict = Body(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+        employee_id = payload.get("employee_id")
+        updated_by = payload.get("updated_by")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        cursor.execute("""
+            SELECT
+                gs.schedule_id,
+                gs.employee_id,
+                s.shift_date
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            WHERE gs.schedule_id = %s
+            AND gs.company_id = %s
+            AND gs.is_archived = FALSE
+            LIMIT 1
+        """, (
+            schedule_id,
+            company_id
+        ))
+
+        schedule_row = cursor.fetchone()
+
+        if not schedule_row:
+            raise HTTPException(
+                status_code=404,
+                detail="Active schedule row not found"
+            )
+
+        old_employee_id = schedule_row[1]
+
+        if employee_id is not None:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE employee_id = %s
+                AND company_id = %s
+                AND employment_status = 'Active'
+                LIMIT 1
+            """, (
+                employee_id,
+                company_id
+            ))
+
+            if not cursor.fetchone():
+                raise HTTPException(
+                    status_code=404,
+                    detail="Employee not found or inactive"
+                )
+
+        # Void cover data only for this one schedule slot.
+        cursor.execute("""
+            SELECT coverage_request_id
+            FROM coverage_requests
+            WHERE company_id = %s
+            AND schedule_id = %s
+            AND is_archived = FALSE
+        """, (
+            company_id,
+            schedule_id
+        ))
+
+        coverage_request_ids = [
+            row[0]
+            for row in cursor.fetchall()
+        ]
+
+        if coverage_request_ids:
+            cursor.execute("""
+                DELETE FROM emergency_cover_targets
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                coverage_request_ids
+            ))
+
+            cursor.execute("""
+                DELETE FROM shift_applications
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                coverage_request_ids
+            ))
+
+            cursor.execute("""
+                DELETE FROM coverage_requests
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                coverage_request_ids
+            ))
+
+        cursor.execute("""
+            UPDATE generated_schedule
+            SET employee_id = %s
+            WHERE schedule_id = %s
+            AND company_id = %s
+            AND is_archived = FALSE
+        """, (
+            employee_id,
+            schedule_id,
+            company_id
+        ))
+
+        if employee_id:
+            create_notification(
+                cursor,
+                employee_id,
+                "Schedule Assignment Updated",
+                "You were assigned to a schedule slot.",
+                "schedule",
+                company_id=company_id,
+                sender_employee_id=updated_by,
+                related_id=schedule_id
+            )
+
+        if old_employee_id and old_employee_id != employee_id:
+            create_notification(
+                cursor,
+                old_employee_id,
+                "Schedule Assignment Updated",
+                "You were removed from a schedule slot.",
+                "schedule",
+                company_id=company_id,
+                sender_employee_id=updated_by,
+                related_id=schedule_id
+            )
+
+        conn.commit()
+
+        return {
+            "message": "Schedule assignment updated",
+            "schedule_id": schedule_id,
+            "employee_id": employee_id
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("UPDATE GENERATED SCHEDULE EMPLOYEE ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()

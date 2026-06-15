@@ -488,7 +488,35 @@ useEffect(() => {
     setIsDialogOpen(true);
   };
 
-  const handleAssign = () => {
+  const updatePublishedAssignment = async (
+    scheduleId: number,
+    employeeId: number | null,
+  ) => {
+    const res = await fetch(
+      `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/employee`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_id: companyId,
+          employee_id: employeeId,
+          updated_by: currentUserId,
+        }),
+      },
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to update assignment");
+    }
+
+    return data;
+  };
+
+  const handleAssign = async () => {
     if (!selectedCell || !selectedEmployeeId) {
       toast.error("Please select an employee");
       return;
@@ -504,6 +532,42 @@ useEffect(() => {
     }
 
     const existing = getAssignment();
+
+    if (
+      scheduleWeekOffset === 0 &&
+      scheduleMode === "saved" &&
+      existing?.schedule_id
+    ) {
+      try {
+        await updatePublishedAssignment(
+          existing.schedule_id,
+          selectedEmployee.id,
+        );
+
+        setAssignments(
+          assignments.map((a) =>
+            a.id === existing.id
+              ? {
+                  ...a,
+                  employee_id: selectedEmployee.id,
+                  employee: selectedEmployee.name,
+                }
+              : a,
+          ),
+        );
+
+        toast.success("This week's assignment updated");
+        setIsDialogOpen(false);
+        setEmployeeName("");
+        setSelectedEmployeeId("");
+        setSelectedCell(null);
+        return;
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to update this week's assignment");
+        return;
+      }
+    }
 
     if (existing) {
       setAssignments(
@@ -562,10 +626,46 @@ useEffect(() => {
     setSelectedCell(null);
   };
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
     if (!selectedCell) return;
 
     const existing = getAssignment();
+
+    if (
+      scheduleWeekOffset === 0 &&
+      scheduleMode === "saved" &&
+      existing?.schedule_id
+    ) {
+      try {
+        await updatePublishedAssignment(
+          existing.schedule_id,
+          null,
+        );
+
+        setAssignments(
+          assignments.map((a) =>
+            a.id === existing.id
+              ? {
+                  ...a,
+                  employee_id: null,
+                  employee: "",
+                }
+              : a,
+          ),
+        );
+
+        toast.success("This week's assignment removed");
+        setIsDialogOpen(false);
+        setEmployeeName("");
+        setSelectedEmployeeId("");
+        setSelectedCell(null);
+        return;
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to remove this week's assignment");
+        return;
+      }
+    }
 
     if (existing) {
       setAssignments(
