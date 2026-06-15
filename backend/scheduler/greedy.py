@@ -115,52 +115,115 @@ def estimate_candidates(employees, shift, role, context):
     return count
 
 
+def get_account_priority_level(shift, context):
+    account_name = shift["account"]
+
+    account_policy = (
+        context["account_settings"]
+        .get(account_name, {})
+    )
+
+    priority_level = account_policy.get(
+        "priority_level",
+        999
+    )
+
+    if isinstance(priority_level, str):
+        normalized = priority_level.strip().lower()
+
+        priority_map = {
+            "high": 1,
+            "medium": 2,
+            "low": 3
+        }
+
+        if normalized in priority_map:
+            return priority_map[normalized]
+
+    try:
+        return int(priority_level)
+    except (TypeError, ValueError):
+        return 999
+
+
+def get_shift_candidate_count(shift, employees, context):
+    requirements = shift.get("staffing_requirements", [])
+
+    if not requirements:
+        return 9999
+
+    total_candidates = 0
+
+    for req in requirements:
+        role = req.get("role_key")
+
+        if not role:
+            continue
+
+        total_candidates += estimate_candidates(
+            employees,
+            shift,
+            role,
+            context
+        )
+
+    return total_candidates
+
+
+def shift_selection_score(shift, employees, context):
+    priority_level = get_account_priority_level(
+        shift,
+        context
+    )
+
+    candidate_count = get_shift_candidate_count(
+        shift,
+        employees,
+        context
+    )
+
+    weekend_boost = (
+        0
+        if shift["shift_date"].weekday() >= 5
+        else 1
+    )
+
+    return (
+        priority_level,
+        candidate_count,
+        weekend_boost,
+        shift["shift_date"],
+        str(shift.get("start_time", "")),
+        str(shift.get("account", "")).lower(),
+        shift["shift_id"]
+    )
+
+
+def pick_next_shift(remaining_shifts, employees, context):
+    return min(
+        remaining_shifts,
+        key=lambda shift: shift_selection_score(
+            shift,
+            employees,
+            context
+        )
+    )
+
+
 def sort_shifts_by_difficulty(shifts, employees, context):
     """
-    Harder shifts first (fewer candidates)
+    Sort shifts using the same rule used by the dynamic picker.
+    Lower score = scheduled earlier.
     """
 
-    def difficulty(shift):
-        
-        total_candidates = 0
-
-        for req in shift.get("staffing_requirements", []):
-            role = req["role_key"]
-
-            total_candidates += estimate_candidates(
-                employees,
-                shift,
-                role,
-                context
-            )
-
-        account_name = shift["account"]
-
-        account_policy = (
-            context["account_settings"]
-            .get(account_name, {})
+    return sorted(
+        shifts,
+        key=lambda shift: shift_selection_score(
+            shift,
+            employees,
+            context
         )
-
-        priority_level = account_policy.get(
-            "priority_level",
-            999
-        )
-
-        # fewer candidates → higher priority
-        difficulty_score = total_candidates
-
-        # Higher priority accounts
-        difficulty_score += (
-            priority_level * 100
-        )
-
-        # Weekend harder
-        if shift["shift_date"].weekday() >= 5:
-            difficulty_score -= 1
-
-        return difficulty_score
-
-    return sorted(shifts, key=difficulty)
+    )
 
 
 # Flexibility estimation
@@ -727,18 +790,10 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
     while context["remaining_shifts"]:
 
-        # Dynamically pick hardest shift
-        shift = min(
+        shift = pick_next_shift(
             context["remaining_shifts"],
-            key=lambda s: sum(
-                estimate_candidates(
-                    employees,
-                    s,
-                    req["role_key"],
-                    context
-                )
-                for req in s.get("staffing_requirements", [])
-            )
+            employees,
+            context
         )
 
         context["remaining_shifts"].remove(shift)
@@ -781,17 +836,10 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
         while context["remaining_shifts"]:
 
-            shift = min(
+            shift = pick_next_shift(
                 context["remaining_shifts"],
-                key=lambda s: sum(
-                    estimate_candidates(
-                        employees,
-                        s,
-                        req["role_key"],
-                        context
-                    )
-                    for req in s.get("staffing_requirements", [])
-                )
+                employees,
+                context
             )
 
             context["remaining_shifts"].remove(shift)
@@ -831,17 +879,10 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
         while context["remaining_shifts"]:
 
-            shift = min(
+            shift = pick_next_shift(
                 context["remaining_shifts"],
-                key=lambda s: sum(
-                    estimate_candidates(
-                        employees,
-                        s,
-                        req["role_key"],
-                        context
-                    )
-                    for req in s.get("staffing_requirements", [])
-                )
+                employees,
+                context
             )
 
             context["remaining_shifts"].remove(shift)
@@ -884,17 +925,10 @@ def generate_schedule(employees, shifts, availability, leaves, absences, setting
 
         while context["remaining_shifts"]:
 
-            shift = min(
+            shift = pick_next_shift(
                 context["remaining_shifts"],
-                key=lambda s: sum(
-                    estimate_candidates(
-                        employees,
-                        s,
-                        req["role_key"],
-                        context
-                    )
-                    for req in s.get("staffing_requirements", [])
-                )
+                employees,
+                context
             )
 
             context["remaining_shifts"].remove(shift)
