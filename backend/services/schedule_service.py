@@ -450,33 +450,23 @@ def fetch_history_scores(cursor, company_id: int):
     try:
         cursor.execute("""
             SELECT
-                COALESCE(cr.requested_by, gs.employee_id) AS employee_id,
+                ass.employee_id,
                 a.account_name,
                 st.shift_name,
                 TRIM(TO_CHAR(s.shift_date, 'Day')) AS day_name,
                 r.role_key,
 
-                COUNT(cr.coverage_request_id) FILTER (
-                    WHERE cr.coverage_request_id IS NOT NULL
-                ) AS cover_requests,
+                0 AS cover_requests,
+                0 AS emergency_requests,
+                0 AS applications,
 
-                COUNT(cr.coverage_request_id) FILTER (
-                    WHERE cr.request_type = 'emergency'
-                ) AS emergency_requests,
+                COUNT(ass.assignment_id) AS successful_assignments
 
-                COUNT(sa.shift_application_id) FILTER (
-                    WHERE sa.status = 'approved'
-                ) AS applications,
-
-                COUNT(gs.schedule_id) FILTER (
-                    WHERE cr.coverage_request_id IS NULL
-                ) AS successful_assignments
-
-            FROM generated_schedule gs
+            FROM assignments ass
 
             JOIN shifts s
-                ON gs.shift_id = s.shift_id
-                AND gs.company_id = s.company_id
+                ON ass.shift_id = s.shift_id
+                AND ass.company_id = s.company_id
 
             JOIN accounts a
                 ON s.account_id = a.account_id
@@ -485,25 +475,22 @@ def fetch_history_scores(cursor, company_id: int):
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
                 AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
 
             JOIN roles r
-                ON gs.role_id = r.role_id
-                AND gs.company_id = r.company_id
+                ON ass.role_id = r.role_id
+                AND ass.company_id = r.company_id
 
-            LEFT JOIN coverage_requests cr
-                ON cr.schedule_id = gs.schedule_id
-                AND cr.company_id = gs.company_id
-
-            LEFT JOIN shift_applications sa
-                ON sa.coverage_request_id = cr.coverage_request_id
-                AND sa.company_id = cr.company_id
-                AND sa.applicant_id = gs.employee_id
-
-            WHERE gs.company_id = %s
-            AND gs.is_archived = TRUE
+            WHERE ass.company_id = %s
+            AND ass.employee_id IS NOT NULL
+            AND LOWER(COALESCE(ass.status, '')) IN (
+                'completed',
+                'worked',
+                'approved'
+            )
 
             GROUP BY
-                COALESCE(cr.requested_by, gs.employee_id),
+                ass.employee_id,
                 a.account_name,
                 st.shift_name,
                 day_name,

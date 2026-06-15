@@ -1632,6 +1632,159 @@ def deny_application(id: int):
         cursor.close()
         conn.close()
 
+@router.post("/finalize-completed-schedules")
+def finalize_completed_schedules(payload: dict = Body(...)):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        today = datetime.today().date()
+        current_week_start = today - timedelta(days=today.weekday())
+
+        # Find active published schedule rows from weeks before the current week.
+        cursor.execute("""
+            SELECT
+                gs.schedule_id
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            WHERE gs.company_id = %s
+            AND gs.is_archived = FALSE
+            AND s.shift_date < %s
+        """, (
+            company_id,
+            current_week_start
+        ))
+
+        completed_schedule_ids = [
+            row[0]
+            for row in cursor.fetchall()
+        ]
+
+        if not completed_schedule_ids:
+            return {
+                "message": "No completed schedules to finalize",
+                "finalized_count": 0
+            }
+
+        # Copy completed generated_schedule rows into assignments.
+        cursor.execute("""
+            INSERT INTO assignments (
+                shift_id,
+                employee_id,
+                status,
+                company_id,
+                role_id,
+                department_id
+            )
+            SELECT
+                gs.shift_id,
+                gs.employee_id,
+                'completed',
+                gs.company_id,
+                gs.role_id,
+                r.department_id
+            FROM generated_schedule gs
+            JOIN roles r
+                ON gs.role_id = r.role_id
+                AND gs.company_id = r.company_id
+            WHERE gs.company_id = %s
+            AND gs.schedule_id = ANY(%s::int[])
+            AND gs.employee_id IS NOT NULL
+        """, (
+            company_id,
+            completed_schedule_ids
+        ))
+
+        finalized_count = cursor.rowcount
+
+        # Find cover requests tied to finalized schedule rows.
+        cursor.execute("""
+            SELECT coverage_request_id
+            FROM coverage_requests
+            WHERE company_id = %s
+            AND schedule_id = ANY(%s::int[])
+        """, (
+            company_id,
+            completed_schedule_ids
+        ))
+
+        completed_coverage_request_ids = [
+            row[0]
+            for row in cursor.fetchall()
+        ]
+
+        # Delete old cover/application data so generated_schedule can be deleted safely.
+        if completed_coverage_request_ids:
+            cursor.execute("""
+                DELETE FROM emergency_cover_targets
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                completed_coverage_request_ids
+            ))
+
+            cursor.execute("""
+                DELETE FROM shift_applications
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                completed_coverage_request_ids
+            ))
+
+            cursor.execute("""
+                DELETE FROM coverage_requests
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                completed_coverage_request_ids
+            ))
+
+        # Remove finalized rows from generated_schedule.
+        cursor.execute("""
+            DELETE FROM generated_schedule
+            WHERE company_id = %s
+            AND schedule_id = ANY(%s::int[])
+        """, (
+            company_id,
+            completed_schedule_ids
+        ))
+
+        conn.commit()
+
+        return {
+            "message": "Completed schedules finalized",
+            "finalized_count": finalized_count
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("FINALIZE COMPLETED SCHEDULES ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
 @router.post("/save-schedule")
 def save_schedule(payload: dict = Body(...)):
     conn = get_connection()

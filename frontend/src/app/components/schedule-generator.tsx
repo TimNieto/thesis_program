@@ -201,6 +201,37 @@ export function ScheduleGenerator({
     }
   };
 
+  const finalizeCompletedSchedules = async () => {
+    try {
+      if (!companyId) return;
+
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/finalize-completed-schedules",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: companyId,
+          }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to finalize completed schedules");
+      }
+
+      if (data.finalized_count > 0) {
+        console.log("Finalized completed schedules:", data.finalized_count);
+      }
+    } catch (err) {
+      console.error("Failed to finalize completed schedules", err);
+    }
+  };
+
   const getOrderedLivestreams = (grouped: any) => {
     const groupedKeys = Object.keys(grouped || {});
 
@@ -316,10 +347,16 @@ useEffect(() => {
   useEffect(() => {
     if (!companyId) return;
 
-    fetchShiftTemplates();
-    fetchStaffingRequirements();
-    fetchAccounts();
-    fetchEmployees();
+    const initializeSchedulePage = async () => {
+      await finalizeCompletedSchedules();
+
+      fetchShiftTemplates();
+      fetchStaffingRequirements();
+      fetchAccounts();
+      fetchEmployees();
+    };
+
+    initializeSchedulePage();
   }, [companyId]);
 
   const loadSchedule = async () => {
