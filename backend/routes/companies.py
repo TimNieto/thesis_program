@@ -23,9 +23,10 @@ def ensure_company_settings(cursor, company_id: int):
             fairness_weight,
             absence_replacement_mode,
             enable_in_app_notifications,
-            gy_fatigue_penalty
+            gy_fatigue_penalty,
+            absence_tolerance
         )
-        VALUES (%s, 7, 2, 7, FALSE, 2, 'Automatic', TRUE, 20)
+        VALUES (%s, 7, 2, 7, FALSE, 2, 'Automatic', TRUE, 20, 50)
         ON CONFLICT (company_id)
         DO NOTHING
     """, (company_id,))

@@ -54,7 +54,7 @@ def record_absence_from_filled_cover(
 ):
     cursor.execute("""
         SELECT
-            s.shift_date
+            s.shift_date,
             gs.shift_id,
             gs.role_id
         FROM generated_schedule gs
@@ -100,6 +100,249 @@ def record_absence_from_filled_cover(
         company_id,
         shift_id,
         role_id
+    ))
+
+
+def archive_cover_history_for_schedule_ids(
+    cursor,
+    company_id: int,
+    schedule_ids: list[int],
+    archive_reason: str
+):
+    if not schedule_ids:
+        return
+
+    # Archive coverage requests first.
+    cursor.execute("""
+        INSERT INTO coverage_request_history (
+            coverage_request_id,
+            schedule_id,
+            company_id,
+
+            shift_id,
+            shift_date,
+
+            account_id,
+            account_name,
+
+            shift_template_id,
+            shift_name,
+
+            role_id,
+            role_key,
+
+            requested_by,
+            accepted_by,
+
+            reason,
+            status,
+            request_type,
+
+            created_at,
+            approved_at,
+            updated_at,
+
+            archive_reason,
+            archived_at
+        )
+        SELECT
+            cr.coverage_request_id,
+            cr.schedule_id,
+            cr.company_id,
+
+            gs.shift_id,
+            s.shift_date,
+
+            a.account_id,
+            a.account_name,
+
+            st.shift_template_id,
+            st.shift_name,
+
+            gs.role_id,
+            r.role_key,
+
+            cr.requested_by,
+            cr.accepted_by,
+
+            cr.reason,
+            cr.status,
+            cr.request_type,
+
+            cr.created_at,
+            cr.approved_at,
+            cr.updated_at,
+
+            %s,
+            NOW()
+        FROM coverage_requests cr
+
+        JOIN generated_schedule gs
+            ON cr.schedule_id = gs.schedule_id
+            AND cr.company_id = gs.company_id
+
+        JOIN shifts s
+            ON gs.shift_id = s.shift_id
+            AND gs.company_id = s.company_id
+
+        JOIN accounts a
+            ON s.account_id = a.account_id
+            AND s.company_id = a.company_id
+
+        JOIN shift_templates st
+            ON s.shift_template_id = st.shift_template_id
+            AND s.company_id = st.company_id
+            AND s.account_id = st.account_id
+
+        JOIN roles r
+            ON gs.role_id = r.role_id
+            AND gs.company_id = r.company_id
+
+        WHERE cr.company_id = %s
+        AND cr.schedule_id = ANY(%s::int[])
+
+        ON CONFLICT (company_id, coverage_request_id)
+        DO UPDATE SET
+            schedule_id = EXCLUDED.schedule_id,
+            shift_id = EXCLUDED.shift_id,
+            shift_date = EXCLUDED.shift_date,
+            account_id = EXCLUDED.account_id,
+            account_name = EXCLUDED.account_name,
+            shift_template_id = EXCLUDED.shift_template_id,
+            shift_name = EXCLUDED.shift_name,
+            role_id = EXCLUDED.role_id,
+            role_key = EXCLUDED.role_key,
+            requested_by = EXCLUDED.requested_by,
+            accepted_by = EXCLUDED.accepted_by,
+            reason = EXCLUDED.reason,
+            status = EXCLUDED.status,
+            request_type = EXCLUDED.request_type,
+            created_at = EXCLUDED.created_at,
+            approved_at = EXCLUDED.approved_at,
+            updated_at = EXCLUDED.updated_at,
+            archive_reason = EXCLUDED.archive_reason,
+            archived_at = NOW()
+    """, (
+        archive_reason,
+        company_id,
+        schedule_ids
+    ))
+
+    # Archive shift applications tied to those coverage requests.
+    cursor.execute("""
+        INSERT INTO shift_application_history (
+            shift_application_id,
+            coverage_request_id,
+            schedule_id,
+            company_id,
+
+            shift_id,
+            shift_date,
+
+            account_id,
+            account_name,
+
+            shift_template_id,
+            shift_name,
+
+            role_id,
+            role_key,
+
+            requested_by,
+            applicant_id,
+
+            reason,
+            status,
+
+            applied_at,
+            updated_at,
+
+            archive_reason,
+            archived_at
+        )
+        SELECT
+            sa.shift_application_id,
+            sa.coverage_request_id,
+            cr.schedule_id,
+            sa.company_id,
+
+            gs.shift_id,
+            s.shift_date,
+
+            a.account_id,
+            a.account_name,
+
+            st.shift_template_id,
+            st.shift_name,
+
+            gs.role_id,
+            r.role_key,
+
+            cr.requested_by,
+            sa.applicant_id,
+
+            sa.reason,
+            sa.status,
+
+            sa.applied_at,
+            sa.updated_at,
+
+            %s,
+            NOW()
+        FROM shift_applications sa
+
+        JOIN coverage_requests cr
+            ON sa.coverage_request_id = cr.coverage_request_id
+            AND sa.company_id = cr.company_id
+
+        JOIN generated_schedule gs
+            ON cr.schedule_id = gs.schedule_id
+            AND cr.company_id = gs.company_id
+
+        JOIN shifts s
+            ON gs.shift_id = s.shift_id
+            AND gs.company_id = s.company_id
+
+        JOIN accounts a
+            ON s.account_id = a.account_id
+            AND s.company_id = a.company_id
+
+        JOIN shift_templates st
+            ON s.shift_template_id = st.shift_template_id
+            AND s.company_id = st.company_id
+            AND s.account_id = st.account_id
+
+        JOIN roles r
+            ON gs.role_id = r.role_id
+            AND gs.company_id = r.company_id
+
+        WHERE sa.company_id = %s
+        AND cr.schedule_id = ANY(%s::int[])
+
+        ON CONFLICT (company_id, shift_application_id)
+        DO UPDATE SET
+            coverage_request_id = EXCLUDED.coverage_request_id,
+            schedule_id = EXCLUDED.schedule_id,
+            shift_id = EXCLUDED.shift_id,
+            shift_date = EXCLUDED.shift_date,
+            account_id = EXCLUDED.account_id,
+            account_name = EXCLUDED.account_name,
+            shift_template_id = EXCLUDED.shift_template_id,
+            shift_name = EXCLUDED.shift_name,
+            role_id = EXCLUDED.role_id,
+            role_key = EXCLUDED.role_key,
+            requested_by = EXCLUDED.requested_by,
+            applicant_id = EXCLUDED.applicant_id,
+            reason = EXCLUDED.reason,
+            status = EXCLUDED.status,
+            applied_at = EXCLUDED.applied_at,
+            updated_at = EXCLUDED.updated_at,
+            archive_reason = EXCLUDED.archive_reason,
+            archived_at = NOW()
+    """, (
+        archive_reason,
+        company_id,
+        schedule_ids
     ))
 
 
@@ -1717,6 +1960,13 @@ def finalize_completed_schedules(payload: dict = Body(...)):
 
         finalized_count = cursor.rowcount
 
+        archive_cover_history_for_schedule_ids(
+            cursor,
+            company_id,
+            completed_schedule_ids,
+            "finalized_week"
+        )
+
         # Find cover requests tied to finalized schedule rows.
         cursor.execute("""
             SELECT coverage_request_id
@@ -1846,6 +2096,13 @@ def save_schedule(payload: dict = Body(...)):
             row[0]
             for row in cursor.fetchall()
         ]
+
+        archive_cover_history_for_schedule_ids(
+            cursor,
+            company_id,
+            old_schedule_ids,
+            "week_republished"
+        )
 
         old_coverage_request_ids = []
 
@@ -2134,6 +2391,14 @@ def update_generated_schedule_employee(
         ]
 
         if coverage_request_ids:
+            archive_cover_history_for_schedule_ids(
+                cursor,
+                company_id,
+                [schedule_id],
+                "manual_override"
+            )
+
+            
             cursor.execute("""
                 DELETE FROM emergency_cover_targets
                 WHERE company_id = %s
