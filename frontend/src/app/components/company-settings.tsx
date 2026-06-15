@@ -75,6 +75,7 @@ export function CompanySettings({
   const [fairnessWeight, setFairnessWeight] = useState("3");
 
   const [gyPenalty, setGyPenalty] = useState("20");
+  const [absenceTolerance, setAbsenceTolerance] = useState("50");
   const [accountPolicies, setAccountPolicies] = useState<any[]>([]);
   const [savingChanges, setSavingChanges] = useState(false);
   const canShowSection = (
@@ -110,6 +111,8 @@ export function CompanySettings({
       setFairnessWeight(String(data.fairness_weight));
 
       setGyPenalty(String(data.gy_fatigue_penalty ?? 20));
+
+      setAbsenceTolerance(String(data.absence_tolerance ?? 50));
 
       setInAppNotifications(data.enable_in_app_notifications);
     } catch (err) {
@@ -172,6 +175,7 @@ export function CompanySettings({
             allow_double_shifts: doubleShiftAllowance,
             fairness_weight: Number(fairnessWeight),
             gy_fatigue_penalty: Number(gyPenalty),
+            absence_tolerance: Number(absenceTolerance),
             absence_replacement_mode: absenceReplacementMode,
             enable_in_app_notifications: inAppNotifications,
             updated_by: currentUser.id,
@@ -459,6 +463,30 @@ export function CompanySettings({
                 a previous GY shift
               </p>
             </div>
+
+          {/* Absence Tolerance */}
+          <div className="space-y-2">
+            <Label>Absence Tolerance</Label>
+
+            <Select value={absenceTolerance} onValueChange={setAbsenceTolerance}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="0">0 - Very Sensitive</SelectItem>
+                <SelectItem value="25">25 - Sensitive</SelectItem>
+                <SelectItem value="50">50 - Balanced</SelectItem>
+                <SelectItem value="75">75 - Tolerant</SelectItem>
+                <SelectItem value="100">100 - Very Tolerant</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <p className="text-xs text-gray-500">
+              Lower values make the genetic optimizer avoid employees with past absence
+              history more aggressively. Higher values make it more forgiving.
+            </p>
+          </div>
           </CardContent>
         </Card>
       )}

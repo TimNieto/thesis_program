@@ -24,7 +24,8 @@ def get_settings(company_id: int = 1):
                 cs.fairness_weight,
                 cs.absence_replacement_mode,
                 cs.enable_in_app_notifications,
-                cs.gy_fatigue_penalty
+                cs.gy_fatigue_penalty,
+                cs.absence_tolerance
             FROM company_settings cs
             JOIN companies c
                 ON cs.company_id = c.company_id
@@ -51,6 +52,7 @@ def get_settings(company_id: int = 1):
             "absence_replacement_mode": row[6],
             "enable_in_app_notifications": row[7],
             "gy_fatigue_penalty": row[8],
+            "absence_tolerance": row[9],
             "company_id": company_id
         }
 
@@ -82,6 +84,15 @@ def update_settings(payload: dict):
 
         gy_fatigue_penalty = max(0, min(100, gy_fatigue_penalty))
 
+        absence_tolerance = payload.get("absence_tolerance", 50)
+
+        try:
+            absence_tolerance = int(absence_tolerance)
+        except (TypeError, ValueError):
+            absence_tolerance = 50
+
+        absence_tolerance = max(0, min(100, absence_tolerance))
+
         cursor.execute("""
             UPDATE companies
             SET company_name = %s,
@@ -103,6 +114,7 @@ def update_settings(payload: dict):
                 absence_replacement_mode = %s,
                 enable_in_app_notifications = %s,
                 gy_fatigue_penalty = %s,
+                absence_tolerance = %s,
                 updated_at = NOW()
             WHERE company_id = %s
         """, (
@@ -114,6 +126,7 @@ def update_settings(payload: dict):
             payload["absence_replacement_mode"],
             payload.get("enable_in_app_notifications", True),
             gy_fatigue_penalty,
+            absence_tolerance,
             company_id
         ))
 

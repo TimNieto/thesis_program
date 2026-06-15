@@ -55,6 +55,8 @@ def record_absence_from_filled_cover(
     cursor.execute("""
         SELECT
             s.shift_date
+            gs.shift_id,
+            gs.role_id
         FROM generated_schedule gs
         JOIN shifts s
             ON gs.shift_id = s.shift_id
@@ -73,23 +75,31 @@ def record_absence_from_filled_cover(
         return
 
     shift_date = row[0]
+    shift_id = row[1]
+    role_id = row[2]
 
     cursor.execute("""
         INSERT INTO absences (
             employee_id,
             date,
             status,
-            company_id
+            company_id,
+            shift_id,
+            role_id
         )
-        VALUES (%s, %s, 'approved', %s)
+        VALUES (%s, %s, 'approved', %s, %s, %s)
         ON CONFLICT (company_id, employee_id, date)
         DO UPDATE SET
             status = 'approved',
+            shift_id = EXCLUDED.shift_id,
+            role_id = EXCLUDED.role_id,
             updated_at = NOW()
     """, (
         requester_id,
         shift_date,
-        company_id
+        company_id,
+        shift_id,
+        role_id
     ))
 
 

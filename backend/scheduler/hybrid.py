@@ -74,6 +74,40 @@ def get_day_name(shift_date):
     return shift_date.strftime("%A").lower()
 
 
+def clamp_int(value, default=50, minimum=0, maximum=100):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = default
+
+    return max(minimum, min(maximum, value))
+
+
+def get_absence_tolerance(settings):
+    return clamp_int(
+        settings.get("absence_tolerance", 50)
+        if settings
+        else 50
+    )
+
+
+def get_absence_sensitivity(settings):
+    tolerance = get_absence_tolerance(settings)
+
+    # 0 tolerance  = 2.0x absence penalty
+    # 50 tolerance = 1.0x absence penalty
+    # 100 tolerance = 0.0x absence penalty
+    return (100 - tolerance) / 50
+
+
+def get_dynamic_mutation_rate(settings):
+    tolerance = get_absence_tolerance(settings)
+
+    # strict absence behavior mutates more often
+    # tolerant behavior mutates less often
+    return 0.15 + ((100 - tolerance) / 100) * 0.45
+
+
 def history_key(assignment):
     return (
         assignment["employee_id"],
@@ -84,30 +118,36 @@ def history_key(assignment):
     )
 
 
-def historical_score(assignment, history_scores):
+def historical_score(assignment, history_scores, settings=None):
     data = history_scores.get(
         history_key(assignment),
         {
             "cover_requests": 0,
             "emergency_requests": 0,
             "applications": 0,
-            "successful_assignments": 0
+            "successful_assignments": 0,
+            "absences": 0
         }
     )
 
     score = 0
 
+    absence_sensitivity = get_absence_sensitivity(settings)
+
     # repeated cover requests = negative compatibility
-    score -= data["cover_requests"] * 30
+    score -= data.get("cover_requests", 0) * 30
 
     # emergency covers are stronger negative signal
-    score -= data["emergency_requests"] * 60
+    score -= data.get("emergency_requests", 0) * 60
+
+    # past approved absences are controlled by absence_tolerance
+    score -= data.get("absences", 0) * 80 * absence_sensitivity
 
     # voluntarily applying to similar shift = positive signal
-    score += data["applications"] * 15
+    score += data.get("applications", 0) * 15
 
-    # completed shift without cover request = small reliability signal
-    score += data["successful_assignments"] * 4
+    # completed shift without issue = reliability signal
+    score += data.get("successful_assignments", 0) * 4
 
     return score
 
@@ -148,7 +188,13 @@ def remove_overfilled_assignments(assignments, shifts):
     return cleaned
 
 
-def evaluate_schedule(individual, history_scores, shifts=None, account_settings=None):
+def evaluate_schedule(
+    individual,
+    history_scores,
+    shifts=None,
+    account_settings=None,
+    settings=None
+):
     assignments = individual["assignments"]
 
     if shifts is not None:
@@ -175,7 +221,7 @@ def evaluate_schedule(individual, history_scores, shifts=None, account_settings=
 
     # historical compatibility
     for a in assignments:
-        score += historical_score(a, history_scores)
+        score += historical_score(a, history_scores, settings)
 
     # fairness
     counts = defaultdict(int)
@@ -302,7 +348,8 @@ def validate_individual_constraints(
         individual,
         history_scores,
         shifts,
-        account_settings
+        account_settings,
+        settings
     )
 
 
@@ -336,7 +383,9 @@ def mutate_schedule(
     if not child["assignments"]:
         return child
 
-    if random.random() > MUTATION_RATE:
+    mutation_rate = get_dynamic_mutation_rate(settings)
+
+    if random.random() > mutation_rate:
         return child
 
     shift_map = {
@@ -409,9 +458,10 @@ def mutate_schedule(
             ),
             "HISTORY:",
             historical_score(
-                temp_assignment,
-                history_scores
-            )
+            temp_assignment,
+            history_scores,
+            settings
+        )
         )
 
         return (
@@ -423,7 +473,8 @@ def mutate_schedule(
             )
             + historical_score(
                 temp_assignment,
-                history_scores
+                history_scores,
+                settings
             )
         )
 
@@ -450,11 +501,12 @@ def mutate_schedule(
         child,
         history_scores,
         shifts,
-        account_settings
+        account_settings,
+        settings
     )
 
 
-def crossover(parent_a, parent_b, history_scores, shifts, account_settings):
+def crossover(parent_a, parent_b, history_scores, shifts, account_settings, settings = None):
     child_map = {}
 
     parent_a_map = {
@@ -488,7 +540,8 @@ def crossover(parent_a, parent_b, history_scores, shifts, account_settings):
         child,
         history_scores,
         shifts,
-        account_settings
+        account_settings,
+        settings
     )
 
 
@@ -535,7 +588,8 @@ def generate_schedule(
         },
         history_scores,
         shifts,
-        account_settings
+        account_settings,
+        settings
     )
 
     print("GREEDY SEED ASSIGNMENTS:", len(seed["assignments"]))
@@ -605,7 +659,8 @@ def generate_schedule(
                 parent_b,
                 history_scores,
                 shifts,
-                account_settings
+                account_settings,
+                settings
             )
 
             child = validate_individual_constraints(

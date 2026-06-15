@@ -398,7 +398,8 @@ def fetch_company_settings(cursor, company_id: int):
             max_shifts_per_week,
             allow_double_shifts,
             fairness_weight,
-            gy_fatigue_penalty
+            gy_fatigue_penalty,
+            absence_tolerance
         FROM company_settings
         WHERE company_id = %s
         LIMIT 1
@@ -415,7 +416,8 @@ def fetch_company_settings(cursor, company_id: int):
         "max_shifts_per_week": row[2],
         "allow_double_shifts": row[3],
         "fairness_weight": row[4],
-        "gy_fatigue_penalty": row[5] or 20
+        "gy_fatigue_penalty": row[5] or 20,
+        "absence_tolerance": row[6] if row[6] is not None else 50
     }
 
 
@@ -447,6 +449,8 @@ def fetch_account_settings(cursor, company_id: int):
 
 
 def fetch_history_scores(cursor, company_id: int):
+    history = {}
+
     try:
         cursor.execute("""
             SELECT
@@ -499,30 +503,99 @@ def fetch_history_scores(cursor, company_id: int):
 
         rows = cursor.fetchall()
 
+        for r in rows:
+            if not r[0] or not r[1] or not r[2] or not r[3] or not r[4]:
+                continue
+
+            key = (
+                r[0],
+                r[1].lower(),
+                r[2].lower(),
+                r[3].strip().lower(),
+                r[4].lower()
+            )
+
+            history[key] = {
+                "cover_requests": r[5] or 0,
+                "emergency_requests": r[6] or 0,
+                "applications": r[7] or 0,
+                "successful_assignments": r[8] or 0,
+                "absences": 0
+            }
+
     except Exception as e:
-        print("FETCH HISTORY SCORES SKIPPED:", e)
+        print("FETCH ASSIGNMENT HISTORY SCORES SKIPPED:", e)
         return {}
 
-    history = {}
+    try:
+        cursor.execute("""
+            SELECT
+                ab.employee_id,
+                a.account_name,
+                st.shift_name,
+                TRIM(TO_CHAR(s.shift_date, 'Day')) AS day_name,
+                r.role_key,
+                COUNT(*) AS absences
+            FROM absences ab
 
-    for r in rows:
-        if not r[0] or not r[1] or not r[2] or not r[3] or not r[4]:
-            continue
+            JOIN shifts s
+                ON ab.shift_id = s.shift_id
+                AND ab.company_id = s.company_id
 
-        key = (
-            r[0],
-            r[1].lower(),
-            r[2].lower(),
-            r[3].strip().lower(),
-            r[4].lower()
-        )
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
 
-        history[key] = {
-            "cover_requests": r[5] or 0,
-            "emergency_requests": r[6] or 0,
-            "applications": r[7] or 0,
-            "successful_assignments": r[8] or 0
-        }
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
+
+            JOIN roles r
+                ON ab.role_id = r.role_id
+                AND ab.company_id = r.company_id
+
+            WHERE ab.company_id = %s
+            AND LOWER(COALESCE(ab.status, '')) = 'approved'
+            AND ab.employee_id IS NOT NULL
+            AND ab.shift_id IS NOT NULL
+            AND ab.role_id IS NOT NULL
+
+            GROUP BY
+                ab.employee_id,
+                a.account_name,
+                st.shift_name,
+                day_name,
+                r.role_key
+        """, (company_id,))
+
+        absence_rows = cursor.fetchall()
+
+        for r in absence_rows:
+            if not r[0] or not r[1] or not r[2] or not r[3] or not r[4]:
+                continue
+
+            key = (
+                r[0],
+                r[1].lower(),
+                r[2].lower(),
+                r[3].strip().lower(),
+                r[4].lower()
+            )
+
+            if key not in history:
+                history[key] = {
+                    "cover_requests": 0,
+                    "emergency_requests": 0,
+                    "applications": 0,
+                    "successful_assignments": 0,
+                    "absences": 0
+                }
+
+            history[key]["absences"] = r[5] or 0
+
+    except Exception as e:
+        print("FETCH ABSENCE HISTORY SCORES SKIPPED:", e)
 
     return history
 
