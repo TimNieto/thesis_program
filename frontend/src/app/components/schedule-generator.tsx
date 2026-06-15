@@ -926,7 +926,7 @@ const getVisibleShifts = (livestream: string) => {
     );
   };
 
-  const weekLabel = leaveWeekOffset === 0 ? "This Week" : "Next Week";
+  const weekLabel = scheduleWeekOffset === 0 ? "This Week" : "Next Week";
 
   return (
     <div className="space-y-6">
@@ -1266,8 +1266,8 @@ const getVisibleShifts = (livestream: string) => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setLeaveWeekOffset(0)}
-                      disabled={leaveWeekOffset === 0}
+                      onClick={() => setScheduleWeekOffset(0)}
+                      disabled={scheduleWeekOffset === 0}
                       className="gap-2"
                     >
                       <ChevronLeft className="size-4" />
@@ -1276,8 +1276,8 @@ const getVisibleShifts = (livestream: string) => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setLeaveWeekOffset(1)}
-                      disabled={leaveWeekOffset === 1}
+                      onClick={() => setScheduleWeekOffset(1)}
+                      disabled={scheduleWeekOffset === 1}
                       className="gap-2"
                     >
                       Next Week
