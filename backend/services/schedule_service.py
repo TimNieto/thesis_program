@@ -720,74 +720,6 @@ def get_generated_schedule(
         if week_start and week_end:
             date_filter = "AND s.shift_date BETWEEN %s AND %s"
             params.extend([week_start, week_end])
-        cursor.execute("""
-            SELECT
-                g.schedule_id,
-                g.shift_id,
-                s.shift_date,
-                a.account_name,
-                st.shift_name,
-                e.employee_id,
-                e.full_name,
-                r.role_key,
-                g.slot_index
-            FROM generated_schedule g
-
-            JOIN shifts s
-                ON g.shift_id = s.shift_id
-                AND g.company_id = s.company_id
-
-            JOIN accounts a
-                ON s.account_id = a.account_id
-                AND s.company_id = a.company_id
-
-            JOIN shift_templates st
-                ON s.shift_template_id = st.shift_template_id
-                AND s.company_id = st.company_id
-
-            JOIN roles r
-                ON g.role_id = r.role_id
-                AND g.company_id = r.company_id
-
-            LEFT JOIN employees e
-                ON g.employee_id = e.employee_id
-                AND g.company_id = e.company_id
-
-            WHERE g.company_id = %s
-            AND g.is_archived = FALSE
-            {date_filter}
-
-            ORDER BY
-                s.shift_date,
-                a.account_id,
-                st.start_time,
-                r.role_key,
-                g.slot_index
-        """, (company_id,))
-
-        rows = cursor.fetchall()
-
-        assignments = [
-            {
-                "schedule_id": r[0],
-                "shift_id": r[1],
-                "shift_date": r[2],
-                "account": r[3],
-                "shift_type": r[4],
-                "employee_id": r[5],
-                "employee_name": r[6] if r[6] else "",
-                "role": r[7],
-                "slot_index": r[8]
-            }
-            for r in rows
-        ]
-
-        active_roles = fetch_active_staffing_roles(cursor, company_id)
-
-        grouped = group_schedule(
-            assignments,
-            active_roles
-        )
 
         cursor.execute(f"""
             SELECT
@@ -813,6 +745,7 @@ def get_generated_schedule(
             JOIN shift_templates st
                 ON s.shift_template_id = st.shift_template_id
                 AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
 
             JOIN roles r
                 ON g.role_id = r.role_id
@@ -833,6 +766,38 @@ def get_generated_schedule(
                 r.role_key,
                 g.slot_index
         """, tuple(params))
+
+        rows = cursor.fetchall()
+
+        assignments = [
+            {
+                "schedule_id": r[0],
+                "shift_id": r[1],
+                "shift_date": r[2],
+                "account": r[3],
+                "shift_type": r[4],
+                "employee_id": r[5],
+                "employee_name": r[6] if r[6] else "",
+                "role": r[7],
+                "slot_index": r[8]
+            }
+            for r in rows
+        ]
+
+        active_roles = fetch_active_staffing_roles(cursor, company_id)
+
+        grouped = group_schedule(
+            assignments,
+            active_roles
+        )
+
+        cursor.execute("""
+            SELECT account_name
+            FROM accounts
+            WHERE company_id = %s
+            AND is_active = TRUE
+            ORDER BY account_id ASC
+        """, (company_id,))
 
         account_rows = cursor.fetchall()
 
