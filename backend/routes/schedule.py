@@ -10,6 +10,42 @@ from services.role_service import get_company_admin_employee_ids
 
 router = APIRouter()
 
+def parse_ymd(value: str, field_name: str):
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field_name} must be YYYY-MM-DD"
+        )
+
+
+def require_week_bounds(payload: dict):
+    week_start_raw = payload.get("week_start")
+    week_end_raw = payload.get("week_end")
+
+    if not week_start_raw or not week_end_raw:
+        raise HTTPException(
+            status_code=400,
+            detail="week_start and week_end are required"
+        )
+
+    week_start = parse_ymd(week_start_raw, "week_start")
+    week_end = parse_ymd(week_end_raw, "week_end")
+
+    if week_end < week_start:
+        raise HTTPException(
+            status_code=400,
+            detail="week_end cannot be before week_start"
+        )
+
+    return week_start, week_end
+
+
+def is_current_week_range(week_start, week_end):
+    today = datetime.today().date()
+    return week_start <= today <= week_end
+
 def record_absence_from_filled_cover(
     cursor,
     requester_id: int,
@@ -365,9 +401,17 @@ def generate_schedule(company_id: int):
         raise HTTPException(status_code=500, detail=str(e)) 
     
 @router.get("/generated-schedule")
-def get_schedule(company_id: int):
+def get_schedule(
+    company_id: int,
+    week_start: str | None = None,
+    week_end: str | None = None
+):
     try:
-        result = get_generated_schedule(company_id)
+        result = get_generated_schedule(
+            company_id,
+            week_start,
+            week_end
+        )
 
         return {
             "status": "success",
@@ -1596,40 +1640,111 @@ def save_schedule(payload: dict = Body(...)):
     assignments = payload.get("assignments", [])
     saved_by = payload.get("saved_by")
     company_id = payload.get("company_id")
+    week_start, week_end = require_week_bounds(payload)
+    force_republish_current_week = bool(
+        payload.get("force_republish_current_week", False)
+    )
 
     if not company_id:
         raise HTTPException(
             status_code=400,
             detail="company_id is required"
         )
+    
+    if is_current_week_range(week_start, week_end) and not force_republish_current_week:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This week is already in progress. "
+                "Full schedule replacement is blocked. "
+                "Use manual edits or explicitly force republish."
+            )
+        )
 
     try:
-        # Archive only this company's current active schedule/requests.
+        # Find existing published schedule rows for this same company/week only.
         cursor.execute("""
-            UPDATE emergency_cover_targets
-            SET is_archived = TRUE
-            WHERE company_id = %s
-        """, (company_id,))
+            SELECT
+                gs.schedule_id
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            WHERE gs.company_id = %s
+            AND gs.is_archived = FALSE
+            AND s.shift_date BETWEEN %s AND %s
+        """, (
+            company_id,
+            week_start,
+            week_end
+        ))
 
-        cursor.execute("""
-            UPDATE shift_applications
-            SET is_archived = TRUE
-            WHERE company_id = %s
-        """, (company_id,))
+        old_schedule_ids = [
+            row[0]
+            for row in cursor.fetchall()
+        ]
 
-        cursor.execute("""
-            UPDATE coverage_requests
-            SET is_archived = TRUE
-            WHERE company_id = %s
-        """, (company_id,))
+        old_coverage_request_ids = []
 
-        cursor.execute("""
-            UPDATE generated_schedule
-            SET is_archived = TRUE
-            WHERE company_id = %s
-        """, (company_id,))
+        if old_schedule_ids:
+            cursor.execute("""
+                SELECT coverage_request_id
+                FROM coverage_requests
+                WHERE company_id = %s
+                AND schedule_id = ANY(%s::int[])
+                AND is_archived = FALSE
+            """, (
+                company_id,
+                old_schedule_ids
+            ))
 
-        # Allowed counts per actual shift + role_id.
+            old_coverage_request_ids = [
+                row[0]
+                for row in cursor.fetchall()
+            ]
+
+        # Hard-delete old cover/application rows tied to the week being replaced.
+        # This avoids broken references when old generated_schedule rows are deleted.
+        if old_coverage_request_ids:
+            cursor.execute("""
+                DELETE FROM emergency_cover_targets
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                old_coverage_request_ids
+            ))
+
+            cursor.execute("""
+                DELETE FROM shift_applications
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                old_coverage_request_ids
+            ))
+
+            cursor.execute("""
+                DELETE FROM coverage_requests
+                WHERE company_id = %s
+                AND coverage_request_id = ANY(%s::int[])
+            """, (
+                company_id,
+                old_coverage_request_ids
+            ))
+
+        # Delete only the old published generated_schedule rows for the selected week.
+        if old_schedule_ids:
+            cursor.execute("""
+                DELETE FROM generated_schedule
+                WHERE company_id = %s
+                AND schedule_id = ANY(%s::int[])
+            """, (
+                company_id,
+                old_schedule_ids
+            ))
+
+        # Allowed counts per actual shift + role_id for the selected week only.
         cursor.execute("""
             SELECT
                 s.shift_id,
@@ -1648,10 +1763,16 @@ def save_schedule(payload: dict = Body(...)):
                 AND ssr.company_id = r.company_id
 
             WHERE s.company_id = %s
+            AND s.shift_date BETWEEN %s AND %s
             AND ssr.company_id = %s
             AND ssr.is_active = TRUE
             AND r.is_active = TRUE
-        """, (company_id, company_id))
+        """, (
+            company_id,
+            week_start,
+            week_end,
+            company_id
+        ))
 
         allowed_counts = {}
         role_id_map = {}

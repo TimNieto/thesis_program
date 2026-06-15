@@ -302,12 +302,16 @@ export function ScheduleGenerator({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-  const [leaveWeekOffset, setLeaveWeekOffset] = useState(0); // 0 = current week, 1 = next week
-  const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
+const [scheduleWeekOffset, setScheduleWeekOffset] = useState<0 | 1>(0);
+const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
+const selectedWeekDates = getWeekDates(scheduleWeekOffset);
+const selectedWeekStart = formatDate(selectedWeekDates[0]);
+const selectedWeekEnd = formatDate(selectedWeekDates[6]);
 
-  useEffect(() => {
-    setWeekDates(getWeekDates(leaveWeekOffset));
-  }, [leaveWeekOffset]);
+useEffect(() => {
+  setWeekDates(getWeekDates(scheduleWeekOffset));
+  setScheduleMode("saved");
+}, [scheduleWeekOffset]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -320,13 +324,17 @@ export function ScheduleGenerator({
 
   const loadSchedule = async () => {
     try {
+      const dates = getWeekDates(scheduleWeekOffset);
+      const weekStart = formatDate(dates[0]);
+      const weekEnd = formatDate(dates[6]);
+
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${companyId}`,
+        `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${companyId}&week_start=${weekStart}&week_end=${weekEnd}`,
       );
 
       const data = await res.json();
 
-      setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
+      setWeekDates(dates);
 
       if (!data.grouped_schedule) return;
 
@@ -371,7 +379,7 @@ export function ScheduleGenerator({
     if (accountOrder.length > 0) {
       loadSchedule();
     }
-  }, [accountOrder]);
+  }, [accountOrder, scheduleWeekOffset]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -642,13 +650,22 @@ const getShiftTemplateForAccount = (
 };
 
   const generateSchedule = async () => {
+    if (scheduleWeekOffset !== 1) {
+      toast.error("Switch to Next Week before generating a new schedule.");
+      return;
+    }
+
     try {
+      const dates = getWeekDates(1);
+      const weekStart = formatDate(dates[0]);
+      const weekEnd = formatDate(dates[6]);
+
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/generate-schedule?company_id=${companyId}`,
+        `https://backend-production-6e75.up.railway.app/generate-schedule?company_id=${companyId}&week_start=${weekStart}&week_end=${weekEnd}`,
       );
       const data = await res.json();
 
-      setWeekDates(getWeekDatesFromAssignments(data.assignments || []));
+      setWeekDates(dates);
 
       console.log("API RESPONSE:", data);
 
@@ -770,10 +787,13 @@ const getShiftTemplateForAccount = (
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            assignments: payload,
-            saved_by: currentUserId,
-            company_id: companyId,
-          }),
+          assignments: payload,
+          saved_by: currentUserId,
+          company_id: companyId,
+          week_start: selectedWeekStart,
+          week_end: selectedWeekEnd,
+          force_republish_current_week: false,
+        }),
         },
       );
 
@@ -918,10 +938,28 @@ const getVisibleShifts = (livestream: string) => {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <Select
+            value={String(scheduleWeekOffset)}
+            onValueChange={(value) => setScheduleWeekOffset(Number(value) as 0 | 1)}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Select week" />
+            </SelectTrigger>
+
+            <SelectContent>
+              <SelectItem value="0">This Week</SelectItem>
+              <SelectItem value="1">Next Week</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Badge variant="secondary">{role}</Badge>
           {role === "admin" && (
             <>
-              <Button onClick={generateSchedule} className="gap-2">
+              <Button
+                onClick={generateSchedule}
+                className="gap-2"
+                disabled={scheduleWeekOffset !== 1}
+              >
                 Generate Schedule
               </Button>
               <Button

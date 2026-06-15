@@ -705,11 +705,21 @@ def generate_weekly_schedule(company_id: int):
         cursor.close()
         conn.close()
 
-def get_generated_schedule(company_id: int):
+def get_generated_schedule(
+    company_id: int,
+    week_start: str | None = None,
+    week_end: str | None = None
+):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
+        date_filter = ""
+        params = [company_id]
+
+        if week_start and week_end:
+            date_filter = "AND s.shift_date BETWEEN %s AND %s"
+            params.extend([week_start, week_end])
         cursor.execute("""
             SELECT
                 g.schedule_id,
@@ -745,6 +755,7 @@ def get_generated_schedule(company_id: int):
 
             WHERE g.company_id = %s
             AND g.is_archived = FALSE
+            {date_filter}
 
             ORDER BY
                 s.shift_date,
@@ -778,13 +789,50 @@ def get_generated_schedule(company_id: int):
             active_roles
         )
 
-        cursor.execute("""
-            SELECT account_name
-            FROM accounts
-            WHERE company_id = %s
-            AND is_active = TRUE
-            ORDER BY account_id ASC
-        """, (company_id,))
+        cursor.execute(f"""
+            SELECT
+                g.schedule_id,
+                g.shift_id,
+                s.shift_date,
+                a.account_name,
+                st.shift_name,
+                e.employee_id,
+                e.full_name,
+                r.role_key,
+                g.slot_index
+            FROM generated_schedule g
+
+            JOIN shifts s
+                ON g.shift_id = s.shift_id
+                AND g.company_id = s.company_id
+
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+
+            JOIN roles r
+                ON g.role_id = r.role_id
+                AND g.company_id = r.company_id
+
+            LEFT JOIN employees e
+                ON g.employee_id = e.employee_id
+                AND g.company_id = e.company_id
+
+            WHERE g.company_id = %s
+            AND g.is_archived = FALSE
+            {date_filter}
+
+            ORDER BY
+                s.shift_date,
+                a.account_id,
+                st.start_time,
+                r.role_key,
+                g.slot_index
+        """, tuple(params))
 
         account_rows = cursor.fetchall()
 
