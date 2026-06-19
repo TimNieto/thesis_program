@@ -795,6 +795,363 @@ def update_employee_account_preferences(employee_id: int, data: dict):
         conn.close()
 
 
+@router.post("/account-preferences-import")
+async def import_account_preferences(
+    company_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to identify your company. Please sign in again."
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. Only .csv files are allowed."
+            )
+
+        content = await file.read()
+
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File must be UTF-8 encoded."
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File is empty."
+            )
+
+        normalized_headers = [
+            normalize_csv_header(header)
+            for header in reader.fieldnames
+            if header
+        ]
+
+        required_headers = [
+            "employee_name",
+            "department_name",
+            "role_name",
+            "account_name",
+            "is_preferred"
+        ]
+
+        if normalized_headers != required_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid CSV file. Required exact header: "
+                    "employee_name,department_name,role_name,account_name,is_preferred"
+                )
+            )
+
+        rows = []
+        errors = []
+        seen_rows = set()
+
+        for row_number, row in enumerate(reader, start=2):
+            normalized_row = {
+                normalize_csv_header(key): value
+                for key, value in row.items()
+                if key
+            }
+
+            employee_name = normalize_csv_text(
+                normalized_row.get("employee_name")
+            )
+            department_name = normalize_csv_text(
+                normalized_row.get("department_name")
+            )
+            role_name = normalize_csv_text(
+                normalized_row.get("role_name")
+            )
+            account_name = normalize_csv_text(
+                normalized_row.get("account_name")
+            )
+            is_preferred_text = normalize_csv_text(
+                normalized_row.get("is_preferred")
+            ).lower()
+
+            if (
+                not employee_name
+                and not department_name
+                and not role_name
+                and not account_name
+                and not is_preferred_text
+            ):
+                continue
+
+            if not employee_name:
+                errors.append(f"Row {row_number}: employee_name is required")
+
+            if not department_name:
+                errors.append(f"Row {row_number}: department_name is required")
+
+            if not role_name:
+                errors.append(f"Row {row_number}: role_name is required")
+
+            if not account_name:
+                errors.append(f"Row {row_number}: account_name is required")
+
+            if not is_preferred_text:
+                errors.append(f"Row {row_number}: is_preferred is required")
+            elif is_preferred_text not in ["yes", "no"]:
+                errors.append(
+                    f"Row {row_number}: is_preferred must be yes or no"
+                )
+
+            duplicate_key = (
+                employee_name.lower(),
+                department_name.lower(),
+                role_name.lower(),
+                account_name.lower()
+            )
+
+            if duplicate_key in seen_rows:
+                errors.append(
+                    f"Row {row_number}: duplicate employee, department, role, and account combination"
+                )
+            else:
+                seen_rows.add(duplicate_key)
+
+            if errors:
+                continue
+
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE company_id = %s
+                AND LOWER(full_name) = LOWER(%s)
+                AND employment_status = 'Active'
+                LIMIT 1
+            """, (
+                company_id,
+                employee_name
+            ))
+
+            employee = cursor.fetchone()
+
+            if not employee:
+                errors.append(
+                    f"Row {row_number}: employee does not exist or is inactive: {employee_name}"
+                )
+                continue
+
+            employee_id = employee[0]
+
+            cursor.execute("""
+                SELECT department_id
+                FROM departments
+                WHERE company_id = %s
+                AND LOWER(department_name) = LOWER(%s)
+                AND is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                department_name
+            ))
+
+            department = cursor.fetchone()
+
+            if not department:
+                errors.append(
+                    f"Row {row_number}: department does not exist or is inactive: {department_name}"
+                )
+                continue
+
+            department_id = department[0]
+
+            cursor.execute("""
+                SELECT account_id
+                FROM accounts
+                WHERE company_id = %s
+                AND department_id = %s
+                AND LOWER(account_name) = LOWER(%s)
+                AND is_active = TRUE
+                LIMIT 1
+            """, (
+                company_id,
+                department_id,
+                account_name
+            ))
+
+            account = cursor.fetchone()
+
+            if not account:
+                errors.append(
+                    f"Row {row_number}: account does not exist, is inactive, or does not belong to department: {account_name}"
+                )
+                continue
+
+            account_id = account[0]
+
+            cursor.execute("""
+                SELECT role_id
+                FROM roles
+                WHERE company_id = %s
+                AND department_id = %s
+                AND LOWER(role_name) = LOWER(%s)
+                AND is_active = TRUE
+                AND is_admin = FALSE
+                LIMIT 1
+            """, (
+                company_id,
+                department_id,
+                role_name
+            ))
+
+            role = cursor.fetchone()
+
+            if not role:
+                errors.append(
+                    f"Row {row_number}: role does not exist, is inactive, is admin, or does not belong to department: {role_name}"
+                )
+                continue
+
+            role_id = role[0]
+
+            cursor.execute("""
+                SELECT 1
+                FROM employee_roles er
+                JOIN roles r
+                    ON er.role_id = r.role_id
+                    AND er.company_id = r.company_id
+                WHERE er.company_id = %s
+                AND er.employee_id = %s
+                AND er.role_id = %s
+                AND er.is_active = TRUE
+                AND r.is_active = TRUE
+                AND r.is_admin = FALSE
+                LIMIT 1
+            """, (
+                company_id,
+                employee_id,
+                role_id
+            ))
+
+            active_employee_role = cursor.fetchone()
+
+            if not active_employee_role:
+                errors.append(
+                    f"Row {row_number}: employee does not have this active role: {employee_name} / {role_name}"
+                )
+                continue
+
+            rows.append({
+                "row_number": row_number,
+                "employee_id": employee_id,
+                "department_id": department_id,
+                "role_id": role_id,
+                "account_id": account_id,
+                "is_preferred": is_preferred_text == "yes"
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid account preferences import data",
+                    "errors": errors
+                }
+            )
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV has no valid account preference rows"
+            )
+
+        activated_rows = 0
+        deactivated_rows = 0
+
+        for row in rows:
+            if row["is_preferred"]:
+                cursor.execute("""
+                    INSERT INTO account_preferences (
+                        employee_id,
+                        account_id,
+                        role_id,
+                        company_id,
+                        department_id,
+                        is_active
+                    )
+                    VALUES (%s, %s, %s, %s, %s, TRUE)
+                    ON CONFLICT (
+                        company_id,
+                        employee_id,
+                        account_id,
+                        role_id
+                    )
+                    DO UPDATE SET
+                        department_id = EXCLUDED.department_id,
+                        is_active = TRUE
+                """, (
+                    row["employee_id"],
+                    row["account_id"],
+                    row["role_id"],
+                    company_id,
+                    row["department_id"]
+                ))
+
+                activated_rows += 1
+
+            else:
+                cursor.execute("""
+                    UPDATE account_preferences
+                    SET is_active = FALSE
+                    WHERE company_id = %s
+                    AND employee_id = %s
+                    AND account_id = %s
+                    AND role_id = %s
+                    AND is_active = TRUE
+                """, (
+                    company_id,
+                    row["employee_id"],
+                    row["account_id"],
+                    row["role_id"]
+                ))
+
+                if cursor.rowcount > 0:
+                    deactivated_rows += 1
+
+        conn.commit()
+
+        return {
+            "message": "Account preferences imported successfully",
+            "rows_imported": len(rows),
+            "activated_rows": activated_rows,
+            "deactivated_rows": deactivated_rows
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("ACCOUNT PREFERENCES IMPORT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to import account preferences"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+        
 @router.post("/employees")
 def add_employee(data: dict):
     conn = get_connection()
