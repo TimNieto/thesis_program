@@ -3,6 +3,7 @@
 
 import csv
 import io
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db.database import get_connection
 from passlib.hash import bcrypt
@@ -52,6 +53,44 @@ def normalize_title_text(value: str) -> str:
 
 def normalize_person_name(value: str) -> str:
     return normalize_title_text(value)
+
+def normalize_csv_header(value: str) -> str:
+    return str(value or "").strip().lower().replace(" ", "_")
+
+
+def normalize_csv_text(value) -> str:
+    return " ".join(str(value or "").strip().split())
+
+
+def parse_availability_import_time(value: str):
+    value = normalize_csv_text(value)
+
+    formats = [
+        "%H:%M",
+        "%H:%M:%S"
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(value, fmt).time()
+        except ValueError:
+            pass
+
+    return None
+
+
+def normalize_day_of_week(value: str):
+    day_lookup = {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday",
+        "saturday": "Saturday",
+        "sunday": "Sunday",
+    }
+
+    return day_lookup.get(normalize_csv_text(value).lower())
 
 
 @router.get("/employees")
@@ -2852,6 +2891,337 @@ def update_global_availability(data: dict):
         raise HTTPException(
             status_code=500,
             detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.post("/availability-import")
+async def import_availability(
+    company_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. Only .csv files are allowed."
+            )
+
+        content = await file.read()
+
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File must be UTF-8 encoded."
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid CSV file. File is empty."
+            )
+
+        normalized_headers = [
+            normalize_csv_header(header)
+            for header in reader.fieldnames
+            if header
+        ]
+
+        required_headers = [
+            "employee_name",
+            "day_of_week",
+            "start_time",
+            "end_time",
+            "is_available"
+        ]
+
+        if normalized_headers != required_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid CSV file. Required exact header: "
+                    "employee_name,day_of_week,start_time,end_time,is_available"
+                )
+            )
+
+        rows = []
+        errors = []
+        duplicate_keys = set()
+
+        for row_number, row in enumerate(reader, start=2):
+            normalized_row = {
+                normalize_csv_header(key): value
+                for key, value in row.items()
+                if key
+            }
+
+            employee_name = normalize_csv_text(
+                normalized_row.get("employee_name")
+            )
+            raw_day_of_week = normalize_csv_text(
+                normalized_row.get("day_of_week")
+            )
+            raw_start_time = normalize_csv_text(
+                normalized_row.get("start_time")
+            )
+            raw_end_time = normalize_csv_text(
+                normalized_row.get("end_time")
+            )
+            raw_is_available = normalize_csv_text(
+                normalized_row.get("is_available")
+            ).lower()
+
+            if (
+                not employee_name
+                and not raw_day_of_week
+                and not raw_start_time
+                and not raw_end_time
+                and not raw_is_available
+            ):
+                continue
+
+            day_of_week = normalize_day_of_week(raw_day_of_week)
+            start_time = parse_availability_import_time(raw_start_time)
+            end_time = parse_availability_import_time(raw_end_time)
+
+            if not employee_name:
+                errors.append(f"Row {row_number}: employee_name is required")
+
+            if not raw_day_of_week:
+                errors.append(f"Row {row_number}: day_of_week is required")
+            elif not day_of_week:
+                errors.append(
+                    f"Row {row_number}: day_of_week must be Monday through Sunday"
+                )
+
+            if not raw_start_time:
+                errors.append(f"Row {row_number}: start_time is required")
+            elif not start_time:
+                errors.append(
+                    f"Row {row_number}: invalid start_time format: {raw_start_time}"
+                )
+
+            if not raw_end_time:
+                errors.append(f"Row {row_number}: end_time is required")
+            elif not end_time:
+                errors.append(
+                    f"Row {row_number}: invalid end_time format: {raw_end_time}"
+                )
+
+            if not raw_is_available:
+                errors.append(f"Row {row_number}: is_available is required")
+            elif raw_is_available not in ["yes", "no"]:
+                errors.append(
+                    f"Row {row_number}: is_available must be yes or no"
+                )
+
+            if employee_name and day_of_week and start_time and end_time:
+                duplicate_key = (
+                    employee_name.lower(),
+                    day_of_week.lower(),
+                    start_time.strftime("%H:%M:%S"),
+                    end_time.strftime("%H:%M:%S")
+                )
+
+                if duplicate_key in duplicate_keys:
+                    errors.append(
+                        f"Row {row_number}: duplicate availability row for "
+                        f"{employee_name}, {day_of_week}, "
+                        f"{start_time.strftime('%H:%M')}-{end_time.strftime('%H:%M')}"
+                    )
+                else:
+                    duplicate_keys.add(duplicate_key)
+
+            rows.append({
+                "row_number": row_number,
+                "employee_name": employee_name,
+                "day_of_week": day_of_week,
+                "start_time": start_time,
+                "end_time": end_time,
+                "is_available": raw_is_available == "yes",
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid availability import data",
+                    "errors": errors
+                }
+            )
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV has no valid availability rows"
+            )
+
+        validated_rows = []
+
+        for row in rows:
+            cursor.execute("""
+                SELECT employee_id
+                FROM employees
+                WHERE company_id = %s
+                AND LOWER(full_name) = LOWER(%s)
+                AND employment_status = 'Active'
+                LIMIT 1
+            """, (
+                company_id,
+                row["employee_name"]
+            ))
+
+            employee = cursor.fetchone()
+
+            if not employee:
+                errors.append(
+                    f"Row {row['row_number']}: active employee not found: "
+                    f"{row['employee_name']}"
+                )
+                continue
+
+            employee_id = employee[0]
+
+            cursor.execute("""
+                SELECT st.shift_template_id
+                FROM shift_templates st
+                JOIN accounts a
+                    ON st.account_id = a.account_id
+                    AND st.company_id = a.company_id
+                JOIN departments d
+                    ON a.department_id = d.department_id
+                    AND a.company_id = d.company_id
+                WHERE st.company_id = %s
+                AND st.start_time = %s::time
+                AND st.end_time = %s::time
+                AND st.is_active = TRUE
+                AND a.is_active = TRUE
+                AND d.is_active = TRUE
+                ORDER BY st.shift_template_id
+            """, (
+                company_id,
+                row["start_time"].strftime("%H:%M:%S"),
+                row["end_time"].strftime("%H:%M:%S")
+            ))
+
+            shift_template_rows = cursor.fetchall()
+
+            if not shift_template_rows:
+                errors.append(
+                    f"Row {row['row_number']}: no active shift time range found: "
+                    f"{row['start_time'].strftime('%H:%M')}-"
+                    f"{row['end_time'].strftime('%H:%M')}"
+                )
+                continue
+
+            validated_rows.append({
+                **row,
+                "employee_id": employee_id,
+                "shift_template_ids": [
+                    shift_template_row[0]
+                    for shift_template_row in shift_template_rows
+                ],
+            })
+
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid availability import data",
+                    "errors": errors
+                }
+            )
+
+        updated_rows = 0
+        updated_shift_templates = 0
+
+        for row in validated_rows:
+            for shift_template_id in row["shift_template_ids"]:
+                cursor.execute("""
+                    SELECT availability_id
+                    FROM availability
+                    WHERE company_id = %s
+                    AND employee_id = %s
+                    AND LOWER(TRIM(day_of_week)) = LOWER(TRIM(%s))
+                    AND shift_template_id = %s
+                    LIMIT 1
+                """, (
+                    company_id,
+                    row["employee_id"],
+                    row["day_of_week"],
+                    shift_template_id
+                ))
+
+                existing = cursor.fetchone()
+
+                if existing:
+                    cursor.execute("""
+                        UPDATE availability
+                        SET
+                            day_of_week = %s,
+                            is_available = %s
+                        WHERE availability_id = %s
+                    """, (
+                        row["day_of_week"],
+                        row["is_available"],
+                        existing[0]
+                    ))
+                else:
+                    cursor.execute("""
+                        INSERT INTO availability (
+                            employee_id,
+                            company_id,
+                            day_of_week,
+                            shift_template_id,
+                            is_available
+                        )
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (
+                        row["employee_id"],
+                        company_id,
+                        row["day_of_week"],
+                        shift_template_id,
+                        row["is_available"]
+                    ))
+
+                updated_shift_templates += 1
+
+            updated_rows += 1
+
+        conn.commit()
+
+        return {
+            "message": "Availability imported successfully",
+            "rows_imported": updated_rows,
+            "updated_shift_templates": updated_shift_templates
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("ERROR importing availability:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to import availability"
         )
 
     finally:

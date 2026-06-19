@@ -5824,9 +5824,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               end_time, is_available.
             </p>
             <p>day_of_week must be Monday through Sunday.</p>
-            <p>is_available must be yes or no.</p>
+            <p>is_available must be yes or no only.</p>
             <p>
-              start_time and end_time must match an existing shift time range.
+              start_time and end_time must match an existing active shift time
+              range.
+            </p>
+            <p>
+              Import is all-or-nothing: if one row is invalid, nothing will be
+              saved.
             </p>
           </div>
 
