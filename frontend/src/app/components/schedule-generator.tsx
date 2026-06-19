@@ -54,6 +54,7 @@ interface ShiftAssignment {
   role: string;
   employee: string;
   slot_index?: number;
+  is_absent?: boolean;
 }
 
 interface LeaveRequest {
@@ -221,7 +222,9 @@ export function ScheduleGenerator({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.detail || "Failed to finalize completed schedules");
+        throw new Error(
+          data.detail || "Failed to finalize completed schedules",
+        );
       }
 
       if (data.finalized_count > 0) {
@@ -333,16 +336,16 @@ export function ScheduleGenerator({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-const [scheduleWeekOffset, setScheduleWeekOffset] = useState<0 | 1>(0);
-const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
-const selectedWeekDates = getWeekDates(scheduleWeekOffset);
-const selectedWeekStart = formatDate(selectedWeekDates[0]);
-const selectedWeekEnd = formatDate(selectedWeekDates[6]);
+  const [scheduleWeekOffset, setScheduleWeekOffset] = useState<0 | 1>(0);
+  const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
+  const selectedWeekDates = getWeekDates(scheduleWeekOffset);
+  const selectedWeekStart = formatDate(selectedWeekDates[0]);
+  const selectedWeekEnd = formatDate(selectedWeekDates[6]);
 
-useEffect(() => {
-  setWeekDates(getWeekDates(scheduleWeekOffset));
-  setScheduleMode("saved");
-}, [scheduleWeekOffset]);
+  useEffect(() => {
+    setWeekDates(getWeekDates(scheduleWeekOffset));
+    setScheduleMode("saved");
+  }, [scheduleWeekOffset]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -397,6 +400,7 @@ useEffect(() => {
                     role: roleKey,
                     employee: emp.employee_name,
                     slot_index: emp.slot_index ?? index,
+                    is_absent: Boolean(emp.is_absent),
                   });
                 });
               });
@@ -553,6 +557,73 @@ useEffect(() => {
     return data;
   };
 
+  const markPublishedAssignmentAbsent = async (scheduleId: number) => {
+    const res = await fetch(
+      `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/mark-absent`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_id: companyId,
+          marked_by: currentUserId,
+        }),
+      },
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to mark absent");
+    }
+
+    return data;
+  };
+
+  const handleMarkAbsent = async () => {
+    const existing = getAssignment();
+
+    if (!existing?.schedule_id || !existing.employee_id) {
+      toast.error("No assigned employee selected");
+      return;
+    }
+
+    if (existing.is_absent) {
+      toast.info("Employee is already marked absent");
+      return;
+    }
+
+    if (scheduleWeekOffset !== 0 || scheduleMode !== "saved") {
+      toast.error("Only this week's published schedule can be marked absent");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Mark ${existing.employee} as absent for this shift? This will record an uninformed absence and keep the employee visible in the schedule.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await markPublishedAssignmentAbsent(existing.schedule_id);
+
+      toast.success("Employee marked as absent");
+
+      await loadSchedule();
+
+      setIsDialogOpen(false);
+      setEmployeeName("");
+      setSelectedEmployeeId("");
+      setSelectedCell(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to mark absent");
+    }
+  };
+
   const handleAssign = async () => {
     if (!selectedCell || !selectedEmployeeId) {
       toast.error("Please select an employee");
@@ -588,6 +659,7 @@ useEffect(() => {
                   ...a,
                   employee_id: selectedEmployee.id,
                   employee: selectedEmployee.name,
+                  is_absent: false,
                 }
               : a,
           ),
@@ -614,6 +686,7 @@ useEffect(() => {
                 ...a,
                 employee_id: selectedEmployee.id,
                 employee: selectedEmployee.name,
+                is_absent: false,
               }
             : a,
         ),
@@ -674,10 +747,7 @@ useEffect(() => {
       existing?.schedule_id
     ) {
       try {
-        await updatePublishedAssignment(
-          existing.schedule_id,
-          null,
-        );
+        await updatePublishedAssignment(existing.schedule_id, null);
 
         setAssignments(
           assignments.map((a) =>
@@ -686,6 +756,7 @@ useEffect(() => {
                   ...a,
                   employee_id: null,
                   employee: "",
+                  is_absent: false,
                 }
               : a,
           ),
@@ -712,6 +783,7 @@ useEffect(() => {
                 ...a,
                 employee_id: null,
                 employee: "",
+                is_absent: false,
               }
             : a,
         ),
@@ -754,37 +826,37 @@ useEffect(() => {
   };
 
   const normalizeKey = (value: any) =>
-  String(value || "").trim().toLowerCase();
+    String(value || "")
+      .trim()
+      .toLowerCase();
 
-const getShiftTemplatesForAccount = (livestream: string) => {
-  const accountKey = normalizeKey(livestream);
+  const getShiftTemplatesForAccount = (livestream: string) => {
+    const accountKey = normalizeKey(livestream);
 
-  return shiftTemplates
-    .filter(
-      (shift) => normalizeKey(shift.account_name) === accountKey,
-    )
-    .sort((a, b) => {
-      const aTime = String(a.start_time || "00:00:00");
-      const bTime = String(b.start_time || "00:00:00");
+    return shiftTemplates
+      .filter((shift) => normalizeKey(shift.account_name) === accountKey)
+      .sort((a, b) => {
+        const aTime = String(a.start_time || "00:00:00");
+        const bTime = String(b.start_time || "00:00:00");
 
-      if (aTime !== bTime) return aTime.localeCompare(bTime);
+        if (aTime !== bTime) return aTime.localeCompare(bTime);
 
-      return String(a.shift_name || "").localeCompare(
-        String(b.shift_name || ""),
-      );
-    });
-};
+        return String(a.shift_name || "").localeCompare(
+          String(b.shift_name || ""),
+        );
+      });
+  };
 
-const getShiftTemplateForAccount = (
-  livestream: string,
-  shiftName: string,
-) => {
-  return shiftTemplates.find(
-    (shift) =>
-      normalizeKey(shift.account_name) === normalizeKey(livestream) &&
-      normalizeKey(shift.shift_name) === normalizeKey(shiftName),
-  );
-};
+  const getShiftTemplateForAccount = (
+    livestream: string,
+    shiftName: string,
+  ) => {
+    return shiftTemplates.find(
+      (shift) =>
+        normalizeKey(shift.account_name) === normalizeKey(livestream) &&
+        normalizeKey(shift.shift_name) === normalizeKey(shiftName),
+    );
+  };
 
   const generateSchedule = async () => {
     if (scheduleWeekOffset !== 1) {
@@ -843,6 +915,7 @@ const getShiftTemplateForAccount = (
                   role: roleKey,
                   employee: emp.employee_name,
                   slot_index: emp.slot_index ?? index,
+                  is_absent: Boolean(emp.is_absent),
                 });
               });
             });
@@ -924,13 +997,13 @@ const getShiftTemplateForAccount = (
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-          assignments: payload,
-          saved_by: currentUserId,
-          company_id: companyId,
-          week_start: selectedWeekStart,
-          week_end: selectedWeekEnd,
-          force_republish_current_week: false,
-        }),
+            assignments: payload,
+            saved_by: currentUserId,
+            company_id: companyId,
+            week_start: selectedWeekStart,
+            week_end: selectedWeekEnd,
+            force_republish_current_week: false,
+          }),
         },
       );
 
@@ -989,27 +1062,27 @@ const getShiftTemplateForAccount = (
     }
   };
 
-const getVisibleShifts = (livestream: string) => {
-  const accountShifts = getShiftTemplatesForAccount(livestream);
+  const getVisibleShifts = (livestream: string) => {
+    const accountShifts = getShiftTemplatesForAccount(livestream);
 
-  if (accountShifts.length > 0) {
-    return accountShifts;
-  }
+    if (accountShifts.length > 0) {
+      return accountShifts;
+    }
 
-  const savedShiftNames = Array.from(
-    new Set(
-      assignments
-        .filter((a) => a.livestream === livestream)
-        .map((a) => a.shift),
-    ),
-  );
+    const savedShiftNames = Array.from(
+      new Set(
+        assignments
+          .filter((a) => a.livestream === livestream)
+          .map((a) => a.shift),
+      ),
+    );
 
-  return savedShiftNames.map((shiftName) => ({
-    shift_name: shiftName,
-    start_time: "",
-    end_time: "",
-  }));
-};
+    return savedShiftNames.map((shiftName) => ({
+      shift_name: shiftName,
+      start_time: "",
+      end_time: "",
+    }));
+  };
 
   const getRoleRowsForShift = (livestream: string, shiftName: string) => {
     const shiftTemplate = getShiftTemplateForAccount(livestream, shiftName);
@@ -1077,7 +1150,9 @@ const getVisibleShifts = (livestream: string) => {
         <div className="flex items-center gap-4">
           <Select
             value={String(scheduleWeekOffset)}
-            onValueChange={(value) => setScheduleWeekOffset(Number(value) as 0 | 1)}
+            onValueChange={(value) =>
+              setScheduleWeekOffset(Number(value) as 0 | 1)
+            }
           >
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Select week" />
@@ -1324,13 +1399,20 @@ const getVisibleShifts = (livestream: string) => {
                                         );
 
                                       const isClickable = role === "admin";
+                                      const isAbsent = Boolean(
+                                        cellAssignment?.is_absent,
+                                      );
 
                                       return (
                                         <td
                                           key={`${livestream}-${day}-${shift.shift_name}-${roleKey}-${slotIndex}`}
                                           className={`border border-gray-300 p-2 ${
                                             cellAssignment?.employee_id
-                                              ? getShiftColor(shift.shift_name)
+                                              ? isAbsent
+                                                ? "bg-gray-200 text-gray-500"
+                                                : getShiftColor(
+                                                    shift.shift_name,
+                                                  )
                                               : "bg-white text-gray-300"
                                           } ${
                                             isClickable &&
@@ -1354,12 +1436,22 @@ const getVisibleShifts = (livestream: string) => {
                                           {cellAssignment?.employee_id ? (
                                             <div className="text-center">
                                               <div
-                                                className={`font-medium text-sm ${getShiftTextColor(
-                                                  shift.shift_name,
-                                                )}`}
+                                                className={`font-medium text-sm ${
+                                                  isAbsent
+                                                    ? "text-gray-500 line-through"
+                                                    : getShiftTextColor(
+                                                        shift.shift_name,
+                                                      )
+                                                }`}
                                               >
                                                 {cellAssignment.employee}
                                               </div>
+
+                                              {isAbsent && (
+                                                <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                                  Absent
+                                                </div>
+                                              )}
                                             </div>
                                           ) : (
                                             <div className="text-center text-gray-300 text-xs py-1">
@@ -1583,6 +1675,20 @@ const getVisibleShifts = (livestream: string) => {
             </div>
           </div>
           <DialogFooter className="gap-2">
+            {selectedCell &&
+              getAssignment()?.employee_id &&
+              scheduleWeekOffset === 0 &&
+              scheduleMode === "saved" &&
+              !getAssignment()?.is_absent && (
+                <Button
+                  variant="secondary"
+                  onClick={handleMarkAbsent}
+                  className="gap-2"
+                >
+                  Mark as Absent
+                </Button>
+              )}
+
             {selectedCell && getAssignment()?.employee_id && (
               <Button
                 variant="destructive"
@@ -1593,9 +1699,11 @@ const getVisibleShifts = (livestream: string) => {
                 Remove
               </Button>
             )}
+
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
+
             <Button onClick={handleAssign}>
               {selectedCell && getAssignment()?.employee_id
                 ? "Update"

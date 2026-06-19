@@ -675,6 +675,184 @@ def get_schedule(
     except Exception as e:
         print("ERROR loading generated schedule:", e)
         raise HTTPException(status_code=500, detail="Failed to load schedule")
+    
+
+@router.patch("/generated-schedule/{schedule_id}/mark-absent")
+def mark_generated_schedule_absent(
+    schedule_id: int,
+    payload: dict = Body(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+        marked_by = payload.get("marked_by")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        cursor.execute("""
+            SELECT
+                gs.schedule_id,
+                gs.employee_id,
+                gs.shift_id,
+                gs.role_id,
+                s.shift_date,
+                a.account_name,
+                st.shift_name,
+                r.role_key,
+                e.full_name
+            FROM generated_schedule gs
+
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
+
+            JOIN roles r
+                ON gs.role_id = r.role_id
+                AND gs.company_id = r.company_id
+
+            JOIN employees e
+                ON gs.employee_id = e.employee_id
+                AND gs.company_id = e.company_id
+
+            WHERE gs.schedule_id = %s
+            AND gs.company_id = %s
+            AND gs.is_archived = FALSE
+            AND e.employment_status = 'Active'
+            LIMIT 1
+        """, (
+            schedule_id,
+            company_id
+        ))
+
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=404,
+                detail="Active assigned schedule row not found"
+            )
+
+        (
+            schedule_id,
+            employee_id,
+            shift_id,
+            role_id,
+            shift_date,
+            account_name,
+            shift_name,
+            role_key,
+            employee_name
+        ) = row
+
+        today = datetime.today().date()
+        current_week_start = today - timedelta(days=today.weekday())
+        current_week_end = current_week_start + timedelta(days=6)
+
+        if shift_date < current_week_start or shift_date > current_week_end:
+            raise HTTPException(
+                status_code=400,
+                detail="Only this week's schedule can be marked absent"
+            )
+
+        cursor.execute("""
+            INSERT INTO absences (
+                employee_id,
+                date,
+                status,
+                company_id,
+                shift_id,
+                role_id
+            )
+            VALUES (%s, %s, 'approved', %s, %s, %s)
+            ON CONFLICT (company_id, employee_id, date)
+            DO UPDATE SET
+                status = 'approved',
+                shift_id = EXCLUDED.shift_id,
+                role_id = EXCLUDED.role_id,
+                updated_at = NOW()
+        """, (
+            employee_id,
+            shift_date,
+            company_id,
+            shift_id,
+            role_id
+        ))
+
+        create_notification(
+            cursor,
+            employee_id,
+            "Marked Absent",
+            f"You were marked absent for {account_name} / {shift_name} on {shift_date}.",
+            "absence",
+            company_id=company_id,
+            sender_employee_id=marked_by,
+            related_id=schedule_id
+        )
+
+        admin_ids = get_company_admin_employee_ids(
+            cursor,
+            company_id
+        )
+
+        for admin_id in admin_ids:
+            if marked_by and int(admin_id) == int(marked_by):
+                continue
+
+            if int(admin_id) == int(employee_id):
+                continue
+
+            create_notification(
+                cursor,
+                admin_id,
+                "Employee Marked Absent",
+                f"{employee_name} was marked absent for {account_name} / {shift_name} on {shift_date}.",
+                "absence",
+                company_id=company_id,
+                sender_employee_id=marked_by,
+                related_id=schedule_id
+            )
+
+        conn.commit()
+
+        return {
+            "message": "Employee marked as absent",
+            "schedule_id": schedule_id,
+            "employee_id": employee_id,
+            "employee_name": employee_name,
+            "shift_date": str(shift_date),
+            "is_absent": True
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("MARK ABSENT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to mark employee as absent"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
 
     
 @router.post("/request-cover/{schedule_id}")

@@ -645,7 +645,8 @@ def group_schedule(assignments, active_roles):
             "shift_id": a.get("shift_id"),
             "employee_id": a.get("employee_id"),
             "employee_name": a.get("employee_name") or "",
-            "slot_index": slot_index
+            "slot_index": slot_index,
+            "is_absent": bool(a.get("is_absent", False))
         })
 
     result = to_dict(schedule)
@@ -791,7 +792,12 @@ def get_generated_schedule(
                 e.employee_id,
                 e.full_name,
                 r.role_key,
-                g.slot_index
+                g.slot_index,
+                CASE
+                    WHEN ab.absence_id IS NOT NULL
+                    THEN TRUE
+                    ELSE FALSE
+                END AS is_absent
             FROM generated_schedule g
 
             JOIN shifts s
@@ -814,6 +820,12 @@ def get_generated_schedule(
             LEFT JOIN employees e
                 ON g.employee_id = e.employee_id
                 AND g.company_id = e.company_id
+
+            LEFT JOIN absences ab
+                ON ab.employee_id = g.employee_id
+                AND ab.company_id = g.company_id
+                AND ab.date = s.shift_date
+                AND LOWER(COALESCE(ab.status, '')) = 'approved'
 
             WHERE g.company_id = %s
             AND g.is_archived = FALSE
@@ -839,7 +851,8 @@ def get_generated_schedule(
                 "employee_id": r[5],
                 "employee_name": r[6] if r[6] else "",
                 "role": r[7],
-                "slot_index": r[8]
+                "slot_index": r[8],
+                "is_absent": bool(r[9])
             }
             for r in rows
         ]
