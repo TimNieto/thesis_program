@@ -2657,15 +2657,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[80px]">ID</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Joined Date</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="w-[28%]">Name</TableHead>
+                      <TableHead className="w-[24%]">Role</TableHead>
+                      <TableHead className="w-[12%]">Status</TableHead>
+                      <TableHead className="w-[16%]">Joined Date</TableHead>
+                      <TableHead className="w-[140px] text-right">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -2683,15 +2685,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     ) : (
                       filteredEmployeeManagementEmployees.map((employee) => (
                         <TableRow key={employee.id}>
-                          <TableCell className="font-medium text-gray-600">
+                          <TableCell className="font-medium text-gray-600 truncate">
                             {employee.id}
                           </TableCell>
 
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium truncate">
                             {employee.name}
                           </TableCell>
 
-                          <TableCell>{employee.role || "None"}</TableCell>
+                          <TableCell className="truncate">
+                            {employee.role || "None"}
+                          </TableCell>
                           <TableCell>
                             <Badge
                               variant={
@@ -2709,8 +2713,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           <TableCell>
                             {new Date(employee.joinedDate).toLocaleDateString()}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
