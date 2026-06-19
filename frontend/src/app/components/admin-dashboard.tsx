@@ -1198,8 +1198,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         throw new Error("Required count must be a whole number");
       }
 
-      if (requiredCount < 0) {
-        throw new Error("Required count cannot be negative");
+      if (requiredCount < 1 || requiredCount > 9) {
+        throw new Error("Required count must be between 1 and 9");
       }
 
       const res = await fetch(
@@ -1245,6 +1245,67 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           ? err.message
           : "Failed to save staffing requirement",
       );
+    }
+  };
+
+  const updateRequirementRequiredCount = async (
+    requirement: any,
+    requiredCount: number,
+  ) => {
+    try {
+      if (!currentUser.company_id) {
+        throw new Error("No company selected");
+      }
+
+      if (!requirement.requirement_id) {
+        throw new Error("Invalid staffing requirement");
+      }
+
+      if (!Number.isInteger(requiredCount)) {
+        throw new Error("Required count must be a whole number");
+      }
+
+      if (requiredCount < 1 || requiredCount > 9) {
+        throw new Error("Required count must be between 1 and 9");
+      }
+
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/staffing-requirements/${requirement.requirement_id}/required-count`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            required_count: requiredCount,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : data?.detail?.message || "Failed to update required count",
+        );
+      }
+
+      await fetchStaffingRequirements();
+
+      toast.success("Required count updated");
+
+      return true;
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update required count",
+      );
+
+      await fetchStaffingRequirements();
+
+      return false;
     }
   };
 
@@ -3886,7 +3947,59 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             </TableCell>
 
                             <TableCell>
-                              {requirement.required_count ?? 0}
+                              <Input
+                                type="number"
+                                min={1}
+                                max={9}
+                                step={1}
+                                defaultValue={String(
+                                  requirement.required_count ?? 1,
+                                )}
+                                className="h-8 w-20"
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.currentTarget.blur();
+                                  }
+                                }}
+                                onBlur={async (event) => {
+                                  const input = event.currentTarget;
+                                  const originalValue = String(
+                                    requirement.required_count ?? 1,
+                                  );
+                                  const rawValue = input.value.trim();
+                                  const nextCount = Number(rawValue);
+
+                                  if (
+                                    !rawValue ||
+                                    !Number.isInteger(nextCount) ||
+                                    nextCount < 1 ||
+                                    nextCount > 9
+                                  ) {
+                                    toast.error(
+                                      "Required count must be between 1 and 9",
+                                    );
+                                    input.value = originalValue;
+                                    return;
+                                  }
+
+                                  if (
+                                    nextCount ===
+                                    Number(requirement.required_count)
+                                  ) {
+                                    return;
+                                  }
+
+                                  const saved =
+                                    await updateRequirementRequiredCount(
+                                      requirement,
+                                      nextCount,
+                                    );
+
+                                  if (!saved) {
+                                    input.value = originalValue;
+                                  }
+                                }}
+                              />
                             </TableCell>
 
                             <TableCell>

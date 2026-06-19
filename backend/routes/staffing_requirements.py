@@ -765,10 +765,10 @@ def update_staffing_requirements(payload: dict):
                     detail=f"Requirement {index}: required_count must be a whole number"
                 )
 
-            if required_count < 0:
+            if required_count < 1 or required_count > 9:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Requirement {index}: required_count cannot be negative"
+                    detail=f"Requirement {index}: required_count must be between 1 and 9"
                 )
 
             cursor.execute("""
@@ -912,6 +912,106 @@ def update_staffing_requirements(payload: dict):
         conn.close()
 
 
+@router.patch("/staffing-requirements/{requirement_id}/required-count")
+def update_staffing_requirement_required_count(
+    requirement_id: int,
+    payload: dict
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+        required_count_raw = payload.get("required_count")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if required_count_raw is None or str(required_count_raw).strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="required_count is required"
+            )
+
+        try:
+            required_count = int(str(required_count_raw).strip())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="required_count must be a whole number"
+            )
+
+        if required_count < 1 or required_count > 9:
+            raise HTTPException(
+                status_code=400,
+                detail="required_count must be between 1 and 9"
+            )
+
+        cursor.execute("""
+            SELECT requirement_id
+            FROM shift_staffing_requirements
+            WHERE requirement_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+            LIMIT 1
+        """, (
+            requirement_id,
+            company_id
+        ))
+
+        existing = cursor.fetchone()
+
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail="Active staffing requirement not found"
+            )
+
+        cursor.execute("""
+            UPDATE shift_staffing_requirements
+            SET
+                required_count = %s,
+                updated_at = NOW()
+            WHERE requirement_id = %s
+            AND company_id = %s
+            AND is_active = TRUE
+            RETURNING requirement_id, required_count
+        """, (
+            required_count,
+            requirement_id,
+            company_id
+        ))
+
+        updated = cursor.fetchone()
+
+        conn.commit()
+
+        return {
+            "message": "Required count updated",
+            "requirement_id": updated[0],
+            "required_count": updated[1]
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("UPDATE REQUIRED COUNT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+        
 @router.delete("/staffing-requirements/{requirement_id}")
 def deactivate_staffing_requirement(requirement_id: int, company_id: int = 1):
     conn = get_connection()
