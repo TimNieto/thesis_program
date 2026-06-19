@@ -14,8 +14,6 @@ def normalize_role_key(role_name: str) -> str:
 def normalize_name(value: str) -> str:
     return " ".join(str(value or "").strip().split()).title()
 
-
-
 def get_csv_value(row: dict, *keys: str) -> str:
     for key in keys:
         value = row.get(key)

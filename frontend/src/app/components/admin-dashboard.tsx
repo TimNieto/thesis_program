@@ -340,6 +340,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     any | null
   >(null);
 
+  const [pendingRequiredCountUpdate, setPendingRequiredCountUpdate] = useState<{
+    requirement: any;
+    previousCount: number;
+    nextCount: number;
+    input: HTMLInputElement;
+  } | null>(null);
+
   const [assignmentToDeactivate, setAssignmentToDeactivate] = useState<
     number | null
   >(null);
@@ -1311,6 +1318,33 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   const handleDeactivateRequirement = (requirement: any) => {
     setRequirementToDeactivate(requirement);
+  };
+
+  const cancelRequiredCountUpdate = () => {
+    if (pendingRequiredCountUpdate) {
+      pendingRequiredCountUpdate.input.value = String(
+        pendingRequiredCountUpdate.previousCount,
+      );
+    }
+
+    setPendingRequiredCountUpdate(null);
+  };
+
+  const confirmRequiredCountUpdate = async () => {
+    if (!pendingRequiredCountUpdate) return;
+
+    const saved = await updateRequirementRequiredCount(
+      pendingRequiredCountUpdate.requirement,
+      pendingRequiredCountUpdate.nextCount,
+    );
+
+    if (!saved) {
+      pendingRequiredCountUpdate.input.value = String(
+        pendingRequiredCountUpdate.previousCount,
+      );
+    }
+
+    setPendingRequiredCountUpdate(null);
   };
 
   const confirmDeactivateRequirement = async () => {
@@ -3948,20 +3982,29 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                             <TableCell>
                               <Input
-                                type="number"
-                                min={1}
-                                max={9}
-                                step={1}
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={1}
                                 defaultValue={String(
                                   requirement.required_count ?? 1,
                                 )}
-                                className="h-8 w-20"
+                                className="h-8 w-20 text-center"
+                                onChange={(event) => {
+                                  const value =
+                                    event.currentTarget.value.trim();
+
+                                  if (value === "" || /^[1-9]$/.test(value)) {
+                                    return;
+                                  }
+
+                                  event.currentTarget.value = "";
+                                }}
                                 onKeyDown={(event) => {
                                   if (event.key === "Enter") {
                                     event.currentTarget.blur();
                                   }
                                 }}
-                                onBlur={async (event) => {
+                                onBlur={(event) => {
                                   const input = event.currentTarget;
                                   const originalValue = String(
                                     requirement.required_count ?? 1,
@@ -3989,15 +4032,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                     return;
                                   }
 
-                                  const saved =
-                                    await updateRequirementRequiredCount(
-                                      requirement,
-                                      nextCount,
-                                    );
-
-                                  if (!saved) {
-                                    input.value = originalValue;
-                                  }
+                                  setPendingRequiredCountUpdate({
+                                    requirement,
+                                    previousCount: Number(originalValue),
+                                    nextCount,
+                                    input,
+                                  });
                                 }}
                               />
                             </TableCell>
@@ -4667,7 +4707,53 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Confirm Required Count Update Dialog */}
+      <Dialog
+        open={Boolean(pendingRequiredCountUpdate)}
+        onOpenChange={(open) => {
+          if (!open) {
+            cancelRequiredCountUpdate();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Required Count</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to update this staffing requirement?
+            </DialogDescription>
+          </DialogHeader>
 
+          {pendingRequiredCountUpdate && (
+            <div className="space-y-2 py-4 text-sm">
+              <div>
+                <strong>Role:</strong>{" "}
+                {pendingRequiredCountUpdate.requirement.role_name ||
+                  pendingRequiredCountUpdate.requirement.role_key ||
+                  "—"}
+              </div>
+
+              <div>
+                <strong>Current Required Count:</strong>{" "}
+                {pendingRequiredCountUpdate.previousCount}
+              </div>
+
+              <div>
+                <strong>New Required Count:</strong>{" "}
+                {pendingRequiredCountUpdate.nextCount}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelRequiredCountUpdate}>
+              Cancel
+            </Button>
+
+            <Button onClick={confirmRequiredCountUpdate}>Confirm Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Confirm Delete Employee Dialog */}
       <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
         <DialogContent>
