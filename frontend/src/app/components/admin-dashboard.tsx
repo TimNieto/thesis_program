@@ -190,6 +190,7 @@ const DAYS = [
 
 export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
 
   interface Holiday {
     id: string;
@@ -2453,6 +2454,22 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     fetchAvailability(); // pass id directly if possible
   };
 
+  const employeeSearchTerm = employeeSearchQuery.trim().toLowerCase();
+
+  const filteredEmployeeManagementEmployees = [...employees]
+    .filter((employee) => {
+      if (!employeeSearchTerm) {
+        return true;
+      }
+
+      return [String(employee.id), employee.name, employee.role].some((value) =>
+        String(value || "")
+          .toLowerCase()
+          .includes(employeeSearchTerm),
+      );
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   // Statistics
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter((e) => e.status === "Active").length;
@@ -2609,12 +2626,32 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         <TabsContent value="employees" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-4">
                 <div>
                   <CardTitle>Employee Management</CardTitle>
                   <CardDescription>
                     Add, remove, or modify employee details
                   </CardDescription>
+                </div>
+
+                <div className="relative w-full max-w-xs">
+                  <Input
+                    value={employeeSearchQuery}
+                    onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                    placeholder="Search ID, name, or role"
+                    className="pr-9"
+                  />
+
+                  {employeeSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setEmployeeSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-1 text-gray-400 hover:text-gray-700"
+                      aria-label="Clear employee search"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -2632,67 +2669,61 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {employees.length === 0 ? (
+                    {filteredEmployeeManagementEmployees.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={6}
                           className="text-center text-gray-500 py-6"
                         >
-                          No employees found. Import employees to populate
+                          {employees.length === 0
+                            ? "No employees found. Import employees to populate"
+                            : "No employees match your search"}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      [...employees]
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((employee) => (
-                          <TableRow key={employee.id}>
-                            <TableCell className="font-medium text-gray-600">
-                              {employee.id}
-                            </TableCell>
+                      filteredEmployeeManagementEmployees.map((employee) => (
+                        <TableRow key={employee.id}>
+                          <TableCell className="font-medium text-gray-600">
+                            {employee.id}
+                          </TableCell>
 
-                            <TableCell className="font-medium">
-                              {employee.name}
-                            </TableCell>
+                          <TableCell className="font-medium">
+                            {employee.name}
+                          </TableCell>
 
-                            <TableCell>{employee.role || "None"}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  employee.status === "Active"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                className="cursor-pointer"
-                                onClick={() =>
-                                  toggleEmployeeStatus(employee.id)
-                                }
+                          <TableCell>{employee.role || "None"}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                employee.status === "Active"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className="cursor-pointer"
+                              onClick={() => toggleEmployeeStatus(employee.id)}
+                            >
+                              {employee.status}
+                            </Badge>
+                          </TableCell>
+
+                          <TableCell>
+                            {new Date(employee.joinedDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openRoleOverrideDialog(employee)}
+                                className="gap-2"
                               >
-                                {employee.status}
-                              </Badge>
-                            </TableCell>
-
-                            <TableCell>
-                              {new Date(
-                                employee.joinedDate,
-                              ).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openRoleOverrideDialog(employee)
-                                  }
-                                  className="gap-2"
-                                >
-                                  <UserSquare2 className="size-4" />
-                                  Roles
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                                <UserSquare2 className="size-4" />
+                                Roles
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
                   </TableBody>
                 </Table>
