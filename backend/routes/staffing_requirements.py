@@ -15,6 +15,7 @@ def normalize_name(value: str) -> str:
     return " ".join(str(value or "").strip().split()).title()
 
 
+
 def get_csv_value(row: dict, *keys: str) -> str:
     for key in keys:
         value = row.get(key)
@@ -1011,7 +1012,7 @@ def update_staffing_requirement_required_count(
         cursor.close()
         conn.close()
 
-        
+
 @router.delete("/staffing-requirements/{requirement_id}")
 def deactivate_staffing_requirement(requirement_id: int, company_id: int = 1):
     conn = get_connection()
