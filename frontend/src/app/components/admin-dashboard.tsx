@@ -172,6 +172,7 @@ type GroupedAccountPreferenceRow =
       display_key: string;
       row_type: "account";
       employee_id: number;
+      employee_name: string;
       department_name: string;
       role_id: number;
       role_name: string;
@@ -434,6 +435,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       day: string;
       slot: any;
     } | null>(null);
+  const [accountPreferenceToUnprefer, setAccountPreferenceToUnprefer] =
+    useState<{
+      employee_id: number;
+      employee_name: string;
+      department_name: string;
+      role_id: number;
+      role_name: string;
+      account_id: number;
+      account_name: string;
+    } | null>(null);
 
   const fetchEmployees = async () => {
     if (!currentUser.company_id) {
@@ -688,6 +699,51 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     } catch (err) {
       console.error("Failed to load account preference rows", err);
       setAccountPreferenceRows([]);
+    }
+  };
+
+  const confirmUnpreferAccountPreference = async () => {
+    if (!currentUser.company_id || !accountPreferenceToUnprefer) return;
+
+    const preference = accountPreferenceToUnprefer;
+
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/employees/${preference.employee_id}/account-preferences/unpreferred`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            account_id: preference.account_id,
+            role_id: preference.role_id,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.detail || "Failed to mark account preference as unpreferred",
+        );
+      }
+
+      setAccountPreferenceToUnprefer(null);
+
+      await fetchAccountPreferenceRows(employees);
+
+      toast.success(
+        data?.message || "Account preference marked as unpreferred",
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to mark account preference as unpreferred",
+      );
     }
   };
 
@@ -2100,6 +2156,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
               display_key: account.display_key,
               row_type: "account" as const,
               employee_id: account.employee_id,
+              employee_name: account.employee_name,
               department_name: account.department_name,
               role_id: account.role_id,
               role_name: account.role_name,
@@ -4834,11 +4891,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <Table className="w-full table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[22%]">Employee</TableHead>
-                        <TableHead className="w-[20%]">Department</TableHead>
-                        <TableHead className="w-[22%]">Role</TableHead>
-                        <TableHead className="w-[24%]">Account Name</TableHead>
-                        <TableHead className="w-[12%]">Status</TableHead>
+                        <TableHead className="w-[18%]">Employee</TableHead>
+                        <TableHead className="w-[17%]">Department</TableHead>
+                        <TableHead className="w-[17%]">Role</TableHead>
+                        <TableHead className="w-[22%]">Account Name</TableHead>
+                        <TableHead className="w-[10%]">Status</TableHead>
+                        <TableHead className="w-[16%] text-right">
+                          Action
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
 
@@ -4846,7 +4906,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       {groupedAccountPreferenceRows.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={5}
+                            colSpan={6}
                             className="text-center text-gray-500 py-6"
                           >
                             No account preferences found. Use Import CSV to add
@@ -4868,6 +4928,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 <TableCell />
                                 <TableCell />
                                 <TableCell />
+                                <TableCell />
                               </TableRow>
                             );
                           }
@@ -4882,6 +4943,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 <TableCell className="pl-4 font-medium text-gray-800 truncate py-3">
                                   {row.department_name}
                                 </TableCell>
+                                <TableCell />
                                 <TableCell />
                                 <TableCell />
                                 <TableCell />
@@ -4900,6 +4962,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 <TableCell className="pl-6 font-medium text-gray-900 truncate py-3">
                                   {row.role_name}
                                 </TableCell>
+                                <TableCell />
                                 <TableCell />
                                 <TableCell />
                               </TableRow>
@@ -4921,6 +4984,26 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                               <TableCell>
                                 {renderStatusBadge(row.status)}
+                              </TableCell>
+
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  className={dangerSmallButtonClass}
+                                  onClick={() =>
+                                    setAccountPreferenceToUnprefer({
+                                      employee_id: row.employee_id,
+                                      employee_name: row.employee_name,
+                                      department_name: row.department_name,
+                                      role_id: row.role_id,
+                                      role_name: row.role_name,
+                                      account_id: row.account_id,
+                                      account_name: row.account_name,
+                                    })
+                                  }
+                                >
+                                  Unpreferred
+                                </Button>
                               </TableCell>
                             </TableRow>
                           );
@@ -6431,7 +6514,62 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Account Preference Unpreferred Confirmation Dialog */}
+      <Dialog
+        open={Boolean(accountPreferenceToUnprefer)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAccountPreferenceToUnprefer(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark as Unpreferred?</DialogTitle>
+            <DialogDescription>
+              This will remove this account from the employee&apos;s preferred
+              account list for this role.
+            </DialogDescription>
+          </DialogHeader>
 
+          {accountPreferenceToUnprefer && (
+            <div className="rounded border bg-gray-50 p-4 text-sm space-y-2">
+              <p>
+                <span className="font-medium">Employee:</span>{" "}
+                {accountPreferenceToUnprefer.employee_name}
+              </p>
+              <p>
+                <span className="font-medium">Department:</span>{" "}
+                {accountPreferenceToUnprefer.department_name}
+              </p>
+              <p>
+                <span className="font-medium">Role:</span>{" "}
+                {accountPreferenceToUnprefer.role_name}
+              </p>
+              <p>
+                <span className="font-medium">Account:</span>{" "}
+                {accountPreferenceToUnprefer.account_name}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAccountPreferenceToUnprefer(null)}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              className={dangerSmallButtonClass}
+              onClick={confirmUnpreferAccountPreference}
+            >
+              Confirm Unpreferred
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Account Preferences Template Preview Dialog */}
       <Dialog
         open={isAccountPreferencesTemplatePreviewOpen}

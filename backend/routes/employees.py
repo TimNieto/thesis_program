@@ -795,6 +795,98 @@ def update_employee_account_preferences(employee_id: int, data: dict):
         conn.close()
 
 
+@router.patch("/employees/{employee_id}/account-preferences/unpreferred")
+def unprefer_employee_account_preference(employee_id: int, data: dict):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = data.get("company_id")
+        account_id = data.get("account_id")
+        role_id = data.get("role_id")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        if not account_id:
+            raise HTTPException(
+                status_code=400,
+                detail="account_id is required"
+            )
+
+        if not role_id:
+            raise HTTPException(
+                status_code=400,
+                detail="role_id is required"
+            )
+
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE employee_id = %s
+            AND company_id = %s
+            AND employment_status = 'Active'
+            LIMIT 1
+        """, (
+            employee_id,
+            company_id
+        ))
+
+        employee = cursor.fetchone()
+
+        if not employee:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee not found under this company"
+            )
+
+        cursor.execute("""
+            UPDATE account_preferences
+            SET is_active = FALSE
+            WHERE company_id = %s
+            AND employee_id = %s
+            AND account_id = %s
+            AND role_id = %s
+            AND is_active = TRUE
+        """, (
+            company_id,
+            employee_id,
+            account_id,
+            role_id
+        ))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="Account preference not found or already unpreferred"
+            )
+
+        conn.commit()
+
+        return {
+            "message": "Account preference marked as unpreferred"
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("UNPREFER ACCOUNT PREFERENCE ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to unprefer account preference"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
+        
 @router.post("/account-preferences-import")
 async def import_account_preferences(
     company_id: int = Form(...),
