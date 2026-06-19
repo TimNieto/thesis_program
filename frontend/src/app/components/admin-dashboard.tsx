@@ -4108,17 +4108,17 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table className="w-full table-fixed">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[15%]">Department</TableHead>
-                      <TableHead className="w-[15%]">Account</TableHead>
+                      <TableHead className="w-[16%]">Department</TableHead>
+                      <TableHead className="w-[16%]">Account</TableHead>
                       <TableHead className="w-[13%]">Shift</TableHead>
-                      <TableHead className="w-[21%]">Role</TableHead>
-                      <TableHead className="w-[13%] text-center">
+                      <TableHead className="w-[13%]">Role</TableHead>
+                      <TableHead className="w-[14%] text-center">
                         Required Count
                       </TableHead>
                       <TableHead className="w-[10%] text-center">
                         Status
                       </TableHead>
-                      <TableHead className="w-[13%] text-right">
+                      <TableHead className="w-[18%] text-right">
                         Action
                       </TableHead>
                     </TableRow>
