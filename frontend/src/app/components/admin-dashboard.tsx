@@ -2064,43 +2064,97 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const groupedShiftTemplateRows = Array.from(
     shiftTemplates
       .reduce(
-        (map, shift) => {
+        (departmentMap, shift) => {
           const departmentName = shift.department_name || "None";
           const departmentKey = String(departmentName).toLowerCase();
 
-          const existing = map.get(departmentKey) ?? {
-            departmentRow: {
-              display_key: `shift-department-${departmentKey}`,
-              row_type: "department" as const,
-              department_name: departmentName,
-            },
-            shiftRows: [] as any[],
+          const accountId = Number(shift.account_id || 0);
+          const accountName = shift.account_name || "None";
+          const accountKey = String(accountId || accountName).toLowerCase();
+
+          const departmentGroup = departmentMap.get(departmentKey) ?? {
+            department_name: departmentName,
+            accounts: new Map<
+              string,
+              {
+                account_id: number;
+                account_name: string;
+                shifts: any[];
+              }
+            >(),
           };
 
-          existing.shiftRows.push({
+          const accountGroup = departmentGroup.accounts.get(accountKey) ?? {
+            account_id: accountId,
+            account_name: accountName,
+            shifts: [] as any[],
+          };
+
+          accountGroup.shifts.push({
             ...shift,
             display_key: `shift-template-${shift.shift_template_id}`,
             row_type: "shift" as const,
           });
 
-          map.set(departmentKey, existing);
+          departmentGroup.accounts.set(accountKey, accountGroup);
+          departmentMap.set(departmentKey, departmentGroup);
 
-          return map;
+          return departmentMap;
         },
         new Map<
           string,
           {
-            departmentRow: {
-              display_key: string;
-              row_type: "department";
-              department_name: string;
-            };
-            shiftRows: any[];
+            department_name: string;
+            accounts: Map<
+              string,
+              {
+                account_id: number;
+                account_name: string;
+                shifts: any[];
+              }
+            >;
           }
         >(),
       )
       .values(),
-  ).flatMap((group) => [group.departmentRow, ...group.shiftRows]);
+  )
+    .sort((a, b) => a.department_name.localeCompare(b.department_name))
+    .flatMap((departmentGroup) => [
+      {
+        display_key: `shift-department-${departmentGroup.department_name}`,
+        row_type: "department" as const,
+        department_name: departmentGroup.department_name,
+      },
+      ...Array.from(departmentGroup.accounts.values())
+        .sort((a, b) => a.account_name.localeCompare(b.account_name))
+        .flatMap((accountGroup) => [
+          {
+            display_key: `shift-account-${departmentGroup.department_name}-${
+              accountGroup.account_id || accountGroup.account_name
+            }`,
+            row_type: "account" as const,
+            account_name: accountGroup.account_name,
+          },
+          ...accountGroup.shifts
+            .sort((a, b) => {
+              const aTime = String(a.start_time || "00:00:00");
+              const bTime = String(b.start_time || "00:00:00");
+
+              if (aTime !== bTime) {
+                return aTime.localeCompare(bTime);
+              }
+
+              return String(a.shift_name || "").localeCompare(
+                String(b.shift_name || ""),
+              );
+            })
+            .map((shift) => ({
+              ...shift,
+              display_key: `shift-template-${shift.shift_template_id}`,
+              row_type: "shift" as const,
+            })),
+        ]),
+    ]);
 
   type StaffingRequirementDisplayRow =
     | {
@@ -3724,11 +3778,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 <Table className={tableClass}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[30%]">Employee</TableHead>
-                      <TableHead className="w-[30%]">Department</TableHead>
-                      <TableHead className="w-[20%]">Role</TableHead>
+                      <TableHead className="w-[28%]">Employee</TableHead>
+                      <TableHead className="w-[28%]">Department</TableHead>
+                      <TableHead className="w-[24%]">Role</TableHead>
                       <TableHead className="w-[10%]">Status</TableHead>
-                      <TableHead className={actionCellClass}>Action</TableHead>
+                      <TableHead className="w-[140px] text-right">
+                        Action
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -3749,9 +3805,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           return (
                             <TableRow
                               key={row.display_key}
-                              className="h-12 bg-gray-50"
+                              className="h-11 bg-white border-b"
                             >
-                              <TableCell className="font-semibold truncate">
+                              <TableCell className="font-semibold text-gray-900 truncate py-3">
                                 {row.employee_name}
                               </TableCell>
                               <TableCell />
@@ -3764,9 +3820,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                         if (row.row_type === "department") {
                           return (
-                            <TableRow key={row.display_key} className="h-12">
+                            <TableRow
+                              key={row.display_key}
+                              className="h-11 bg-white border-b"
+                            >
                               <TableCell />
-                              <TableCell className="pl-4 font-medium text-gray-800 truncate">
+                              <TableCell className="pl-6 font-medium text-gray-800 truncate py-3">
                                 {row.department_name}
                               </TableCell>
                               <TableCell />
@@ -3777,11 +3836,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         }
 
                         return (
-                          <TableRow key={row.display_key} className="h-12">
+                          <TableRow
+                            key={row.display_key}
+                            className="h-11 bg-white border-b"
+                          >
                             <TableCell />
                             <TableCell />
 
-                            <TableCell className="pl-8 font-medium truncate">
+                            <TableCell className="pl-10 font-medium text-gray-900 truncate py-3">
                               {row.role_name}
                             </TableCell>
 
@@ -3789,7 +3851,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               {renderStatusBadge(row.status)}
                             </TableCell>
 
-                            <TableCell className={actionCellClass}>
+                            <TableCell className="w-[140px] text-right">
                               <Button
                                 size="sm"
                                 className={dangerSmallButtonClass}
@@ -3904,54 +3966,58 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      groupedShiftTemplateRows.map((row: any) => (
-                        <TableRow key={row.display_key} className="h-12">
-                          <TableCell className="font-medium truncate">
-                            {row.row_type === "department"
-                              ? row.department_name
-                              : ""}
-                          </TableCell>
+                      groupedShiftTemplateRows.map((row: any) => {
+                        if (row.row_type === "department") {
+                          return (
+                            <TableRow
+                              key={row.display_key}
+                              className="h-12 bg-gray-50"
+                            >
+                              <TableCell className="font-semibold truncate">
+                                {row.department_name}
+                              </TableCell>
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                            </TableRow>
+                          );
+                        }
 
-                          <TableCell
-                            className={
-                              row.row_type === "shift"
-                                ? "font-medium truncate pl-6"
-                                : "truncate text-gray-400"
-                            }
-                          >
-                            {row.row_type === "shift" ? row.account_name : ""}
-                          </TableCell>
+                        if (row.row_type === "account") {
+                          return (
+                            <TableRow key={row.display_key} className="h-12">
+                              <TableCell />
+                              <TableCell className="pl-4 font-medium text-gray-800 truncate">
+                                {row.account_name}
+                              </TableCell>
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                            </TableRow>
+                          );
+                        }
 
-                          <TableCell
-                            className={
-                              row.row_type === "shift"
-                                ? "font-medium truncate"
-                                : "truncate text-gray-400"
-                            }
-                          >
-                            {row.row_type === "shift" ? row.shift_name : ""}
-                          </TableCell>
+                        return (
+                          <TableRow key={row.display_key} className="h-12">
+                            <TableCell />
+                            <TableCell />
 
-                          <TableCell>
-                            {row.row_type === "shift"
-                              ? row.start_time || "-"
-                              : ""}
-                          </TableCell>
+                            <TableCell className="pl-8 font-medium truncate">
+                              {row.shift_name}
+                            </TableCell>
 
-                          <TableCell>
-                            {row.row_type === "shift"
-                              ? row.end_time || "-"
-                              : ""}
-                          </TableCell>
+                            <TableCell>{row.start_time || "-"}</TableCell>
 
-                          <TableCell>
-                            {row.row_type === "shift"
-                              ? renderStatusBadge("Active")
-                              : ""}
-                          </TableCell>
+                            <TableCell>{row.end_time || "-"}</TableCell>
 
-                          <TableCell className={actionCellClass}>
-                            {row.row_type === "shift" && (
+                            <TableCell>{renderStatusBadge("Active")}</TableCell>
+
+                            <TableCell className={actionCellClass}>
                               <Button
                                 size="sm"
                                 className={dangerSmallButtonClass}
@@ -3959,10 +4025,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               >
                                 Deactivate
                               </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
