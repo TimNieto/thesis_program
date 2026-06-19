@@ -304,14 +304,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [newEmployeeNickname, setNewEmployeeNickname] = useState("");
 
   const [isRoleOverrideOpen, setIsRoleOverrideOpen] = useState(false);
-const [selectedEmployeeForRoles, setSelectedEmployeeForRoles] =
-  useState<Employee | null>(null);
+  const [selectedEmployeeForRoles, setSelectedEmployeeForRoles] =
+    useState<Employee | null>(null);
 
-const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
 
-const [accountRolePrefs, setAccountRolePrefs] = useState<
-  Record<number, Record<number, boolean>>
->({});
+  const [accountRolePrefs, setAccountRolePrefs] = useState<
+    Record<number, Record<number, boolean>>
+  >({});
 
   const [accounts, setAccounts] = useState<any[]>([]);
   const [accountDepartmentRows, setAccountDepartmentRows] = useState<
@@ -517,7 +517,6 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
     }
   };
 
-
   const fetchEmployeeAccountPreferences = async (employeeId: number) => {
     if (!currentUser.company_id) return {};
 
@@ -706,21 +705,24 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
     }
 
     try {
-      await fetch("https://backend-production-6e75.up.railway.app/import-history", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      await fetch(
+        "https://backend-production-6e75.up.railway.app/import-history",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            imported_by_employee_id: currentUser.id,
+            category,
+            file_name: fileName,
+            row_count: rowCount,
+            status,
+            error_message: errorMessage || null,
+          }),
         },
-        body: JSON.stringify({
-          company_id: currentUser.company_id,
-          imported_by_employee_id: currentUser.id,
-          category,
-          file_name: fileName,
-          row_count: rowCount,
-          status,
-          error_message: errorMessage || null,
-        }),
-      });
+      );
 
       await fetchImportHistory();
     } catch (err) {
@@ -818,12 +820,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
         throw new Error(getImportErrorMessage(data));
       }
 
-      await saveImportHistory(
-        category,
-        file.name,
-        rows.length - 1,
-        "success",
-      );
+      await saveImportHistory(category, file.name, rows.length - 1, "success");
 
       await refreshAfterImport(category);
 
@@ -831,13 +828,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Import failed";
 
-      await saveImportHistory(
-        category,
-        file.name,
-        0,
-        "error",
-        msg,
-      );
+      await saveImportHistory(category, file.name, 0, "error", msg);
 
       toast.error(msg);
     }
@@ -1611,7 +1602,6 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
       );
     });
 
-
   const getGlobalShiftName = (shift: any) => {
     const rawShiftName = String(shift.shift_name || "").trim();
     const accountName = String(shift.account_name || "").trim();
@@ -1791,56 +1781,56 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
         ];
       });
 
-      const selectedRoles = staffingRoles.filter((role) =>
-        selectedRoleIds.includes(Number(role.role_id)),
-      );
+  const selectedRoles = staffingRoles.filter((role) =>
+    selectedRoleIds.includes(Number(role.role_id)),
+  );
 
-      const selectedDepartmentName =
-        selectedRoles.length > 0 ? selectedRoles[0].department_name : null;
+  const selectedDepartmentName =
+    selectedRoles.length > 0 ? selectedRoles[0].department_name : null;
 
-      const selectedIsAdmin =
-        selectedRoles.length > 0 ? Boolean(selectedRoles[0].is_admin) : null;
+  const selectedIsAdmin =
+    selectedRoles.length > 0 ? Boolean(selectedRoles[0].is_admin) : null;
 
-      const selectedNonAdminRoles = selectedRoles.filter(
-        (role) => !Boolean(role.is_admin),
-      );
+  const selectedNonAdminRoles = selectedRoles.filter(
+    (role) => !Boolean(role.is_admin),
+  );
 
-      const rolesByDepartment = staffingRoles.reduce(
-        (groups: Record<string, any[]>, role) => {
-          const department = role.department_name || "None";
+  const rolesByDepartment = staffingRoles.reduce(
+    (groups: Record<string, any[]>, role) => {
+      const department = role.department_name || "None";
 
-          if (!groups[department]) {
-            groups[department] = [];
-          }
+      if (!groups[department]) {
+        groups[department] = [];
+      }
 
-          groups[department].push(role);
+      groups[department].push(role);
 
-          return groups;
-        },
-        {},
-      );
+      return groups;
+    },
+    {},
+  );
 
-      const isRoleCheckboxDisabled = (role: any) => {
-        if (selectedRoles.length === 0) return false;
+  const isRoleCheckboxDisabled = (role: any) => {
+    if (selectedRoles.length === 0) return false;
 
-        const roleDepartment = role.department_name || "None";
-        const roleIsAdmin = Boolean(role.is_admin);
+    const roleDepartment = role.department_name || "None";
+    const roleIsAdmin = Boolean(role.is_admin);
 
-        if (roleDepartment !== selectedDepartmentName) return true;
-        if (roleIsAdmin !== selectedIsAdmin) return true;
+    if (roleDepartment !== selectedDepartmentName) return true;
+    if (roleIsAdmin !== selectedIsAdmin) return true;
 
-        return false;
-      };
+    return false;
+  };
 
-      const roleDepartmentAccounts = accountDepartmentRows.filter((row) => {
-        if (!selectedDepartmentName) return false;
+  const roleDepartmentAccounts = accountDepartmentRows.filter((row) => {
+    if (!selectedDepartmentName) return false;
 
-        return (
-          row.account_id &&
-          row.account_name &&
-          row.department_name === selectedDepartmentName
-        );
-      });
+    return (
+      row.account_id &&
+      row.account_name &&
+      row.department_name === selectedDepartmentName
+    );
+  });
 
   const groupedShiftTemplateRows = Array.from(
     shiftTemplates
@@ -1882,8 +1872,6 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
       )
       .values(),
   ).flatMap((group) => [group.departmentRow, ...group.shiftRows]);
-
-
 
   type StaffingRequirementDisplayRow =
     | {
@@ -2635,6 +2623,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[80px]">ID</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
@@ -2646,11 +2635,10 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                     {employees.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="text-center text-gray-500 py-6"
                         >
                           No employees found. Import employees to populate
-
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -2658,9 +2646,14 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map((employee) => (
                           <TableRow key={employee.id}>
+                            <TableCell className="font-medium text-gray-600">
+                              {employee.id}
+                            </TableCell>
+
                             <TableCell className="font-medium">
                               {employee.name}
                             </TableCell>
+
                             <TableCell>{employee.role || "None"}</TableCell>
                             <TableCell>
                               <Badge
@@ -2688,7 +2681,9 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => openRoleOverrideDialog(employee)}
+                                  onClick={() =>
+                                    openRoleOverrideDialog(employee)
+                                  }
                                   className="gap-2"
                                 >
                                   <UserSquare2 className="size-4" />
@@ -2775,7 +2770,7 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
                         ))}
                       </div>
 
-                     {globalAvailabilityShifts.map((shift) => (
+                      {globalAvailabilityShifts.map((shift) => (
                         <div
                           key={`availability-shift-${shift.shift_name}`}
                           className="grid grid-cols-8 gap-2 mt-2"
@@ -4298,7 +4293,8 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
           <DialogHeader>
             <DialogTitle>Manage Roles & Account Preferences</DialogTitle>
             <DialogDescription>
-              Override employee roles and configure account scheduling permissions.
+              Override employee roles and configure account scheduling
+              permissions.
             </DialogDescription>
           </DialogHeader>
 
@@ -4314,132 +4310,145 @@ const [accountRolePrefs, setAccountRolePrefs] = useState<
               <div className="space-y-4">
                 <h3 className="font-semibold">Role Override</h3>
 
-                {Object.entries(rolesByDepartment).map(([department, roles]) => (
-                  <div key={department} className="border rounded-lg p-4 space-y-3">
-                    <div className="font-medium">{department}</div>
+                {Object.entries(rolesByDepartment).map(
+                  ([department, roles]) => (
+                    <div
+                      key={department}
+                      className="border rounded-lg p-4 space-y-3"
+                    >
+                      <div className="font-medium">{department}</div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {roles.map((role: any) => {
-                        const roleId = Number(role.role_id);
-                        const checked = selectedRoleIds.includes(roleId);
-                        const disabled = isRoleCheckboxDisabled(role);
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {roles.map((role: any) => {
+                          const roleId = Number(role.role_id);
+                          const checked = selectedRoleIds.includes(roleId);
+                          const disabled = isRoleCheckboxDisabled(role);
 
-                        return (
-                          <label
-                            key={roleId}
-                            className={`flex items-center gap-2 rounded border p-3 ${
-                              disabled ? "opacity-50" : ""
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              disabled={disabled}
-                              onChange={(event) => {
-                                const isChecked = event.target.checked;
+                          return (
+                            <label
+                              key={roleId}
+                              className={`flex items-center gap-2 rounded border p-3 ${
+                                disabled ? "opacity-50" : ""
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={disabled}
+                                onChange={(event) => {
+                                  const isChecked = event.target.checked;
 
-                                setSelectedRoleIds((prev) => {
-                                  if (isChecked) {
-                                    return [...prev, roleId];
-                                  }
+                                  setSelectedRoleIds((prev) => {
+                                    if (isChecked) {
+                                      return [...prev, roleId];
+                                    }
 
-                                  return prev.filter((id) => id !== roleId);
-                                });
-                              }}
-                            />
+                                    return prev.filter((id) => id !== roleId);
+                                  });
+                                }}
+                              />
 
-                            <span>
-                              {role.role_name}
-                              {role.is_admin && (
-                                <span className="ml-2 text-xs text-blue-600">
-                                  Admin access
-                                </span>
-                              )}
-                            </span>
-                          </label>
-                        );
-                      })}
+                              <span>
+                                {role.role_name}
+                                {role.is_admin && (
+                                  <span className="ml-2 text-xs text-blue-600">
+                                    Admin access
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
 
               {selectedIsAdmin === true && (
                 <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-600">
-                  Admin roles are not schedule roles. Account preferences are disabled
-                  for admin-role employees.
+                  Admin roles are not schedule roles. Account preferences are
+                  disabled for admin-role employees.
                 </div>
               )}
 
-              {selectedIsAdmin === false && selectedNonAdminRoles.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Account Preferences</h3>
+              {selectedIsAdmin === false &&
+                selectedNonAdminRoles.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Account Preferences</h3>
 
-                  <div className="overflow-x-auto border rounded-lg">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Account</TableHead>
-                          {selectedNonAdminRoles.map((role) => (
-                            <TableHead key={role.role_id}>{role.role_name}</TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-
-                      <TableBody>
-                        {roleDepartmentAccounts.length === 0 ? (
+                    <div className="overflow-x-auto border rounded-lg">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell
-                              colSpan={1 + selectedNonAdminRoles.length}
-                              className="text-center text-gray-500 py-6"
-                            >
-                              No accounts found under this department.
-                            </TableCell>
+                            <TableHead>Account</TableHead>
+                            {selectedNonAdminRoles.map((role) => (
+                              <TableHead key={role.role_id}>
+                                {role.role_name}
+                              </TableHead>
+                            ))}
                           </TableRow>
-                        ) : (
-                          roleDepartmentAccounts.map((account) => (
-                            <TableRow key={account.account_id}>
-                              <TableCell>{account.account_name}</TableCell>
+                        </TableHeader>
 
-                              {selectedNonAdminRoles.map((role) => {
-                                const accountId = Number(account.account_id);
-                                const roleId = Number(role.role_id);
-
-                                return (
-                                  <TableCell key={roleId}>
-                                    <input
-                                      type="checkbox"
-                                      checked={
-                                        accountRolePrefs[accountId]?.[roleId] || false
-                                      }
-                                      onChange={(event) => {
-                                        const checked = event.target.checked;
-
-                                        setAccountRolePrefs((prev) => ({
-                                          ...prev,
-                                          [accountId]: {
-                                            ...(prev[accountId] || {}),
-                                            [roleId]: checked,
-                                          },
-                                        }));
-                                      }}
-                                    />
-                                  </TableCell>
-                                );
-                              })}
+                        <TableBody>
+                          {roleDepartmentAccounts.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={1 + selectedNonAdminRoles.length}
+                                className="text-center text-gray-500 py-6"
+                              >
+                                No accounts found under this department.
+                              </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                          ) : (
+                            roleDepartmentAccounts.map((account) => (
+                              <TableRow key={account.account_id}>
+                                <TableCell>{account.account_name}</TableCell>
+
+                                {selectedNonAdminRoles.map((role) => {
+                                  const accountId = Number(account.account_id);
+                                  const roleId = Number(role.role_id);
+
+                                  return (
+                                    <TableCell key={roleId}>
+                                      <input
+                                        type="checkbox"
+                                        checked={
+                                          accountRolePrefs[accountId]?.[
+                                            roleId
+                                          ] || false
+                                        }
+                                        onChange={(event) => {
+                                          const checked = event.target.checked;
+
+                                          setAccountRolePrefs((prev) => ({
+                                            ...prev,
+                                            [accountId]: {
+                                              ...(prev[accountId] || {}),
+                                              [roleId]: checked,
+                                            },
+                                          }));
+                                        }}
+                                      />
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRoleOverrideOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsRoleOverrideOpen(false)}
+            >
               Cancel
             </Button>
 
