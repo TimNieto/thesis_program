@@ -6575,30 +6575,38 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         open={isAccountPreferencesTemplatePreviewOpen}
         onOpenChange={setIsAccountPreferencesTemplatePreviewOpen}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Account Preferences CSV Template</DialogTitle>
             <DialogDescription>
-              Your CSV must use exactly these columns. Employees, accounts, and
-              roles must already exist.
+              Your CSV must use exactly these columns. Employees, departments,
+              roles, and accounts must already exist.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded border bg-white p-4 overflow-x-auto">
-            <pre className="text-sm">
-              employee_name,account_name,role_name,is_preferred{"\n"}
-              Juan Dela Cruz,Shopee,Host,yes{"\n"}
-              Juan Dela Cruz,MamyPoko,Host,no
-            </pre>
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/account-preferences-template.png"
+              alt="Account preferences CSV template preview"
+              className="w-full h-auto"
+            />
           </div>
 
           <div className="text-sm text-gray-600 space-y-1">
             <p>
-              Required columns: employee_name, account_name, role_name,
-              is_preferred.
+              Required columns: employee_name, department_name, role_name,
+              account_name, is_preferred.
             </p>
-            <p>is_preferred must be yes or no.</p>
-            <p>The employee must already have the selected role assignment.</p>
+            <p>is_preferred must be yes or no only.</p>
+            <p>yes creates or reactivates the account preference.</p>
+            <p>no marks the account preference as unpreferred if it exists.</p>
+            <p>
+              The employee must already have the selected active non-admin role.
+            </p>
+            <p>
+              Import is all-or-nothing: if one row is invalid, nothing will be
+              saved.
+            </p>
           </div>
 
           <DialogFooter>
@@ -6682,7 +6690,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
           <div className="rounded border overflow-hidden bg-white">
             <img
-              src="/availability.png"
+              src="/availabilities-template.png"
               alt="Availability CSV template preview"
               className="w-full h-auto"
             />
