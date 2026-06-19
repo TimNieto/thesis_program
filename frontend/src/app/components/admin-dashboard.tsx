@@ -4398,12 +4398,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <Table className="w-full table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[22%]">Employee</TableHead>
-                        <TableHead className="w-[18%]">Day</TableHead>
-                        <TableHead className="w-[26%]">Shift Name(s)</TableHead>
-                        <TableHead className="w-[18%] text-center">
-                          Time Range
-                        </TableHead>
+                        <TableHead className="w-[20%]">Employee</TableHead>
+                        <TableHead className="w-[14%]">Day</TableHead>
+                        <TableHead className="w-[24%]">Shift Name(s)</TableHead>
+                        <TableHead className="w-[16%]">Time Range</TableHead>
+                        <TableHead className="w-[10%]">Status</TableHead>
                         <TableHead className="w-[16%] text-right">
                           Action
                         </TableHead>
@@ -4414,7 +4413,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       {groupedAvailabilityRows.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={5}
+                            colSpan={6}
                             className="text-center text-gray-500 py-6"
                           >
                             No available employee slots found.
@@ -4435,6 +4434,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 <TableCell />
                                 <TableCell />
                                 <TableCell />
+                                <TableCell />
                               </TableRow>
                             );
                           }
@@ -4446,9 +4446,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 className="h-11 bg-white border-b"
                               >
                                 <TableCell />
-                                <TableCell className="pl-6 font-medium text-gray-800 truncate py-3">
+                                <TableCell className="pl-4 font-medium text-gray-800 truncate py-3">
                                   {row.day}
                                 </TableCell>
+                                <TableCell />
                                 <TableCell />
                                 <TableCell />
                                 <TableCell />
@@ -4464,12 +4465,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               <TableCell />
                               <TableCell />
 
-                              <TableCell className="pl-10 font-medium text-gray-900 truncate py-3">
+                              <TableCell className="pl-6 font-medium text-gray-900 truncate py-3">
                                 {row.slot.shift_name}
                               </TableCell>
 
-                              <TableCell className="text-center">
+                              <TableCell className="whitespace-nowrap">
                                 {row.slot.time_range}
+                              </TableCell>
+
+                              <TableCell>
+                                <Badge variant="default">Available</Badge>
                               </TableCell>
 
                               <TableCell className="text-right">
