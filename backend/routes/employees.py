@@ -2513,6 +2513,8 @@ def get_availability(company_id: int):
                 a.is_available,
                 a.shift_template_id,
                 st.shift_name,
+                st.start_time,
+                st.end_time,
                 a.company_id
             FROM availability a
             JOIN shift_templates st
@@ -2531,7 +2533,9 @@ def get_availability(company_id: int):
                     WHEN 'Sunday' THEN 7
                     ELSE 8
                 END,
-                st.start_time
+                st.start_time,
+                st.end_time,
+                st.shift_name
         """, (company_id,))
 
         rows = cursor.fetchall()
@@ -2544,7 +2548,10 @@ def get_availability(company_id: int):
                 "shift_template_id": r[3],
                 "preferred_shift": r[4],
                 "shift_name": r[4],
-                "company_id": r[5],
+                "start_time": str(r[5]),
+                "end_time": str(r[6]),
+                "availability_group_key": f"{str(r[5])}|{str(r[6])}",
+                "company_id": r[7],
             }
             for r in rows
         ]
@@ -2709,13 +2716,20 @@ def update_global_availability(data: dict):
         employee_id = int(data["employee_id"])
         company_id = int(data["company_id"])
         day_of_week = str(data["day_of_week"]).strip().capitalize()
-        shift_name = str(data.get("shift_name", "")).strip()
+        start_time = str(data.get("start_time", "")).strip()
+        end_time = str(data.get("end_time", "")).strip()
         is_available = bool(data["is_available"])
 
-        if not shift_name:
+        if not start_time:
             raise HTTPException(
                 status_code=400,
-                detail="shift_name is required"
+                detail="start_time is required"
+            )
+
+        if not end_time:
+            raise HTTPException(
+                status_code=400,
+                detail="end_time is required"
             )
 
         cursor.execute("""
@@ -2745,13 +2759,15 @@ def update_global_availability(data: dict):
                 ON st.account_id = a.account_id
                 AND st.company_id = a.company_id
             WHERE st.company_id = %s
-            AND LOWER(TRIM(st.shift_name)) = LOWER(TRIM(%s))
+            AND st.start_time = %s::time
+            AND st.end_time = %s::time
             AND st.is_active = TRUE
             AND a.is_active = TRUE
             ORDER BY st.shift_template_id
         """, (
             company_id,
-            shift_name
+            start_time,
+            end_time
         ))
 
         shift_template_rows = cursor.fetchall()
@@ -2759,7 +2775,7 @@ def update_global_availability(data: dict):
         if not shift_template_rows:
             raise HTTPException(
                 status_code=400,
-                detail="No active shift templates found for this shift name"
+                detail="No active shift templates found for this time range"
             )
 
         for row in shift_template_rows:
@@ -2819,7 +2835,9 @@ def update_global_availability(data: dict):
             "employee_id": employee_id,
             "company_id": company_id,
             "day_of_week": day_of_week,
-            "shift_name": shift_name,
+            "start_time": start_time,
+            "end_time": end_time,
+            "availability_group_key": f"{start_time}|{end_time}",
             "is_available": is_available,
             "updated_shift_templates": len(shift_template_rows),
         }

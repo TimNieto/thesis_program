@@ -1717,20 +1717,41 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const globalAvailabilityShifts = Array.from(
     shiftTemplates
       .reduce((map, shift) => {
-        const shiftName = String(shift.shift_name || "").trim();
+        const startTime = String(shift.start_time || "00:00:00").trim();
+        const endTime = String(shift.end_time || "00:00:00").trim();
 
-        if (!shiftName) return map;
+        const key = `${startTime}|${endTime}`;
 
-        const key = shiftName.toLowerCase();
+        const shiftName =
+          getGlobalShiftName(shift) || String(shift.shift_name || "").trim();
 
-        if (!map.has(key)) {
-          map.set(key, {
-            shift_name: shift.shift_name,
-            start_time: shift.start_time,
-            end_time: shift.end_time,
-            representative_shift_template_id: shift.shift_template_id,
-          });
+        const existing = map.get(key) ?? {
+          availability_group_key: key,
+          shift_names: [] as string[],
+          display_name: "",
+          start_time: startTime,
+          end_time: endTime,
+          representative_shift_template_id: shift.shift_template_id,
+        };
+
+        if (
+          shiftName &&
+          !existing.shift_names.some(
+            (name: string) =>
+              name.trim().toLowerCase() === shiftName.trim().toLowerCase(),
+          )
+        ) {
+          existing.shift_names.push(shiftName);
         }
+
+        existing.shift_names.sort((a: string, b: string) => a.localeCompare(b));
+
+        existing.display_name =
+          existing.shift_names.length > 0
+            ? existing.shift_names.join(" / ")
+            : "Unnamed Shift";
+
+        map.set(key, existing);
 
         return map;
       }, new Map<string, any>())
@@ -1741,7 +1762,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     if (aTime !== bTime) return aTime.localeCompare(bTime);
 
-    return String(a.shift_name || "").localeCompare(String(b.shift_name || ""));
+    const aEnd = String(a.end_time || "00:00:00");
+    const bEnd = String(b.end_time || "00:00:00");
+
+    if (aEnd !== bEnd) return aEnd.localeCompare(bEnd);
+
+    return String(a.display_name || "").localeCompare(
+      String(b.display_name || ""),
+    );
   });
 
   const selectedRequirementAccountInfo = activeShiftAccountOptions.find(
@@ -2423,7 +2451,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const isSlotUnavailable = (
     employeeId: number,
     day: string,
-    shiftName: number | string,
+    availabilityGroupKey: number | string,
   ): boolean => {
     const emp = employeeAvailability[employeeId];
 
@@ -2433,8 +2461,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     if (!dayData) return true;
 
-    const shiftKey = String(shiftName).trim().toLowerCase();
-    const shiftData = dayData[shiftKey];
+    const shiftData = dayData[String(availabilityGroupKey)];
 
     if (shiftData === undefined) return true;
 
@@ -2446,17 +2473,21 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     day: string,
     shift: any,
   ) => {
-    const shiftName = String(shift.shift_name || "").trim();
+    const availabilityGroupKey = String(
+      shift.availability_group_key || "",
+    ).trim();
+    const startTime = String(shift.start_time || "").trim();
+    const endTime = String(shift.end_time || "").trim();
 
-    if (!shiftName) {
-      toast.error("Invalid shift name");
+    if (!availabilityGroupKey || !startTime || !endTime) {
+      toast.error("Invalid shift time range");
       return;
     }
 
     const isCurrentlyUnavailable = isSlotUnavailable(
       employeeId,
       day,
-      shiftName,
+      availabilityGroupKey,
     );
 
     try {
@@ -2471,7 +2502,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             employee_id: employeeId,
             company_id: currentUser.company_id,
             day_of_week: day.toLowerCase(),
-            shift_name: shiftName,
+            start_time: startTime,
+            end_time: endTime,
             is_available: isCurrentlyUnavailable,
           }),
         },
@@ -2505,17 +2537,15 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       data.forEach((row: any) => {
         if (!row.day_of_week) return;
 
-        const rawShiftName =
-          row.shift_name ||
-          row.preferred_shift ||
-          row.shift_type ||
-          row.shift_template_name;
+        const startTime = String(row.start_time || "").trim();
+        const endTime = String(row.end_time || "").trim();
 
-        if (!rawShiftName) return;
+        if (!startTime || !endTime) return;
 
         const empId = Number(row.employee_id);
         const day = String(row.day_of_week).toLowerCase();
-        const shiftKey = String(rawShiftName).trim().toLowerCase();
+        const availabilityGroupKey =
+          row.availability_group_key || `${startTime}|${endTime}`;
 
         if (!transformed[empId]) {
           transformed[empId] = {};
@@ -2525,7 +2555,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           transformed[empId][day] = {};
         }
 
-        transformed[empId][day][shiftKey] = row.is_available;
+        const existingValue = transformed[empId][day][availabilityGroupKey];
+
+        transformed[empId][day][availabilityGroupKey] =
+          existingValue === undefined
+            ? row.is_available
+            : Boolean(existingValue && row.is_available);
       });
 
       console.log("GLOBAL AVAILABILITY MAP:", transformed);
@@ -2902,11 +2937,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                       {globalAvailabilityShifts.map((shift) => (
                         <div
-                          key={`availability-shift-${shift.shift_name}`}
+                          key={`availability-shift-${shift.availability_group_key}`}
                           className="grid grid-cols-8 gap-2 mt-2"
                         >
                           <div className="p-3 font-medium bg-gray-100 rounded flex flex-col justify-center">
-                            <div>{shift.shift_name}</div>
+                            <div>{shift.display_name}</div>
                             <div className="text-xs text-gray-600">
                               {(shift.start_time || "").slice(0, 5)} -{" "}
                               {(shift.end_time || "").slice(0, 5)}
@@ -2916,12 +2951,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                             const isUnavailable = isSlotUnavailable(
                               selectedEmployeeForDayOff,
                               day,
-                              shift.shift_name,
+                              shift.availability_group_key,
                             );
 
                             return (
                               <div
-                                key={`${day}-${shift.shift_name}`}
+                                key={`${day}-${shift.availability_group_key}`}
                                 onClick={() =>
                                   toggleSlotAvailability(
                                     selectedEmployeeForDayOff,
