@@ -427,6 +427,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     useState(false);
   const [selectedEmployeeForAvailability, setSelectedEmployeeForAvailability] =
     useState<Employee | null>(null);
+  const [availabilityToggleToConfirm, setAvailabilityToggleToConfirm] =
+    useState<{
+      employee_id: number;
+      employee_name: string;
+      day: string;
+      slot: any;
+    } | null>(null);
 
   const fetchEmployees = async () => {
     if (!currentUser.company_id) {
@@ -2941,6 +2948,20 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const confirmAvailabilityToggle = async () => {
+    if (!availabilityToggleToConfirm) return;
+
+    const pendingToggle = availabilityToggleToConfirm;
+
+    setAvailabilityToggleToConfirm(null);
+
+    await toggleSlotAvailability(
+      pendingToggle.employee_id,
+      pendingToggle.day,
+      pendingToggle.slot,
+    );
+  };
+
   const fetchAvailability = async () => {
     try {
       const companyId = currentUser.company_id;
@@ -4720,11 +4741,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                   size="sm"
                                   className={dangerSmallButtonClass}
                                   onClick={() =>
-                                    toggleSlotAvailability(
-                                      row.employee_id,
-                                      row.day,
-                                      row.slot,
-                                    )
+                                    setAvailabilityToggleToConfirm({
+                                      employee_id: row.employee_id,
+                                      employee_name:
+                                        employees.find(
+                                          (employee) =>
+                                            employee.id === row.employee_id,
+                                        )?.name || "this employee",
+                                      day: row.day,
+                                      slot: row.slot,
+                                    })
                                   }
                                 >
                                   Unavailable
@@ -6446,7 +6472,62 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Availability Unavailable Confirmation Dialog */}
+      <Dialog
+        open={Boolean(availabilityToggleToConfirm)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAvailabilityToggleToConfirm(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark as Unavailable?</DialogTitle>
+            <DialogDescription>
+              This will remove this available slot from the employee
+              availability list.
+            </DialogDescription>
+          </DialogHeader>
 
+          {availabilityToggleToConfirm && (
+            <div className="rounded border bg-gray-50 p-4 text-sm space-y-2">
+              <p>
+                <span className="font-medium">Employee:</span>{" "}
+                {availabilityToggleToConfirm.employee_name}
+              </p>
+              <p>
+                <span className="font-medium">Day:</span>{" "}
+                {availabilityToggleToConfirm.day}
+              </p>
+              <p>
+                <span className="font-medium">Shift:</span>{" "}
+                {availabilityToggleToConfirm.slot.shift_name}
+              </p>
+              <p>
+                <span className="font-medium">Time:</span>{" "}
+                {availabilityToggleToConfirm.slot.time_range}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAvailabilityToggleToConfirm(null)}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              className={dangerSmallButtonClass}
+              onClick={confirmAvailabilityToggle}
+            >
+              Confirm Unavailable
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Availability Template Preview Dialog */}
       <Dialog
         open={isAvailabilityTemplatePreviewOpen}
