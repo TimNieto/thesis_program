@@ -135,6 +135,51 @@ interface AccountDepartmentDisplayRow extends AccountDepartmentRow {
   row_type: "department" | "account";
 }
 
+interface AccountPreferenceDisplayRow {
+  display_key: string;
+  employee_id: number;
+  employee_name: string;
+  department_name: string;
+  role_id: number;
+  role_name: string;
+  account_id: number;
+  account_name: string;
+  status: "Active" | "Inactive";
+}
+
+type GroupedAccountPreferenceRow =
+  | {
+      display_key: string;
+      row_type: "employee";
+      employee_id: number;
+      employee_name: string;
+    }
+  | {
+      display_key: string;
+      row_type: "department";
+      employee_id: number;
+      department_name: string;
+    }
+  | {
+      display_key: string;
+      row_type: "role";
+      employee_id: number;
+      department_name: string;
+      role_id: number;
+      role_name: string;
+    }
+  | {
+      display_key: string;
+      row_type: "account";
+      employee_id: number;
+      department_name: string;
+      role_id: number;
+      role_name: string;
+      account_id: number;
+      account_name: string;
+      status: "Active" | "Inactive";
+    };
+
 interface Request {
   id: string;
   type: "application" | "cover" | "leave";
@@ -333,6 +378,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [accountDepartmentRows, setAccountDepartmentRows] = useState<
     AccountDepartmentRow[]
+  >([]);
+  const [accountPreferenceRows, setAccountPreferenceRows] = useState<
+    AccountPreferenceDisplayRow[]
   >([]);
 
   // Override Dialog States
@@ -575,12 +623,84 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
+  const fetchAccountPreferenceRows = async (
+    employeeList: Employee[] = employees,
+  ) => {
+    if (!currentUser.company_id) {
+      setAccountPreferenceRows([]);
+      return;
+    }
+
+    try {
+      const activeEmployees = employeeList.filter(
+        (employee) => employee.status === "Active",
+      );
+
+      const rows = await Promise.all(
+        activeEmployees.map(async (employee) => {
+          const res = await fetch(
+            `https://backend-production-6e75.up.railway.app/employees/${employee.id}/account-preferences?company_id=${currentUser.company_id}`,
+          );
+
+          const data = await res.json().catch(() => null);
+
+          if (!res.ok) {
+            return [];
+          }
+
+          return (Array.isArray(data) ? data : []).map((pref: any) => ({
+            display_key: `account-preference-${employee.id}-${pref.department_id}-${pref.role_id}-${pref.account_id}`,
+            employee_id: employee.id,
+            employee_name: employee.name,
+            department_name: pref.department_name || "None",
+            role_id: Number(pref.role_id),
+            role_name: pref.role_name || "None",
+            account_id: Number(pref.account_id),
+            account_name: pref.account_name || "None",
+            status: employee.status,
+          }));
+        }),
+      );
+
+      const flattenedRows = rows.flat().sort((a, b) => {
+        const employeeCompare = a.employee_name.localeCompare(b.employee_name);
+        if (employeeCompare !== 0) return employeeCompare;
+
+        const departmentCompare = a.department_name.localeCompare(
+          b.department_name,
+        );
+        if (departmentCompare !== 0) return departmentCompare;
+
+        const roleCompare = a.role_name.localeCompare(b.role_name);
+        if (roleCompare !== 0) return roleCompare;
+
+        return a.account_name.localeCompare(b.account_name);
+      });
+
+      setAccountPreferenceRows(flattenedRows);
+    } catch (err) {
+      console.error("Failed to load account preference rows", err);
+      setAccountPreferenceRows([]);
+    }
+  };
+
   useEffect(() => {
     if (!currentUser.company_id) return;
     if (shiftTemplates.length === 0) return;
 
     fetchAvailability();
   }, [currentUser.company_id, shiftTemplates]);
+
+  useEffect(() => {
+    if (!currentUser.company_id) return;
+    if (currentUser.role.toLowerCase() !== "admin") return;
+    if (employees.length === 0) {
+      setAccountPreferenceRows([]);
+      return;
+    }
+
+    fetchAccountPreferenceRows(employees);
+  }, [currentUser.company_id, currentUser.role, employees]);
 
   useEffect(() => {
     const loadAdminData = async () => {
@@ -1866,6 +1986,124 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       ]),
     ],
   );
+
+  const groupedAccountPreferenceRows: GroupedAccountPreferenceRow[] =
+    Array.from(
+      accountPreferenceRows
+        .reduce(
+          (employeeMap, row) => {
+            const employeeGroup = employeeMap.get(row.employee_id) ?? {
+              employee_id: row.employee_id,
+              employee_name: row.employee_name,
+              departments: new Map<
+                string,
+                {
+                  department_name: string;
+                  roles: Map<
+                    string,
+                    {
+                      role_id: number;
+                      role_name: string;
+                      accounts: AccountPreferenceDisplayRow[];
+                    }
+                  >;
+                }
+              >(),
+            };
+
+            const departmentKey = row.department_name.toLowerCase();
+
+            const departmentGroup = employeeGroup.departments.get(
+              departmentKey,
+            ) ?? {
+              department_name: row.department_name,
+              roles: new Map<
+                string,
+                {
+                  role_id: number;
+                  role_name: string;
+                  accounts: AccountPreferenceDisplayRow[];
+                }
+              >(),
+            };
+
+            const roleKey = String(row.role_id || row.role_name).toLowerCase();
+
+            const roleGroup = departmentGroup.roles.get(roleKey) ?? {
+              role_id: row.role_id,
+              role_name: row.role_name,
+              accounts: [],
+            };
+
+            roleGroup.accounts.push(row);
+            departmentGroup.roles.set(roleKey, roleGroup);
+            employeeGroup.departments.set(departmentKey, departmentGroup);
+            employeeMap.set(row.employee_id, employeeGroup);
+
+            return employeeMap;
+          },
+          new Map<
+            number,
+            {
+              employee_id: number;
+              employee_name: string;
+              departments: Map<
+                string,
+                {
+                  department_name: string;
+                  roles: Map<
+                    string,
+                    {
+                      role_id: number;
+                      role_name: string;
+                      accounts: AccountPreferenceDisplayRow[];
+                    }
+                  >;
+                }
+              >;
+            }
+          >(),
+        )
+        .values(),
+    ).flatMap((employeeGroup) => [
+      {
+        display_key: `account-pref-employee-${employeeGroup.employee_id}`,
+        row_type: "employee" as const,
+        employee_id: employeeGroup.employee_id,
+        employee_name: employeeGroup.employee_name,
+      },
+      ...Array.from(employeeGroup.departments.values()).flatMap(
+        (departmentGroup) => [
+          {
+            display_key: `account-pref-department-${employeeGroup.employee_id}-${departmentGroup.department_name}`,
+            row_type: "department" as const,
+            employee_id: employeeGroup.employee_id,
+            department_name: departmentGroup.department_name,
+          },
+          ...Array.from(departmentGroup.roles.values()).flatMap((roleGroup) => [
+            {
+              display_key: `account-pref-role-${employeeGroup.employee_id}-${departmentGroup.department_name}-${roleGroup.role_id}`,
+              row_type: "role" as const,
+              employee_id: employeeGroup.employee_id,
+              department_name: departmentGroup.department_name,
+              role_id: roleGroup.role_id,
+              role_name: roleGroup.role_name,
+            },
+            ...roleGroup.accounts.map((account) => ({
+              display_key: account.display_key,
+              row_type: "account" as const,
+              employee_id: account.employee_id,
+              department_name: account.department_name,
+              role_id: account.role_id,
+              role_name: account.role_name,
+              account_id: account.account_id,
+              account_name: account.account_name,
+              status: account.status,
+            })),
+          ]),
+        ],
+      ),
+    ]);
 
   const selectedRequirementAccountInfo = activeShiftAccountOptions.find(
     (row) => String(row.account_id) === newRequirementAccountId,
@@ -4560,10 +4798,112 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardHeader>
 
             <CardContent>
-              <p className="text-sm text-gray-600">
-                Use this to bulk import employee account preferences. No manual
-                add form is available here.
-              </p>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Use this to bulk import employee account preferences. No
+                  manual add form is available here.
+                </p>
+
+                <div className="overflow-x-auto">
+                  <Table className="w-full table-fixed">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[22%]">Employee</TableHead>
+                        <TableHead className="w-[20%]">Department</TableHead>
+                        <TableHead className="w-[22%]">Role</TableHead>
+                        <TableHead className="w-[24%]">Account Name</TableHead>
+                        <TableHead className="w-[12%]">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {groupedAccountPreferenceRows.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="text-center text-gray-500 py-6"
+                          >
+                            No account preferences found. Use Import CSV to add
+                            records.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        groupedAccountPreferenceRows.map((row) => {
+                          if (row.row_type === "employee") {
+                            return (
+                              <TableRow
+                                key={row.display_key}
+                                className="h-11 bg-white border-b"
+                              >
+                                <TableCell className="font-semibold text-gray-900 truncate py-3">
+                                  {row.employee_name}
+                                </TableCell>
+                                <TableCell />
+                                <TableCell />
+                                <TableCell />
+                                <TableCell />
+                              </TableRow>
+                            );
+                          }
+
+                          if (row.row_type === "department") {
+                            return (
+                              <TableRow
+                                key={row.display_key}
+                                className="h-11 bg-white border-b"
+                              >
+                                <TableCell />
+                                <TableCell className="pl-4 font-medium text-gray-800 truncate py-3">
+                                  {row.department_name}
+                                </TableCell>
+                                <TableCell />
+                                <TableCell />
+                                <TableCell />
+                              </TableRow>
+                            );
+                          }
+
+                          if (row.row_type === "role") {
+                            return (
+                              <TableRow
+                                key={row.display_key}
+                                className="h-11 bg-white border-b"
+                              >
+                                <TableCell />
+                                <TableCell />
+                                <TableCell className="pl-6 font-medium text-gray-900 truncate py-3">
+                                  {row.role_name}
+                                </TableCell>
+                                <TableCell />
+                                <TableCell />
+                              </TableRow>
+                            );
+                          }
+
+                          return (
+                            <TableRow
+                              key={row.display_key}
+                              className="h-11 bg-white border-b"
+                            >
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+
+                              <TableCell className="pl-6 font-medium text-gray-900 truncate py-3">
+                                {row.account_name}
+                              </TableCell>
+
+                              <TableCell>
+                                {renderStatusBadge(row.status)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
