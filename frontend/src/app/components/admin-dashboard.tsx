@@ -4105,16 +4105,22 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
             <CardContent>
               <div className="overflow-x-auto">
-                <Table className={tableClass}>
+                <Table className="w-full table-fixed">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[16%]">Department</TableHead>
-                      <TableHead className="w-[16%]">Account</TableHead>
-                      <TableHead className="w-[16%]">Shift</TableHead>
-                      <TableHead className="w-[24%]">Role</TableHead>
-                      <TableHead className="w-[12%]">Required Count</TableHead>
-                      <TableHead className="w-[8%]">Status</TableHead>
-                      <TableHead className={actionCellClass}>Action</TableHead>
+                      <TableHead className="w-[15%]">Department</TableHead>
+                      <TableHead className="w-[15%]">Account</TableHead>
+                      <TableHead className="w-[13%]">Shift</TableHead>
+                      <TableHead className="w-[21%]">Role</TableHead>
+                      <TableHead className="w-[13%] text-center">
+                        Required Count
+                      </TableHead>
+                      <TableHead className="w-[10%] text-center">
+                        Status
+                      </TableHead>
+                      <TableHead className="w-[13%] text-right">
+                        Action
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -4134,9 +4140,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           return (
                             <TableRow
                               key={row.display_key}
-                              className="bg-gray-50 h-12"
+                              className="h-11 bg-white border-b"
                             >
-                              <TableCell className="font-semibold truncate">
+                              <TableCell className="font-semibold text-gray-900 truncate py-3">
                                 {row.department_name}
                               </TableCell>
                               <TableCell />
@@ -4151,9 +4157,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                         if (row.row_type === "account") {
                           return (
-                            <TableRow key={row.display_key} className="h-12">
+                            <TableRow
+                              key={row.display_key}
+                              className="h-11 bg-white border-b"
+                            >
                               <TableCell />
-                              <TableCell className="pl-4 font-medium text-gray-800 truncate">
+                              <TableCell className="font-medium text-gray-800 truncate py-3">
                                 {row.account_name}
                               </TableCell>
                               <TableCell />
@@ -4167,10 +4176,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
                         if (row.row_type === "shift") {
                           return (
-                            <TableRow key={row.display_key} className="h-12">
+                            <TableRow
+                              key={row.display_key}
+                              className="h-11 bg-white border-b"
+                            >
                               <TableCell />
                               <TableCell />
-                              <TableCell className="pl-4 font-medium text-gray-700 truncate">
+                              <TableCell className="font-medium text-gray-800 truncate py-3">
                                 {row.shift_name}
                               </TableCell>
                               <TableCell />
@@ -4184,18 +4196,21 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         const requirement = row.requirement;
 
                         return (
-                          <TableRow key={row.display_key} className="h-12">
+                          <TableRow
+                            key={row.display_key}
+                            className="h-11 bg-white border-b"
+                          >
                             <TableCell />
                             <TableCell />
                             <TableCell />
 
-                            <TableCell className="pl-4 truncate">
+                            <TableCell className="font-medium text-gray-900 truncate py-3">
                               {requirement.role_name ||
                                 requirement.role_key ||
                                 "—"}
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="text-center">
                               <Input
                                 type="text"
                                 inputMode="numeric"
@@ -4203,7 +4218,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 defaultValue={String(
                                   requirement.required_count ?? 1,
                                 )}
-                                className="h-8 w-20 text-center"
+                                className="h-8 w-20 mx-auto text-center"
                                 onChange={(event) => {
                                   const value =
                                     event.currentTarget.value.trim();
@@ -4257,7 +4272,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               />
                             </TableCell>
 
-                            <TableCell>
+                            <TableCell className="text-center">
                               <Badge
                                 variant={
                                   requirement.is_active
@@ -4269,7 +4284,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               </Badge>
                             </TableCell>
 
-                            <TableCell className={actionCellClass}>
+                            <TableCell className="text-right">
                               <Button
                                 size="sm"
                                 className={dangerSmallButtonClass}
