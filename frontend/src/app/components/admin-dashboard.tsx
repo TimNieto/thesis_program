@@ -100,17 +100,21 @@ type EmployeeAssignmentDisplayRow =
       row_type: "employee";
       employee_id: number;
       employee_name: string;
-      department_name: "";
-      role_name: "";
+      status: "Active" | "Inactive";
+    }
+  | {
+      display_key: string;
+      row_type: "department";
+      employee_id: number;
+      department_id: number;
+      department_name: string;
       status: "Active" | "Inactive";
     }
   | {
       display_key: string;
       row_type: "assignment";
       employee_id: number;
-      employee_name: string;
       employee_role_id: number;
-      department_name: string;
       role_name: string;
       status: "Active" | "Inactive";
       is_admin: boolean;
@@ -1792,6 +1796,49 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     );
   });
 
+  const formatAvailabilityTime = (value: any) => {
+    const time = String(value || "").trim();
+
+    if (!time) return "";
+
+    return time.slice(0, 5);
+  };
+
+  const availabilityDisplayGroups = [...employees]
+    .filter((employee) => employee.status === "Active")
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((employee) => {
+      const days = DAYS.map((day) => {
+        const dayData =
+          employeeAvailability[employee.id]?.[day.toLowerCase()] || {};
+
+        const slots = globalAvailabilityShifts
+          .filter((shift) => {
+            return dayData[String(shift.availability_group_key)] === true;
+          })
+          .map((shift) => ({
+            availability_group_key: shift.availability_group_key,
+            shift_name: shift.display_name,
+            time_range: `${formatAvailabilityTime(
+              shift.start_time,
+            )} - ${formatAvailabilityTime(shift.end_time)}`,
+            status: "Available",
+          }));
+
+        return {
+          day,
+          slots,
+        };
+      }).filter((dayGroup) => dayGroup.slots.length > 0);
+
+      return {
+        employee_id: employee.id,
+        employee_name: employee.name,
+        days,
+      };
+    })
+    .filter((employeeGroup) => employeeGroup.days.length > 0);
+
   const selectedRequirementAccountInfo = activeShiftAccountOptions.find(
     (row) => String(row.account_id) === newRequirementAccountId,
   );
@@ -1895,11 +1942,43 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       })
       .sort((a, b) => a.name.localeCompare(b.name))
       .flatMap((employee) => {
-        const assignments = [...(employee.assignments || [])].sort((a, b) =>
-          `${a.department_name}-${a.role_name}`.localeCompare(
-            `${b.department_name}-${b.role_name}`,
-          ),
-        );
+        const departmentGroups = Array.from(
+          [...(employee.assignments || [])]
+            .sort((a, b) =>
+              `${a.department_name}-${a.role_name}`.localeCompare(
+                `${b.department_name}-${b.role_name}`,
+              ),
+            )
+            .reduce(
+              (map, assignment) => {
+                const departmentId = Number(assignment.department_id);
+                const departmentName = assignment.department_name || "None";
+                const key = String(
+                  departmentId || departmentName,
+                ).toLowerCase();
+
+                const existing = map.get(key) ?? {
+                  department_id: departmentId,
+                  department_name: departmentName,
+                  assignments: [] as EmployeeAssignmentRow[],
+                };
+
+                existing.assignments.push(assignment);
+                map.set(key, existing);
+
+                return map;
+              },
+              new Map<
+                string,
+                {
+                  department_id: number;
+                  department_name: string;
+                  assignments: EmployeeAssignmentRow[];
+                }
+              >(),
+            )
+            .values(),
+        ).sort((a, b) => a.department_name.localeCompare(b.department_name));
 
         return [
           {
@@ -1907,21 +1986,27 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             row_type: "employee" as const,
             employee_id: employee.id,
             employee_name: employee.name,
-            department_name: "" as const,
-            role_name: "" as const,
             status: employee.status,
           },
-          ...assignments.map((assignment) => ({
-            display_key: `employee-assignment-${assignment.employee_role_id}`,
-            row_type: "assignment" as const,
-            employee_id: employee.id,
-            employee_name: employee.name,
-            employee_role_id: assignment.employee_role_id,
-            department_name: assignment.department_name,
-            role_name: assignment.role_name,
-            status: employee.status,
-            is_admin: assignment.is_admin,
-          })),
+          ...departmentGroups.flatMap((departmentGroup) => [
+            {
+              display_key: `employee-assignment-department-${employee.id}-${departmentGroup.department_id}`,
+              row_type: "department" as const,
+              employee_id: employee.id,
+              department_id: departmentGroup.department_id,
+              department_name: departmentGroup.department_name,
+              status: employee.status,
+            },
+            ...departmentGroup.assignments.map((assignment) => ({
+              display_key: `employee-assignment-${assignment.employee_role_id}`,
+              row_type: "assignment" as const,
+              employee_id: employee.id,
+              employee_role_id: assignment.employee_role_id,
+              role_name: assignment.role_name,
+              status: employee.status,
+              is_admin: assignment.is_admin,
+            })),
+          ]),
         ];
       });
 
@@ -3659,43 +3744,52 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      groupedEmployeeAssignmentRows.map((row) => (
-                        <TableRow key={row.display_key} className="h-12">
-                          <TableCell className="font-medium truncate">
-                            {row.row_type === "employee"
-                              ? row.employee_name
-                              : ""}
-                          </TableCell>
+                      groupedEmployeeAssignmentRows.map((row) => {
+                        if (row.row_type === "employee") {
+                          return (
+                            <TableRow
+                              key={row.display_key}
+                              className="h-12 bg-gray-50"
+                            >
+                              <TableCell className="font-semibold truncate">
+                                {row.employee_name}
+                              </TableCell>
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                            </TableRow>
+                          );
+                        }
 
-                          <TableCell
-                            className={
-                              row.row_type === "assignment"
-                                ? "truncate pl-6"
-                                : "truncate text-gray-400"
-                            }
-                          >
-                            {row.row_type === "assignment"
-                              ? row.department_name
-                              : ""}
-                          </TableCell>
+                        if (row.row_type === "department") {
+                          return (
+                            <TableRow key={row.display_key} className="h-12">
+                              <TableCell />
+                              <TableCell className="pl-4 font-medium text-gray-800 truncate">
+                                {row.department_name}
+                              </TableCell>
+                              <TableCell />
+                              <TableCell />
+                              <TableCell />
+                            </TableRow>
+                          );
+                        }
 
-                          <TableCell
-                            className={
-                              row.row_type === "assignment"
-                                ? "font-medium truncate"
-                                : "truncate text-gray-400"
-                            }
-                          >
-                            {row.row_type === "assignment" ? row.role_name : ""}
-                          </TableCell>
+                        return (
+                          <TableRow key={row.display_key} className="h-12">
+                            <TableCell />
+                            <TableCell />
 
-                          <TableCell>
-                            {row.row_type === "assignment"
-                              ? renderStatusBadge(row.status)
-                              : ""}
-                          </TableCell>
-                          <TableCell className={actionCellClass}>
-                            {row.row_type === "assignment" && (
+                            <TableCell className="pl-8 font-medium truncate">
+                              {row.role_name}
+                            </TableCell>
+
+                            <TableCell>
+                              {renderStatusBadge(row.status)}
+                            </TableCell>
+
+                            <TableCell className={actionCellClass}>
                               <Button
                                 size="sm"
                                 className={dangerSmallButtonClass}
@@ -3707,10 +3801,10 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               >
                                 Deactivate
                               </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -4185,10 +4279,87 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardHeader>
 
             <CardContent>
-              <p className="text-sm text-gray-600">
-                Use this to bulk import weekly employee availability. No manual
-                add form is available here.
-              </p>
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Shows available slots only. Employees, days, and shifts with
+                  no available slots are hidden.
+                </p>
+
+                <div className="overflow-x-auto">
+                  <Table className={tableClass}>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[24%]">Employee</TableHead>
+                        <TableHead className="w-[18%]">Day</TableHead>
+                        <TableHead>Shift Name(s)</TableHead>
+                        <TableHead className="w-[160px]">Time Range</TableHead>
+                        <TableHead className="w-[120px]">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {availabilityDisplayGroups.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="text-center text-gray-500 py-6"
+                          >
+                            No available employee slots found.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        availabilityDisplayGroups.map((employeeGroup) => (
+                          <>
+                            <TableRow
+                              key={`availability-employee-${employeeGroup.employee_id}`}
+                              className="bg-gray-50"
+                            >
+                              <TableCell
+                                colSpan={5}
+                                className="font-semibold text-gray-900"
+                              >
+                                {employeeGroup.employee_name}
+                              </TableCell>
+                            </TableRow>
+
+                            {employeeGroup.days.map((dayGroup) => (
+                              <>
+                                <TableRow
+                                  key={`availability-day-${employeeGroup.employee_id}-${dayGroup.day}`}
+                                >
+                                  <TableCell />
+                                  <TableCell
+                                    colSpan={4}
+                                    className="font-medium text-gray-700"
+                                  >
+                                    {dayGroup.day}
+                                  </TableCell>
+                                </TableRow>
+
+                                {dayGroup.slots.map((slot) => (
+                                  <TableRow
+                                    key={`availability-slot-${employeeGroup.employee_id}-${dayGroup.day}-${slot.availability_group_key}`}
+                                  >
+                                    <TableCell />
+                                    <TableCell />
+                                    <TableCell className="pl-8 font-medium">
+                                      {slot.shift_name}
+                                    </TableCell>
+                                    <TableCell>{slot.time_range}</TableCell>
+                                    <TableCell>
+                                      <Badge>Available</Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </>
+                            ))}
+                          </>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
