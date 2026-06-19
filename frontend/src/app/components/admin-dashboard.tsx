@@ -1841,20 +1841,30 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     })
     .filter((employeeGroup) => employeeGroup.days.length > 0);
 
-  const availabilityTableRows = availabilityDisplayGroups.flatMap(
-    (employeeGroup) =>
-      employeeGroup.days.flatMap((dayGroup, dayIndex) =>
-        dayGroup.slots.map((slot, slotIndex) => ({
+  const groupedAvailabilityRows = availabilityDisplayGroups.flatMap(
+    (employeeGroup) => [
+      {
+        display_key: `availability-employee-${employeeGroup.employee_id}`,
+        row_type: "employee" as const,
+        employee_id: employeeGroup.employee_id,
+        employee_name: employeeGroup.employee_name,
+      },
+      ...employeeGroup.days.flatMap((dayGroup) => [
+        {
+          display_key: `availability-day-${employeeGroup.employee_id}-${dayGroup.day}`,
+          row_type: "day" as const,
           employee_id: employeeGroup.employee_id,
-          employee_name:
-            dayIndex === 0 && slotIndex === 0
-              ? employeeGroup.employee_name
-              : "",
-          day: slotIndex === 0 ? dayGroup.day : "",
-          day_value: dayGroup.day,
+          day: dayGroup.day,
+        },
+        ...dayGroup.slots.map((slot) => ({
+          display_key: `availability-slot-${employeeGroup.employee_id}-${dayGroup.day}-${slot.availability_group_key}`,
+          row_type: "slot" as const,
+          employee_id: employeeGroup.employee_id,
+          day: dayGroup.day,
           slot,
         })),
-      ),
+      ]),
+    ],
   );
 
   const selectedRequirementAccountInfo = activeShiftAccountOptions.find(
@@ -4388,9 +4398,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <Table className="w-full table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[24%]">Employee</TableHead>
+                        <TableHead className="w-[22%]">Employee</TableHead>
                         <TableHead className="w-[18%]">Day</TableHead>
-                        <TableHead className="w-[24%]">Shift Name(s)</TableHead>
+                        <TableHead className="w-[26%]">Shift Name(s)</TableHead>
                         <TableHead className="w-[18%] text-center">
                           Time Range
                         </TableHead>
@@ -4401,7 +4411,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     </TableHeader>
 
                     <TableBody>
-                      {availabilityTableRows.length === 0 ? (
+                      {groupedAvailabilityRows.length === 0 ? (
                         <TableRow>
                           <TableCell
                             colSpan={5}
@@ -4411,44 +4421,75 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        availabilityTableRows.map((row) => (
-                          <TableRow
-                            key={`availability-row-${row.employee_id}-${row.day_value}-${row.slot.availability_group_key}`}
-                            className="h-11 bg-white border-b"
-                          >
-                            <TableCell className="font-semibold text-gray-900 truncate py-3">
-                              {row.employee_name}
-                            </TableCell>
-
-                            <TableCell className="font-medium text-gray-800 truncate py-3">
-                              {row.day}
-                            </TableCell>
-
-                            <TableCell className="font-medium text-gray-900 truncate py-3">
-                              {row.slot.shift_name}
-                            </TableCell>
-
-                            <TableCell className="text-center">
-                              {row.slot.time_range}
-                            </TableCell>
-
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                className={dangerSmallButtonClass}
-                                onClick={() =>
-                                  toggleSlotAvailability(
-                                    row.employee_id,
-                                    row.day_value,
-                                    row.slot,
-                                  )
-                                }
+                        groupedAvailabilityRows.map((row) => {
+                          if (row.row_type === "employee") {
+                            return (
+                              <TableRow
+                                key={row.display_key}
+                                className="h-11 bg-white border-b"
                               >
-                                Unavailable
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                                <TableCell className="font-semibold text-gray-900 truncate py-3">
+                                  {row.employee_name}
+                                </TableCell>
+                                <TableCell />
+                                <TableCell />
+                                <TableCell />
+                                <TableCell />
+                              </TableRow>
+                            );
+                          }
+
+                          if (row.row_type === "day") {
+                            return (
+                              <TableRow
+                                key={row.display_key}
+                                className="h-11 bg-white border-b"
+                              >
+                                <TableCell />
+                                <TableCell className="pl-6 font-medium text-gray-800 truncate py-3">
+                                  {row.day}
+                                </TableCell>
+                                <TableCell />
+                                <TableCell />
+                                <TableCell />
+                              </TableRow>
+                            );
+                          }
+
+                          return (
+                            <TableRow
+                              key={row.display_key}
+                              className="h-11 bg-white border-b"
+                            >
+                              <TableCell />
+                              <TableCell />
+
+                              <TableCell className="pl-10 font-medium text-gray-900 truncate py-3">
+                                {row.slot.shift_name}
+                              </TableCell>
+
+                              <TableCell className="text-center">
+                                {row.slot.time_range}
+                              </TableCell>
+
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  className={dangerSmallButtonClass}
+                                  onClick={() =>
+                                    toggleSlotAvailability(
+                                      row.employee_id,
+                                      row.day,
+                                      row.slot,
+                                    )
+                                  }
+                                >
+                                  Unavailable
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
