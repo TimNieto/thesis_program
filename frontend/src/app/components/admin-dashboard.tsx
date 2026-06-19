@@ -1819,6 +1819,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           .map((shift) => ({
             availability_group_key: shift.availability_group_key,
             shift_name: shift.display_name,
+            start_time: shift.start_time,
+            end_time: shift.end_time,
             time_range: `${formatAvailabilityTime(
               shift.start_time,
             )} - ${formatAvailabilityTime(shift.end_time)}`,
@@ -4367,14 +4369,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                 </p>
 
                 <div className="overflow-x-auto">
-                  <Table className={tableClass}>
+                  <Table className="w-full table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[24%]">Employee</TableHead>
-                        <TableHead className="w-[18%]">Day</TableHead>
-                        <TableHead>Shift Name(s)</TableHead>
-                        <TableHead className="w-[160px]">Time Range</TableHead>
-                        <TableHead className="w-[120px]">Status</TableHead>
+                        <TableHead>Availability</TableHead>
+                        <TableHead className="w-[180px] text-center">
+                          Time Range
+                        </TableHead>
+                        <TableHead className="w-[150px] text-right">
+                          Action
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
 
@@ -4382,7 +4386,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                       {availabilityDisplayGroups.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={5}
+                            colSpan={3}
                             className="text-center text-gray-500 py-6"
                           >
                             No available employee slots found.
@@ -4393,11 +4397,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                           <>
                             <TableRow
                               key={`availability-employee-${employeeGroup.employee_id}`}
-                              className="bg-gray-50"
+                              className="h-11 bg-white border-b"
                             >
                               <TableCell
-                                colSpan={5}
-                                className="font-semibold text-gray-900"
+                                colSpan={3}
+                                className="font-semibold text-gray-900 py-3"
                               >
                                 {employeeGroup.employee_name}
                               </TableCell>
@@ -4407,11 +4411,11 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                               <>
                                 <TableRow
                                   key={`availability-day-${employeeGroup.employee_id}-${dayGroup.day}`}
+                                  className="h-11 bg-white border-b"
                                 >
-                                  <TableCell />
                                   <TableCell
-                                    colSpan={4}
-                                    className="font-medium text-gray-700"
+                                    colSpan={3}
+                                    className="pl-6 font-medium text-gray-800 py-3"
                                   >
                                     {dayGroup.day}
                                   </TableCell>
@@ -4420,15 +4424,30 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                                 {dayGroup.slots.map((slot) => (
                                   <TableRow
                                     key={`availability-slot-${employeeGroup.employee_id}-${dayGroup.day}-${slot.availability_group_key}`}
+                                    className="h-11 bg-white border-b"
                                   >
-                                    <TableCell />
-                                    <TableCell />
-                                    <TableCell className="pl-8 font-medium">
+                                    <TableCell className="pl-12 font-medium text-gray-900 py-3">
                                       {slot.shift_name}
                                     </TableCell>
-                                    <TableCell>{slot.time_range}</TableCell>
-                                    <TableCell>
-                                      <Badge>Available</Badge>
+
+                                    <TableCell className="text-center">
+                                      {slot.time_range}
+                                    </TableCell>
+
+                                    <TableCell className="text-right">
+                                      <Button
+                                        size="sm"
+                                        className={dangerSmallButtonClass}
+                                        onClick={() =>
+                                          toggleSlotAvailability(
+                                            employeeGroup.employee_id,
+                                            dayGroup.day,
+                                            slot,
+                                          )
+                                        }
+                                      >
+                                        Unavailable
+                                      </Button>
                                     </TableCell>
                                   </TableRow>
                                 ))}
