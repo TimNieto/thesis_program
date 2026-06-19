@@ -7,6 +7,40 @@ from services.notification_service import create_notification
 
 router = APIRouter()
 
+def require_company_admin(cursor, company_id: int, employee_id: int):
+    if not employee_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only company admin can update company settings"
+        )
+
+    cursor.execute("""
+        SELECT 1
+        FROM employees e
+        JOIN employee_roles er
+            ON e.employee_id = er.employee_id
+            AND e.company_id = er.company_id
+        JOIN roles r
+            ON er.role_id = r.role_id
+            AND er.company_id = r.company_id
+        WHERE e.employee_id = %s
+        AND e.company_id = %s
+        AND e.employment_status = 'Active'
+        AND er.is_active = TRUE
+        AND r.is_active = TRUE
+        AND r.is_admin = TRUE
+        LIMIT 1
+    """, (
+        employee_id,
+        company_id
+    ))
+
+    if not cursor.fetchone():
+        raise HTTPException(
+            status_code=403,
+            detail="Only company admin can update company settings"
+        )
+    
 
 @router.get("/settings")
 def get_settings(company_id: int = 1):
@@ -68,13 +102,21 @@ def update_settings(payload: dict):
     cursor = conn.cursor()
 
     try:
+
         company_id = payload.get("company_id")
+        updated_by = payload.get("updated_by")
 
         if not company_id:
             raise HTTPException(
                 status_code=400,
                 detail="company_id is required"
             )
+
+        require_company_admin(
+            cursor,
+            company_id,
+            updated_by
+        )
 
         gy_fatigue_penalty = payload.get("gy_fatigue_penalty", 20)
 
@@ -141,8 +183,6 @@ def update_settings(payload: dict):
             absence_tolerance,
             company_id
         ))
-
-        updated_by = payload.get("updated_by")
 
         if updated_by:
             cursor.execute("""
