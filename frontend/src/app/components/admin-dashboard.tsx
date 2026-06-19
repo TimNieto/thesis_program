@@ -209,7 +209,9 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     | "employees"
     | "employeeAssignments"
     | "shifts"
-    | "staffing";
+    | "staffing"
+    | "availability"
+    | "accountPreferences";
 
   const IMPORT_ENDPOINTS: Record<ImportCategory, string | null> = {
     departments: "/account-department-import",
@@ -218,6 +220,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     employeeAssignments: "/employee-assignments-import",
     shifts: "/shift-templates-import",
     staffing: "/staffing-requirements-import",
+    availability: "/availability-import",
+    accountPreferences: "/account-preferences-import",
   };
 
   interface ImportRecord {
@@ -249,6 +253,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [
     isStaffingRequirementsTemplatePreviewOpen,
     setIsStaffingRequirementsTemplatePreviewOpen,
+  ] = useState(false);
+  const [
+    isAvailabilityTemplatePreviewOpen,
+    setIsAvailabilityTemplatePreviewOpen,
+  ] = useState(false);
+  const [
+    isAccountPreferencesTemplatePreviewOpen,
+    setIsAccountPreferencesTemplatePreviewOpen,
   ] = useState(false);
 
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false);
@@ -762,6 +774,14 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     if (category === "staffing") {
       await fetchStaffingRequirements();
+    }
+
+    if (category === "availability") {
+      await fetchAvailability();
+    }
+
+    if (category === "accountPreferences") {
+      await fetchEmployees();
     }
   };
 
@@ -4110,6 +4130,132 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </CardContent>
           </Card>
 
+          {/* Availability */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <CalendarOff className="size-5 text-orange-600" />
+                  <div>
+                    <CardTitle>Availability</CardTitle>
+                    <CardDescription>
+                      Imports employee availability by day and shift time range.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setIsAvailabilityTemplatePreviewOpen(true)}
+                  >
+                    <Download className="size-4" />
+                    View Template
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => triggerImportInput("availability")}
+                  >
+                    <Upload className="size-4" />
+                    Import CSV
+                  </Button>
+
+                  <Input
+                    id="availability-csv-input"
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+
+                      if (file) {
+                        handleFileImport("availability", file);
+                      }
+
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <p className="text-sm text-gray-600">
+                Use this to bulk import weekly employee availability. No manual
+                add form is available here.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Account Preferences */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <UserSquare2 className="size-5 text-blue-600" />
+                  <div>
+                    <CardTitle>Account Preferences</CardTitle>
+                    <CardDescription>
+                      Imports which accounts each employee can work for by role.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() =>
+                      setIsAccountPreferencesTemplatePreviewOpen(true)
+                    }
+                  >
+                    <Download className="size-4" />
+                    View Template
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => triggerImportInput("accountPreferences")}
+                  >
+                    <Upload className="size-4" />
+                    Import CSV
+                  </Button>
+
+                  <Input
+                    id="accountPreferences-csv-input"
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+
+                      if (file) {
+                        handleFileImport("accountPreferences", file);
+                      }
+
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <p className="text-sm text-gray-600">
+                Use this to bulk import employee account preferences. No manual
+                add form is available here.
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Import History */}
           <Card>
             <CardHeader>
@@ -5608,6 +5754,90 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Account Preferences Template Preview Dialog */}
+      <Dialog
+        open={isAccountPreferencesTemplatePreviewOpen}
+        onOpenChange={setIsAccountPreferencesTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Account Preferences CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. Employees, accounts, and
+              roles must already exist.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded border bg-white p-4 overflow-x-auto">
+            <pre className="text-sm">
+              employee_name,account_name,role_name,is_preferred{"\n"}
+              Juan Dela Cruz,Shopee,Host,yes{"\n"}
+              Juan Dela Cruz,MamyPoko,Host,no
+            </pre>
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>
+              Required columns: employee_name, account_name, role_name,
+              is_preferred.
+            </p>
+            <p>is_preferred must be yes or no.</p>
+            <p>The employee must already have the selected role assignment.</p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setIsAccountPreferencesTemplatePreviewOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Availability Template Preview Dialog */}
+      <Dialog
+        open={isAvailabilityTemplatePreviewOpen}
+        onOpenChange={setIsAvailabilityTemplatePreviewOpen}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Availability CSV Template</DialogTitle>
+            <DialogDescription>
+              Your CSV must use exactly these columns. Employees and shift time
+              ranges must already exist.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded border bg-white p-4 overflow-x-auto">
+            <pre className="text-sm">
+              employee_name,day_of_week,start_time,end_time,is_available{"\n"}
+              Juan Dela Cruz,Monday,01:00,07:00,yes{"\n"}
+              Juan Dela Cruz,Tuesday,07:00,13:00,no
+            </pre>
+          </div>
+
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>
+              Required columns: employee_name, day_of_week, start_time,
+              end_time, is_available.
+            </p>
+            <p>day_of_week must be Monday through Sunday.</p>
+            <p>is_available must be yes or no.</p>
+            <p>
+              start_time and end_time must match an existing shift time range.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setIsAvailabilityTemplatePreviewOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Staffing Requirements Template Preview Dialog */}
       <Dialog
         open={isStaffingRequirementsTemplatePreviewOpen}
