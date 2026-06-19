@@ -6112,7 +6112,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         open={isAvailabilityTemplatePreviewOpen}
         onOpenChange={setIsAvailabilityTemplatePreviewOpen}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Availability CSV Template</DialogTitle>
             <DialogDescription>
@@ -6121,12 +6121,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded border bg-white p-4 overflow-x-auto">
-            <pre className="text-sm">
-              employee_name,day_of_week,start_time,end_time,is_available{"\n"}
-              Juan Dela Cruz,Monday,01:00,07:00,yes{"\n"}
-              Juan Dela Cruz,Tuesday,07:00,13:00,no
-            </pre>
+          <div className="rounded border overflow-hidden bg-white">
+            <img
+              src="/availability.png"
+              alt="Availability CSV template preview"
+              className="w-full h-auto"
+            />
           </div>
 
           <div className="text-sm text-gray-600 space-y-1">
