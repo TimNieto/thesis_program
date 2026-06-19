@@ -4399,8 +4399,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[20%]">Employee</TableHead>
-                        <TableHead className="w-[14%]">Day</TableHead>
-                        <TableHead className="w-[24%]">Shift Name(s)</TableHead>
+                        <TableHead className="w-[20%]">Day</TableHead>
+                        <TableHead className="w-[18%]">Shift Name(s)</TableHead>
                         <TableHead className="w-[16%]">Time Range</TableHead>
                         <TableHead className="w-[10%]">Status</TableHead>
                         <TableHead className="w-[16%] text-right">
