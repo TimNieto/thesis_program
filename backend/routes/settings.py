@@ -17,6 +17,7 @@ def get_settings(company_id: int = 1):
         cursor.execute("""
             SELECT
                 c.company_name,
+                c.company_type,
                 cs.max_working_days,
                 cs.max_shifts_per_day,
                 cs.max_shifts_per_week,
@@ -43,16 +44,16 @@ def get_settings(company_id: int = 1):
 
         return {
             "company_name": row[0],
-            "company_type": "Live Selling",
-            "max_working_days": row[1],
-            "max_shifts_per_day": row[2],
-            "max_shifts_per_week": row[3],
-            "allow_double_shifts": row[4],
-            "fairness_weight": row[5],
-            "absence_replacement_mode": row[6],
-            "enable_in_app_notifications": row[7],
-            "gy_fatigue_penalty": row[8],
-            "absence_tolerance": row[9],
+            "company_type": row[1],
+            "max_working_days": row[2],
+            "max_shifts_per_day": row[3],
+            "max_shifts_per_week": row[4],
+            "allow_double_shifts": row[5],
+            "fairness_weight": row[6],
+            "absence_replacement_mode": row[7],
+            "enable_in_app_notifications": row[8],
+            "gy_fatigue_penalty": row[9],
+            "absence_tolerance": row[10],
             "company_id": company_id
         }
 
@@ -93,13 +94,24 @@ def update_settings(payload: dict):
 
         absence_tolerance = max(0, min(100, absence_tolerance))
 
+        company_type = str(payload.get("company_type", "")).strip()
+
+        if not company_type:
+            raise HTTPException(
+                status_code=400,
+                detail="company_type is required"
+            )
+
         cursor.execute("""
             UPDATE companies
-            SET company_name = %s,
+            SET
+                company_name = %s,
+                company_type = %s,
                 updated_at = NOW()
             WHERE company_id = %s
         """, (
             payload["company_name"],
+            company_type,
             company_id
         ))
 
