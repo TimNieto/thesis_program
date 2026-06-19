@@ -1841,6 +1841,22 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     })
     .filter((employeeGroup) => employeeGroup.days.length > 0);
 
+  const availabilityTableRows = availabilityDisplayGroups.flatMap(
+    (employeeGroup) =>
+      employeeGroup.days.flatMap((dayGroup, dayIndex) =>
+        dayGroup.slots.map((slot, slotIndex) => ({
+          employee_id: employeeGroup.employee_id,
+          employee_name:
+            dayIndex === 0 && slotIndex === 0
+              ? employeeGroup.employee_name
+              : "",
+          day: slotIndex === 0 ? dayGroup.day : "",
+          day_value: dayGroup.day,
+          slot,
+        })),
+      ),
+  );
+
   const selectedRequirementAccountInfo = activeShiftAccountOptions.find(
     (row) => String(row.account_id) === newRequirementAccountId,
   );
@@ -4372,88 +4388,66 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
                   <Table className="w-full table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Availability</TableHead>
-                        <TableHead className="w-[180px] text-center">
+                        <TableHead className="w-[24%]">Employee</TableHead>
+                        <TableHead className="w-[18%]">Day</TableHead>
+                        <TableHead className="w-[24%]">Shift Name(s)</TableHead>
+                        <TableHead className="w-[18%] text-center">
                           Time Range
                         </TableHead>
-                        <TableHead className="w-[150px] text-right">
+                        <TableHead className="w-[16%] text-right">
                           Action
                         </TableHead>
                       </TableRow>
                     </TableHeader>
 
                     <TableBody>
-                      {availabilityDisplayGroups.length === 0 ? (
+                      {availabilityTableRows.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={3}
+                            colSpan={5}
                             className="text-center text-gray-500 py-6"
                           >
                             No available employee slots found.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        availabilityDisplayGroups.map((employeeGroup) => (
-                          <>
-                            <TableRow
-                              key={`availability-employee-${employeeGroup.employee_id}`}
-                              className="h-11 bg-white border-b"
-                            >
-                              <TableCell
-                                colSpan={3}
-                                className="font-semibold text-gray-900 py-3"
+                        availabilityTableRows.map((row) => (
+                          <TableRow
+                            key={`availability-row-${row.employee_id}-${row.day_value}-${row.slot.availability_group_key}`}
+                            className="h-11 bg-white border-b"
+                          >
+                            <TableCell className="font-semibold text-gray-900 truncate py-3">
+                              {row.employee_name}
+                            </TableCell>
+
+                            <TableCell className="font-medium text-gray-800 truncate py-3">
+                              {row.day}
+                            </TableCell>
+
+                            <TableCell className="font-medium text-gray-900 truncate py-3">
+                              {row.slot.shift_name}
+                            </TableCell>
+
+                            <TableCell className="text-center">
+                              {row.slot.time_range}
+                            </TableCell>
+
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                className={dangerSmallButtonClass}
+                                onClick={() =>
+                                  toggleSlotAvailability(
+                                    row.employee_id,
+                                    row.day_value,
+                                    row.slot,
+                                  )
+                                }
                               >
-                                {employeeGroup.employee_name}
-                              </TableCell>
-                            </TableRow>
-
-                            {employeeGroup.days.map((dayGroup) => (
-                              <>
-                                <TableRow
-                                  key={`availability-day-${employeeGroup.employee_id}-${dayGroup.day}`}
-                                  className="h-11 bg-white border-b"
-                                >
-                                  <TableCell
-                                    colSpan={3}
-                                    className="pl-6 font-medium text-gray-800 py-3"
-                                  >
-                                    {dayGroup.day}
-                                  </TableCell>
-                                </TableRow>
-
-                                {dayGroup.slots.map((slot) => (
-                                  <TableRow
-                                    key={`availability-slot-${employeeGroup.employee_id}-${dayGroup.day}-${slot.availability_group_key}`}
-                                    className="h-11 bg-white border-b"
-                                  >
-                                    <TableCell className="pl-12 font-medium text-gray-900 py-3">
-                                      {slot.shift_name}
-                                    </TableCell>
-
-                                    <TableCell className="text-center">
-                                      {slot.time_range}
-                                    </TableCell>
-
-                                    <TableCell className="text-right">
-                                      <Button
-                                        size="sm"
-                                        className={dangerSmallButtonClass}
-                                        onClick={() =>
-                                          toggleSlotAvailability(
-                                            employeeGroup.employee_id,
-                                            dayGroup.day,
-                                            slot,
-                                          )
-                                        }
-                                      >
-                                        Unavailable
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </>
-                            ))}
-                          </>
+                                Unavailable
+                              </Button>
+                            </TableCell>
+                          </TableRow>
                         ))
                       )}
                     </TableBody>
