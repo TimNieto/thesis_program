@@ -33,7 +33,7 @@ def ensure_company_settings(cursor, company_id: int):
 
 
 def create_default_company_data(cursor, company_id: int):
-    # 1. Default Department
+    # 1. Ensure Default Department exists and is active
     cursor.execute("""
         INSERT INTO departments (
             company_id,
@@ -50,7 +50,7 @@ def create_default_company_data(cursor, company_id: int):
 
     department_id = cursor.fetchone()[0]
 
-    # 2. Default Admin Role under Default Department
+    # 2. Ensure Default Role exists and is active
     cursor.execute("""
         INSERT INTO roles (
             company_id,
@@ -76,7 +76,7 @@ def create_default_company_data(cursor, company_id: int):
 
     role_id = cursor.fetchone()[0]
 
-    # 3. Default Admin Employee
+    # 3. Ensure Default Admin Employee exists and is active
     cursor.execute("""
         SELECT company_name
         FROM companies
@@ -96,39 +96,98 @@ def create_default_company_data(cursor, company_id: int):
         .replace("_", "")
     )
 
+    if not safe_company_name:
+        safe_company_name = f"company{company_id}"
+
     default_email = f"{safe_company_name}_defaultaccount@gmail.com"
 
+    # First, try to find the default account by its expected email.
     cursor.execute("""
-        INSERT INTO employees (
-            full_name,
-            nickname,
-            email,
-            password,
-            employment_status,
-            contact_number,
-            joined_date,
-            company_id
-        )
-        VALUES (
-            'Default Admin',
-            'Admin',
-            %s,
-            %s,
-            'Active',
-            '0000000000',
-            CURRENT_DATE,
-            %s
-        )
-        RETURNING employee_id
+        SELECT employee_id
+        FROM employees
+        WHERE company_id = %s
+        AND LOWER(email) = LOWER(%s)
+        LIMIT 1
     """, (
-        default_email,
-        hash_password("1234"),
-        company_id
+        company_id,
+        default_email
     ))
 
-    employee_id = cursor.fetchone()[0]
+    employee_row = cursor.fetchone()
 
-    # 4. Assign Default Admin Employee to Default Role
+    # If the company was renamed, the old default account may have the old email.
+    # In that case, find it by the known default identity.
+    if not employee_row:
+        cursor.execute("""
+            SELECT employee_id
+            FROM employees
+            WHERE company_id = %s
+            AND LOWER(full_name) = 'default admin'
+            AND LOWER(COALESCE(nickname, '')) = 'admin'
+            ORDER BY employee_id ASC
+            LIMIT 1
+        """, (company_id,))
+
+        employee_row = cursor.fetchone()
+
+    if employee_row:
+        employee_id = employee_row[0]
+
+        cursor.execute("""
+            UPDATE employees
+            SET
+                full_name = 'Default Admin',
+                nickname = 'Admin',
+                email = %s,
+                password = %s,
+                employment_status = 'Active',
+                contact_number = '0000000000',
+                joined_date = COALESCE(joined_date, CURRENT_DATE),
+                updated_at = NOW()
+            WHERE employee_id = %s
+            AND company_id = %s
+            RETURNING employee_id
+        """, (
+            default_email,
+            hash_password("1234"),
+            employee_id,
+            company_id
+        ))
+
+        employee_id = cursor.fetchone()[0]
+
+    else:
+        cursor.execute("""
+            INSERT INTO employees (
+                full_name,
+                nickname,
+                email,
+                password,
+                employment_status,
+                contact_number,
+                joined_date,
+                company_id
+            )
+            VALUES (
+                'Default Admin',
+                'Admin',
+                %s,
+                %s,
+                'Active',
+                '0000000000',
+                CURRENT_DATE,
+                %s
+            )
+            RETURNING employee_id
+        """, (
+            default_email,
+            hash_password("1234"),
+            company_id
+        ))
+
+        employee_id = cursor.fetchone()[0]
+
+    # 4. Ensure Default Admin Employee is assigned to Default Role
     cursor.execute("""
         INSERT INTO employee_roles (
             employee_id,
@@ -228,8 +287,10 @@ def create_company(payload: dict):
                 detail="Company already exists"
             )
 
-        # Existing inactive company: reactivate only.
-        # Do NOT create new default department/account/employee.
+        # Existing inactive company:
+        # Reactivate the company and restore the default access chain.
+        # This prevents dead ends where the default department, role,
+        # default admin employee, or default role assignment was deactivated.
         if existing_company and not existing_company[1]:
             company_id = existing_company[0]
 
@@ -249,6 +310,10 @@ def create_company(payload: dict):
             ))
 
             company_id = cursor.fetchone()[0]
+
+            ensure_company_settings(cursor, company_id)
+
+            create_default_company_data(cursor, company_id)
 
             ensure_permission_defaults(cursor, company_id)
 
@@ -299,44 +364,6 @@ def create_company(payload: dict):
     finally:
         cursor.close()
         conn.close()
-
-
-@router.put("/companies/{company_id}/toggle-status")
-def toggle_company_status(company_id: int):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("""
-            UPDATE companies
-            SET
-                is_active = NOT is_active,
-                updated_at = NOW()
-            WHERE company_id = %s
-            RETURNING company_id
-        """, (company_id,))
-
-        row = cursor.fetchone()
-
-        if not row:
-            raise HTTPException(status_code=404, detail="Company not found")
-
-        conn.commit()
-
-        return {"message": "Company status updated"}
-
-    except HTTPException:
-        conn.rollback()
-        raise
-
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-    finally:
-        cursor.close()
-        conn.close()
-
 
 @router.delete("/companies/{company_id}")
 def soft_delete_company(company_id: int):
