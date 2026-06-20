@@ -311,7 +311,7 @@ def score_employee(employee, shift, role, context):
     if shift_pref and shift_pref.get("is_available"):
         score += 2
 
-    # 4. GY FATIGUE PENALTY
+    # 4. NIGHT / OVERNIGHT FATIGUE PENALTY
     if shift.get("is_overnight"):
 
         previous_assignments = context[
@@ -328,7 +328,7 @@ def score_employee(employee, shift, role, context):
 
             if (
                 delta == 1 and
-                a["shift_type"].upper() == "GY"
+                a.get("is_overnight")
             ):
                 score -= shift.get("fatigue_penalty", 0)
 
@@ -385,7 +385,10 @@ def assign_employee(employee, shift, role, context):
         "employee_name": employee["full_name"],
         "role": role,
         "slot_index": slot_index,
-        "relaxation_level": relaxation_level
+        "relaxation_level": relaxation_level,
+        "is_overnight": bool(shift.get("is_overnight", False)),
+        "start_time": shift.get("start_time"),
+        "end_time": shift.get("end_time"),
     }
 
     context["assignments"].append(assignment)

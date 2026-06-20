@@ -491,7 +491,7 @@ export function CompanySettings({
 
                 <p className="text-xs text-gray-500">
                   Higher values make the scheduler avoid assigning employees
-                  after a previous GY shift
+                  after a previous night or overnight shift
                 </p>
               </div>
 

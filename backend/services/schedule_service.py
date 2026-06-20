@@ -264,6 +264,77 @@ def get_next_week_range():
     return next_monday.date(), next_sunday.date()
 
 
+NIGHT_WINDOW_START_MINUTES = 22 * 60  # 10:00 PM
+NIGHT_WINDOW_END_MINUTES = 6 * 60     # 6:00 AM
+MIN_NIGHT_OVERLAP_MINUTES = 4 * 60    # 4 hours
+
+
+def time_to_minutes(value):
+    if isinstance(value, str):
+        value = value.strip()
+
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                value = datetime.strptime(value, fmt).time()
+                break
+            except ValueError:
+                pass
+
+    return value.hour * 60 + value.minute
+
+
+def build_minute_ranges(start_minutes, end_minutes):
+    if start_minutes == end_minutes:
+        return []
+
+    if end_minutes > start_minutes:
+        return [(start_minutes, end_minutes)]
+
+    return [
+        (start_minutes, 1440),
+        (0, end_minutes)
+    ]
+
+
+def overlap_minutes(start_time, end_time, window_start, window_end):
+    shift_start = time_to_minutes(start_time)
+    shift_end = time_to_minutes(end_time)
+
+    shift_ranges = build_minute_ranges(shift_start, shift_end)
+    window_ranges = build_minute_ranges(window_start, window_end)
+
+    total_overlap = 0
+
+    for shift_range_start, shift_range_end in shift_ranges:
+        for window_range_start, window_range_end in window_ranges:
+            total_overlap += max(
+                0,
+                min(shift_range_end, window_range_end)
+                - max(shift_range_start, window_range_start)
+            )
+
+    return total_overlap
+
+
+def is_night_or_overnight_shift(start_time, end_time):
+    start_minutes = time_to_minutes(start_time)
+    end_minutes = time_to_minutes(end_time)
+
+    crosses_midnight = end_minutes < start_minutes
+
+    night_overlap = overlap_minutes(
+        start_time,
+        end_time,
+        NIGHT_WINDOW_START_MINUTES,
+        NIGHT_WINDOW_END_MINUTES
+    )
+
+    return (
+        crosses_midnight
+        or night_overlap >= MIN_NIGHT_OVERLAP_MINUTES
+    )
+
+
 def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
     start_date, end_date = get_next_week_range()
 
@@ -312,8 +383,15 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
 
     rows = cursor.fetchall()
 
-    return [
-        {
+    shifts = []
+
+    for r in rows:
+        is_fatigue_sensitive = is_night_or_overnight_shift(
+            r[5],
+            r[6]
+        )
+
+        shifts.append({
             "shift_id": r[0],
             "shift_date": r[1],
             "account": r[2],
@@ -323,19 +401,15 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
             "end_time": r[6],
             "fatigue_penalty": (
                 gy_fatigue_penalty
-                if str(r[4]).upper() == "GY"
+                if is_fatigue_sensitive
                 else r[7]
             ),
             "difficulty_weight": r[8],
-            "is_overnight": (
-                True
-                if str(r[4]).upper() == "GY"
-                else r[9]
-            ),
+            "is_overnight": is_fatigue_sensitive,
             "staffing_requirements": staffing_requirements_map.get((r[3], r[10]), [])
-        }
-        for r in rows
-    ]
+        })
+
+    return shifts
 
 def fetch_availability(cursor, company_id: int):
     cursor.execute("""
