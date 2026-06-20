@@ -238,7 +238,15 @@ def evaluate_schedule(
             for v in values
         )
 
-        score -= fairness_penalty * 50
+        fairness_weight = 2
+
+        if settings:
+            try:
+                fairness_weight = float(settings.get("fairness_weight", 2) or 0)
+            except (TypeError, ValueError):
+                fairness_weight = 2
+
+        score -= fairness_penalty * fairness_weight * 25
 
     individual["fitness"] = score
 
