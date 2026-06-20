@@ -16,6 +16,11 @@ def get_period_bounds(period: str):
         start = today - timedelta(days=today.weekday())
         end = start + timedelta(days=6)
 
+    elif period == "next-week":
+        this_week_start = today - timedelta(days=today.weekday())
+        start = this_week_start + timedelta(days=7)
+        end = start + timedelta(days=6)
+
     elif period == "this-month":
         start = today.replace(day=1)
 
@@ -332,7 +337,7 @@ def get_general_report(company_id: int, period: str = "this-week"):
             "period": period,
             "start": str(start),
             "end": str(end),
-            "isUtilizationApproximate": period != "this-week",
+            "isUtilizationApproximate": period not in ("this-week", "next-week"),
 
             "totalShifts": total_shifts,
             "filledShifts": filled_shifts,
@@ -685,7 +690,7 @@ def get_employee_report(company_id: int, period: str = "this-week"):
                 "maxWorkload": max_workload,
                 "assignedWorkload": total_shifts,
                 "utilization": utilization,
-                "isUtilizationApproximate": period != "this-week",
+                "isUtilizationApproximate": period not in ("this-week", "next-week"),
 
                 "coverageRequests": row[3] or 0,
                 "approvedCoverageRequests": row[4] or 0,
@@ -708,7 +713,7 @@ def get_employee_report(company_id: int, period: str = "this-week"):
             "maxShiftsPerWeekUsed": max_shifts_per_week,
             "weeksInPeriod": weeks_in_period,
             "maxWorkload": max_workload,
-            "isUtilizationApproximate": period != "this-week",
+            "isUtilizationApproximate": period not in ("this-week", "next-week"),
             "employees": employees,
         }
 

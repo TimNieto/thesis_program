@@ -141,6 +141,8 @@ export function DataReport({ currentUser }: DataReportProps) {
     switch (timePeriod) {
       case "this-week":
         return "This Week";
+      case "next-week":
+        return "Next Week";
       case "this-month":
         return "This Month";
       case "last-month":
@@ -277,6 +279,7 @@ export function DataReport({ currentUser }: DataReportProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="this-week">This Week</SelectItem>
+                <SelectItem value="next-week">Next Week</SelectItem>
                 <SelectItem value="this-month">This Month</SelectItem>
                 <SelectItem value="last-month">Last Month</SelectItem>
                 <SelectItem value="last-3-months">Last 3 Months</SelectItem>
