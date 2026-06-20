@@ -256,11 +256,17 @@ def score_employee(employee, shift, role, context):
     # 1. FAIRNESS
     assignment_count = context["assignment_counts"][emp_id]
 
-    # stronger fairness penalty
-    fairness_weight = (
-    context["settings"]["fairness_weight"]
+    try:
+        fairness_weight = float(
+            context.get("settings", {}).get("fairness_weight", 2) or 0
         )
-    score -= assignment_count * fairness_weight
+    except (TypeError, ValueError):
+        fairness_weight = 2
+
+    fairness_weight = max(0, fairness_weight)
+
+    if fairness_weight > 0:
+        score -= assignment_count * fairness_weight
 
     # 1.5 ROLE MATCH PRIORITY
     employee_role_keys = set(

@@ -448,6 +448,8 @@ export function CompanySettings({
                   </SelectTrigger>
 
                   <SelectContent>
+                    <SelectItem value="0">0 - No Balancing</SelectItem>
+
                     <SelectItem value="1">1 - Loose Balancing</SelectItem>
 
                     <SelectItem value="2">2 - Mild Balancing</SelectItem>

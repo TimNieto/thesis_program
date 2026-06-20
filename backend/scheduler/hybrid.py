@@ -83,6 +83,19 @@ def clamp_int(value, default=50, minimum=0, maximum=100):
     return max(minimum, min(maximum, value))
 
 
+def get_fairness_weight(settings):
+    try:
+        value = float(
+            settings.get("fairness_weight", 2)
+            if settings
+            else 2
+        )
+    except (TypeError, ValueError):
+        value = 2
+
+    return max(0, value)
+
+
 def get_absence_tolerance(settings):
     return clamp_int(
         settings.get("absence_tolerance", 50)
@@ -224,29 +237,26 @@ def evaluate_schedule(
         score += historical_score(a, history_scores, settings)
 
     # fairness
-    counts = defaultdict(int)
+    fairness_weight = get_fairness_weight(settings)
 
-    for a in assignments:
-        counts[a["employee_id"]] += 1
+    if fairness_weight > 0:
+        counts = defaultdict(int)
 
-    if counts:
-        values = list(counts.values())
-        avg = sum(values) / len(values)
+        for a in assignments:
+            counts[a["employee_id"]] += 1
 
-        fairness_penalty = sum(
-            abs(v - avg)
-            for v in values
-        )
+        if counts:
+            values = list(counts.values())
+            avg = sum(values) / len(values)
 
-        fairness_weight = 2
+            fairness_penalty = sum(
+                abs(v - avg)
+                for v in values
+            )
 
-        if settings:
-            try:
-                fairness_weight = float(settings.get("fairness_weight", 2) or 0)
-            except (TypeError, ValueError):
-                fairness_weight = 2
-
-        score -= fairness_penalty * fairness_weight * 25
+            # Old default behavior:
+            # fairness_weight 2 => multiplier 50
+            score -= fairness_penalty * fairness_weight * 25
 
     individual["fitness"] = score
 
