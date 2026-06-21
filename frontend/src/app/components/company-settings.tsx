@@ -580,27 +580,6 @@ export function CompanySettings({
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Partial Staffing */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Allow Partial Staffing</Label>
-
-                        <p className="text-xs text-gray-500">
-                          Scheduler may leave some slots unfilled
-                        </p>
-                      </div>
-
-                      <Switch
-                        checked={policy.allow_partial_staffing}
-                        onCheckedChange={(checked) => {
-                          const updated = [...accountPolicies];
-
-                          updated[index].allow_partial_staffing = checked;
-
-                          setAccountPolicies(updated);
-                        }}
-                      />
-                    </div>
                   </div>
                 ))}
             </CardContent>
