@@ -580,7 +580,7 @@ export function CompanySettings({
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Partial Staffing */}
+                    {/* Partial Staffing
                     <div className="flex items-center justify-between">
                       <div>
                         <Label>Allow Partial Staffing</Label>
@@ -588,7 +588,7 @@ export function CompanySettings({
                         <p className="text-xs text-gray-500">
                           Scheduler may leave some slots unfilled
                         </p>
-                      </div>
+                      </div> */}
 
                       <Switch
                         checked={policy.allow_partial_staffing}
