@@ -432,6 +432,133 @@ def cover_shift_weekly_limit_error(
 
     return None
 
+
+
+def schedule_time_conflict_error(
+    cursor,
+    employee_id: int,
+    target_schedule_id: int,
+    company_id: int
+):
+    """
+    Prevent assigning/applying an employee to overlapping schedule times,
+    even when the shifts are on different accounts or have different names.
+    """
+
+    cursor.execute("""
+        WITH target_shift AS (
+            SELECT
+                gs.schedule_id,
+                s.shift_date,
+                st.start_time,
+                st.end_time,
+                (
+                    s.shift_date + st.start_time
+                ) AS target_start_at,
+                (
+                    s.shift_date
+                    + st.end_time
+                    + CASE
+                        WHEN st.end_time <= st.start_time
+                        THEN INTERVAL '1 day'
+                        ELSE INTERVAL '0 day'
+                    END
+                ) AS target_end_at
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
+            WHERE gs.schedule_id = %s
+            AND gs.company_id = %s
+            AND gs.is_archived = FALSE
+            LIMIT 1
+        ),
+
+        existing_assignments AS (
+            SELECT
+                gs.schedule_id,
+                a.account_name,
+                st.shift_name,
+                s.shift_date,
+                st.start_time,
+                st.end_time,
+                (
+                    s.shift_date + st.start_time
+                ) AS existing_start_at,
+                (
+                    s.shift_date
+                    + st.end_time
+                    + CASE
+                        WHEN st.end_time <= st.start_time
+                        THEN INTERVAL '1 day'
+                        ELSE INTERVAL '0 day'
+                    END
+                ) AS existing_end_at
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+            CROSS JOIN target_shift target
+            WHERE gs.company_id = %s
+            AND gs.employee_id = %s
+            AND gs.is_archived = FALSE
+            AND gs.schedule_id <> %s
+
+            -- Include previous/next day so overnight shifts are checked correctly.
+            AND s.shift_date BETWEEN
+                target.shift_date - INTERVAL '1 day'
+                AND target.shift_date + INTERVAL '1 day'
+        )
+
+        SELECT
+            ea.schedule_id,
+            ea.account_name,
+            ea.shift_name,
+            ea.shift_date,
+            ea.start_time,
+            ea.end_time
+        FROM existing_assignments ea
+        CROSS JOIN target_shift target
+        WHERE ea.existing_start_at < target.target_end_at
+        AND ea.existing_end_at > target.target_start_at
+        LIMIT 1
+    """, (
+        target_schedule_id,
+        company_id,
+        company_id,
+        employee_id,
+        target_schedule_id,
+    ))
+
+    conflict = cursor.fetchone()
+
+    if conflict:
+        account_name = conflict[1]
+        shift_name = conflict[2]
+        shift_date = conflict[3]
+        start_time = conflict[4]
+        end_time = conflict[5]
+
+        return (
+            "Employee already has an overlapping shift: "
+            f"{account_name} / {shift_name} on {shift_date} "
+            f"({start_time} - {end_time})."
+        )
+
+    return None
+
+
 def get_week_bounds_for_shift(cursor, coverage_request_id: int):
     cursor.execute("""
         SELECT
@@ -549,6 +676,16 @@ def auto_approve_cover_application(cursor, application_id: int):
     )
 
     if limit_error:
+        return False
+    
+    conflict_error = schedule_time_conflict_error(
+        cursor,
+        applicant_id,
+        schedule_id,
+        company_id
+    )
+
+    if conflict_error:
         return False
 
     cursor.execute("""
@@ -1501,6 +1638,19 @@ def apply_for_cover(id: int, payload: dict):
                 status_code=400,
                 detail=limit_error
             )
+        
+        conflict_error = schedule_time_conflict_error(
+            cursor,
+            int(employee_id),
+            schedule_id,
+            company_id
+        )
+
+        if conflict_error:
+            raise HTTPException(
+                status_code=400,
+                detail=conflict_error
+            )
 
         shift_datetime = datetime.combine(
             shift_date,
@@ -1885,6 +2035,20 @@ def approve_application(id: int):
             raise HTTPException(
                 status_code=400,
                 detail=limit_error
+            )
+        
+
+        conflict_error = schedule_time_conflict_error(
+            cursor,
+            applicant_id,
+            schedule_id,
+            company_id
+        )
+
+        if conflict_error:
+            raise HTTPException(
+                status_code=400,
+                detail=conflict_error
             )
 
         cursor.execute("""
@@ -2549,6 +2713,19 @@ def update_generated_schedule_employee(
                 raise HTTPException(
                     status_code=404,
                     detail="Employee not found or inactive"
+                )
+            
+            conflict_error = schedule_time_conflict_error(
+                cursor,
+                int(employee_id),
+                schedule_id,
+                company_id
+            )
+
+            if conflict_error:
+                raise HTTPException(
+                    status_code=400,
+                    detail=conflict_error
                 )
 
         # Void cover data only for this one schedule slot.

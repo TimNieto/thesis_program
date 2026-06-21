@@ -627,21 +627,36 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           ? `/shift-applications/${id}/approve`
           : `/shift-applications/${id}/deny`;
 
-      await fetch(`https://backend-production-6e75.up.railway.app${endpoint}`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app${endpoint}`,
+        {
+          method: "POST",
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : `Failed to ${status} application`,
+        );
+      }
 
       toast.success(`Application ${status}`);
 
       fetchApplications();
-
       fetchCoverRequests();
-
       fetchMyShifts();
     } catch (err) {
       console.error(err);
 
-      toast.error("Failed to update application");
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update application",
+      );
     }
   };
 
@@ -683,7 +698,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           errorMessage = JSON.stringify(data.detail);
         }
 
-        toast.error("Unable to apply for cover, maximum shifts reached", {});
+        toast.error(errorMessage);
 
         return;
       }
