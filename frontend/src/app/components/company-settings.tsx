@@ -212,7 +212,7 @@ export function CompanySettings({
             body: JSON.stringify({
               company_id: currentUser.company_id,
               priority_level: Number(policy.priority_level),
-              allow_partial_staffing: Boolean(policy.allow_partial_staffing),
+              allow_partial_staffing: false,
             }),
           },
         );
