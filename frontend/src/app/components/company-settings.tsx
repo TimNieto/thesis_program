@@ -619,7 +619,7 @@ export function CompanySettings({
                   {absenceReplacementMode === "Manual" &&
                     "Admin must manually approve all replacement assignments"}
                   {absenceReplacementMode === "Hybrid" &&
-                    "System suggests replacements but requires admin approval"}
+                    "Admin must manually approve normal cover request, emergency request will automatically transfer."}
                 </p>
               </div>
             </CardContent>
