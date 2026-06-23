@@ -1417,18 +1417,17 @@ export function ScheduleGenerator({
           </Button>
         </div>
       </div>
-
       {/* Shift Legend */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex flex-wrap items-start justify-start gap-x-10 gap-y-4">
             {getGroupedShiftLegendItems().map((shiftGroup) => {
               const shiftColor = getShiftColorClasses(shiftGroup.color_index);
 
               return (
                 <div
                   key={shiftGroup.key}
-                  className="flex items-center gap-2 min-w-0"
+                  className="flex items-center gap-2 min-w-[130px] max-w-[260px]"
                 >
                   <div
                     className={`w-10 h-10 shrink-0 rounded border-2 ${shiftColor.marker}`}
@@ -1447,7 +1446,6 @@ export function ScheduleGenerator({
           </div>
         </CardContent>
       </Card>
-
       {/* Main Tabs */}
       <Tabs defaultValue="schedule" className="space-y-6">
         <TabsList
