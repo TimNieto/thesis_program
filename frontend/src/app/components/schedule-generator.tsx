@@ -1466,7 +1466,6 @@ export function ScheduleGenerator({
             </TabsTrigger>
           )}
         </TabsList>
-
         {/* Weekly Schedule Tab */}
         <TabsContent value="schedule" className="space-y-6">
           <Card>
