@@ -62,6 +62,8 @@ import { toast } from "sonner";
 interface ShiftApplication {
   id: string;
   coverage_request_id?: string;
+  shift_template_id?: number | null;
+  color_index?: number | null;
   employee_id?: number;
   applicant: string;
   livestream: string;
@@ -76,6 +78,8 @@ interface ShiftApplication {
 interface CoverRequest {
   id: string;
   schedule_id?: number;
+  shift_template_id?: number | null;
+  color_index?: number | null;
   requested_by?: number;
   requester: string;
   livestream: string;
@@ -83,13 +87,9 @@ interface CoverRequest {
   shift: string;
   role: string;
   reason: string;
-
   status: "pending" | "approved" | "denied";
-
   request_type: "normal" | "emergency";
-
   is_targeted: boolean;
-
   submittedAt: string;
 }
 
@@ -130,6 +130,171 @@ const LEAVE_TYPES = [
   "Personal",
   "Emergency",
   "Other",
+];
+
+type ShiftColorClasses = {
+  surface: string;
+  marker: string;
+  text: string;
+};
+
+const DEFAULT_SHIFT_COLOR_CLASSES: ShiftColorClasses = {
+  surface: "bg-gray-50 border-gray-300",
+  marker: "bg-gray-400 border-gray-500",
+  text: "text-gray-700",
+};
+
+const SHIFT_COLOR_PALETTE: ShiftColorClasses[] = [
+  {
+    surface: "bg-blue-50 border-blue-300",
+    marker: "bg-blue-500 border-blue-600",
+    text: "text-blue-700",
+  },
+  {
+    surface: "bg-emerald-50 border-emerald-300",
+    marker: "bg-emerald-500 border-emerald-600",
+    text: "text-emerald-700",
+  },
+  {
+    surface: "bg-orange-50 border-orange-300",
+    marker: "bg-orange-500 border-orange-600",
+    text: "text-orange-700",
+  },
+  {
+    surface: "bg-purple-50 border-purple-300",
+    marker: "bg-purple-500 border-purple-600",
+    text: "text-purple-700",
+  },
+  {
+    surface: "bg-pink-50 border-pink-300",
+    marker: "bg-pink-500 border-pink-600",
+    text: "text-pink-700",
+  },
+  {
+    surface: "bg-cyan-50 border-cyan-300",
+    marker: "bg-cyan-500 border-cyan-600",
+    text: "text-cyan-700",
+  },
+  {
+    surface: "bg-lime-50 border-lime-300",
+    marker: "bg-lime-500 border-lime-600",
+    text: "text-lime-700",
+  },
+  {
+    surface: "bg-amber-50 border-amber-300",
+    marker: "bg-amber-500 border-amber-600",
+    text: "text-amber-700",
+  },
+  {
+    surface: "bg-rose-50 border-rose-300",
+    marker: "bg-rose-500 border-rose-600",
+    text: "text-rose-700",
+  },
+  {
+    surface: "bg-indigo-50 border-indigo-300",
+    marker: "bg-indigo-500 border-indigo-600",
+    text: "text-indigo-700",
+  },
+  {
+    surface: "bg-teal-50 border-teal-300",
+    marker: "bg-teal-500 border-teal-600",
+    text: "text-teal-700",
+  },
+  {
+    surface: "bg-yellow-50 border-yellow-300",
+    marker: "bg-yellow-500 border-yellow-600",
+    text: "text-yellow-700",
+  },
+  {
+    surface: "bg-fuchsia-50 border-fuchsia-300",
+    marker: "bg-fuchsia-500 border-fuchsia-600",
+    text: "text-fuchsia-700",
+  },
+  {
+    surface: "bg-sky-50 border-sky-300",
+    marker: "bg-sky-500 border-sky-600",
+    text: "text-sky-700",
+  },
+  {
+    surface: "bg-violet-50 border-violet-300",
+    marker: "bg-violet-500 border-violet-600",
+    text: "text-violet-700",
+  },
+  {
+    surface: "bg-red-50 border-red-300",
+    marker: "bg-red-500 border-red-600",
+    text: "text-red-700",
+  },
+  {
+    surface: "bg-green-50 border-green-300",
+    marker: "bg-green-500 border-green-600",
+    text: "text-green-700",
+  },
+  {
+    surface: "bg-blue-100 border-blue-400",
+    marker: "bg-blue-600 border-blue-700",
+    text: "text-blue-800",
+  },
+  {
+    surface: "bg-emerald-100 border-emerald-400",
+    marker: "bg-emerald-600 border-emerald-700",
+    text: "text-emerald-800",
+  },
+  {
+    surface: "bg-orange-100 border-orange-400",
+    marker: "bg-orange-600 border-orange-700",
+    text: "text-orange-800",
+  },
+  {
+    surface: "bg-purple-100 border-purple-400",
+    marker: "bg-purple-600 border-purple-700",
+    text: "text-purple-800",
+  },
+  {
+    surface: "bg-pink-100 border-pink-400",
+    marker: "bg-pink-600 border-pink-700",
+    text: "text-pink-800",
+  },
+  {
+    surface: "bg-cyan-100 border-cyan-400",
+    marker: "bg-cyan-600 border-cyan-700",
+    text: "text-cyan-800",
+  },
+  {
+    surface: "bg-lime-100 border-lime-400",
+    marker: "bg-lime-600 border-lime-700",
+    text: "text-lime-800",
+  },
+  {
+    surface: "bg-amber-100 border-amber-400",
+    marker: "bg-amber-600 border-amber-700",
+    text: "text-amber-800",
+  },
+  {
+    surface: "bg-rose-100 border-rose-400",
+    marker: "bg-rose-600 border-rose-700",
+    text: "text-rose-800",
+  },
+  {
+    surface: "bg-indigo-100 border-indigo-400",
+    marker: "bg-indigo-600 border-indigo-700",
+    text: "text-indigo-800",
+  },
+  {
+    surface: "bg-teal-100 border-teal-400",
+    marker: "bg-teal-600 border-teal-700",
+    text: "text-teal-800",
+  },
+  {
+    surface: "bg-yellow-100 border-yellow-400",
+    marker: "bg-yellow-600 border-yellow-700",
+    text: "text-yellow-800",
+  },
+  {
+    surface: "bg-fuchsia-100 border-fuchsia-400",
+    marker: "bg-fuchsia-600 border-fuchsia-700",
+    text: "text-fuchsia-800",
+  },
 ];
 
 export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
@@ -246,6 +411,12 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
           shift: r.shift,
 
+          shift_template_id: r.shift_template_id
+            ? Number(r.shift_template_id)
+            : null,
+
+          color_index: r.color_index ?? null,
+
           role: String(r.role || "").replace(/_/g, " "),
 
           reason: r.reason,
@@ -328,6 +499,12 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           }),
 
           shift: a.shift,
+
+          shift_template_id: a.shift_template_id
+            ? Number(a.shift_template_id)
+            : null,
+
+          color_index: a.color_index ?? null,
 
           role: String(a.role || "").replace(/_/g, " "),
 
@@ -653,9 +830,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       console.error(err);
 
       toast.error(
-        err instanceof Error
-          ? err.message
-          : "Failed to update application",
+        err instanceof Error ? err.message : "Failed to update application",
       );
     }
   };
@@ -796,42 +971,23 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     );
   };
 
-  const getShiftColor = (shift: string) => {
-    switch (shift) {
-      case "AM":
-        return "bg-blue-100 border-blue-300";
+  const normalizeKey = (value: any) =>
+    String(value || "")
+      .trim()
+      .toLowerCase();
 
-      case "NN":
-        return "bg-yellow-100 border-yellow-300";
+  const getShiftColorClasses = (colorIndex?: number | null) => {
+    const parsedColorIndex = Number(colorIndex);
 
-      case "PM":
-        return "bg-orange-100 border-orange-300";
-
-      case "GY":
-        return "bg-purple-100 border-purple-300";
-
-      default:
-        return "bg-gray-100 border-gray-300";
+    if (
+      !Number.isInteger(parsedColorIndex) ||
+      parsedColorIndex < 1 ||
+      parsedColorIndex > SHIFT_COLOR_PALETTE.length
+    ) {
+      return DEFAULT_SHIFT_COLOR_CLASSES;
     }
-  };
 
-  const getShiftTextColor = (shift: string) => {
-    switch (shift) {
-      case "AM":
-        return "text-blue-700";
-
-      case "NN":
-        return "text-yellow-700";
-
-      case "PM":
-        return "text-orange-700";
-
-      case "GY":
-        return "text-purple-700";
-
-      default:
-        return "text-gray-700";
-    }
+    return SHIFT_COLOR_PALETTE[parsedColorIndex - 1];
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -840,8 +996,54 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       : "bg-purple-100 text-purple-700";
   };
 
-  const getShiftInfo = (code: string) => {
-    return shiftTemplates.find((s) => s.shift_name === code);
+  const getShiftInfo = (shiftObj: any) => {
+    const shiftName =
+      typeof shiftObj === "string"
+        ? shiftObj
+        : shiftObj?.shift || shiftObj?.shift_name;
+
+    const livestream =
+      typeof shiftObj === "string"
+        ? ""
+        : shiftObj?.livestream || shiftObj?.account_name || shiftObj?.account;
+
+    const shiftTemplateId =
+      typeof shiftObj === "string" ? null : shiftObj?.shift_template_id;
+
+    const templateById = shiftTemplateId
+      ? shiftTemplates.find(
+          (s) => Number(s.shift_template_id) === Number(shiftTemplateId),
+        )
+      : null;
+
+    const template =
+      templateById ||
+      shiftTemplates.find(
+        (s) =>
+          normalizeKey(s.account_name) === normalizeKey(livestream) &&
+          normalizeKey(s.shift_name) === normalizeKey(shiftName),
+      ) ||
+      shiftTemplates.find(
+        (s) => normalizeKey(s.shift_name) === normalizeKey(shiftName),
+      );
+
+    const colorIndex =
+      typeof shiftObj === "string"
+        ? template?.color_index
+        : (shiftObj?.color_index ?? template?.color_index ?? null);
+
+    return {
+      shift_name: template?.shift_name || shiftName || "",
+      start_time: template?.start_time || "",
+      end_time: template?.end_time || "",
+      color_index: colorIndex,
+      time:
+        template?.start_time && template?.end_time
+          ? `${String(template.start_time).slice(0, 5)} - ${String(
+              template.end_time,
+            ).slice(0, 5)}`
+          : "",
+    };
   };
 
   const fetchMyShifts = async () => {
@@ -872,6 +1074,10 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           )
           .map((s: any) => ({
             schedule_id: s.schedule_id,
+            shift_template_id: s.shift_template_id
+              ? Number(s.shift_template_id)
+              : null,
+            color_index: s.color_index ?? null,
             livestream: s.account || s.livestream || s.account_name,
             day: new Date(s.shift_date).toLocaleDateString("en-US", {
               weekday: "long",
@@ -943,44 +1149,51 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {availableShifts.map((slot, index) => {
-                    const shiftInfo = getShiftInfo(slot.shift);
+                    const shiftInfo = getShiftInfo(slot);
+                    const shiftColor = getShiftColorClasses(
+                      shiftInfo.color_index,
+                    );
+
                     return (
                       <Card
                         key={index}
-                        className={`border-2 ${getShiftColor(slot.shift)}`}
+                        className={`border-2 ${shiftColor.surface}`}
                       >
                         <CardContent className="pt-6">
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Badge
-                                className={`text-base px-3 py-1 border ${getShiftColor(
-                                  slot.shift,
-                                )} ${getShiftTextColor(slot.shift)}`}
-                              >
-                                {slot.shift}
-                              </Badge>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={`h-8 w-8 shrink-0 rounded border-2 ${shiftColor.marker}`}
+                                />
+                                <span className="font-semibold text-sm truncate">
+                                  {shiftInfo.shift_name || slot.shift}
+                                </span>
+                              </div>
+
                               <Badge className={getRoleBadgeColor(slot.role)}>
                                 {slot.role}
                               </Badge>
                             </div>
+
                             <div className="text-sm">
                               <div className="font-bold text-blue-700">
                                 {slot.livestream}
                               </div>
                               <div className="font-medium">{slot.day}</div>
                               <div className="text-gray-600">
-                                {shiftInfo?.name}
-                              </div>
-                              <div className="text-gray-600">
-                                {shiftInfo?.time}
+                                {shiftInfo.time || "Time not set"}
                               </div>
                             </div>
+
                             <Button
-                              onClick={() => applyForCover(slot.id)}
+                              onClick={() =>
+                                applyForCover(slot.id, slot.request_type)
+                              }
                               className="w-full"
                               size="sm"
                             >
-                              applying to cover
+                              Apply to Cover
                             </Button>
                           </div>
                         </CardContent>
@@ -1015,38 +1228,43 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                     </p>
                   )}
                   {requestableMyShifts.map((slot, index) => {
-                    const shiftInfo = getShiftInfo(slot.shift);
+                    const shiftInfo = getShiftInfo(slot);
+                    const shiftColor = getShiftColorClasses(
+                      shiftInfo.color_index,
+                    );
+
                     return (
                       <Card
                         key={index}
-                        className={`border-2 ${getShiftColor(slot.shift)}`}
+                        className={`border-2 ${shiftColor.surface}`}
                       >
                         <CardContent className="pt-6">
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Badge
-                                className={`text-base px-3 py-1 border ${getShiftColor(
-                                  slot.shift,
-                                )} ${getShiftTextColor(slot.shift)}`}
-                              >
-                                {slot.shift}
-                              </Badge>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className={`h-8 w-8 shrink-0 rounded border-2 ${shiftColor.marker}`}
+                                />
+                                <span className="font-semibold text-sm truncate">
+                                  {shiftInfo.shift_name || slot.shift}
+                                </span>
+                              </div>
+
                               <Badge className={getRoleBadgeColor(slot.role)}>
                                 {slot.role}
                               </Badge>
                             </div>
+
                             <div className="text-sm">
                               <div className="font-bold text-blue-700">
                                 {slot.livestream}
                               </div>
                               <div className="font-medium">{slot.day}</div>
                               <div className="text-gray-600">
-                                {shiftInfo?.name}
-                              </div>
-                              <div className="text-gray-600">
-                                {shiftInfo?.time}
+                                {shiftInfo.time || "Time not set"}
                               </div>
                             </div>
+
                             <Button
                               onClick={() => openCoverDialog(slot)}
                               variant="outline"
@@ -1235,7 +1453,10 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                             app.employee_id === currentUser.employee_id,
                         )
                         .map((application) => {
-                          const shiftInfo = getShiftInfo(application.shift);
+                          const shiftInfo = getShiftInfo(application);
+                          const shiftColor = getShiftColorClasses(
+                            shiftInfo.color_index,
+                          );
                           return (
                             <TableRow key={application.id}>
                               <TableCell>{application.applicant}</TableCell>
@@ -1246,13 +1467,19 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                               </TableCell>
                               <TableCell>{application.day}</TableCell>
                               <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {application.shift} - {shiftInfo?.name}
-                                  </span>
-                                  <span className="text-xs text-gray-600">
-                                    {shiftInfo?.time}
-                                  </span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`h-4 w-4 shrink-0 rounded border ${shiftColor.marker}`}
+                                  />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-medium truncate">
+                                      {shiftInfo.shift_name ||
+                                        application.shift}
+                                    </span>
+                                    <span className="text-xs text-gray-600">
+                                      {shiftInfo.time || "Time not set"}
+                                    </span>
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -1356,7 +1583,10 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                             request.requester === currentUser.name,
                         )
                         .map((request) => {
-                          const shiftInfo = getShiftInfo(request.shift);
+                          const shiftInfo = getShiftInfo(request);
+                          const shiftColor = getShiftColorClasses(
+                            shiftInfo.color_index,
+                          );
                           return (
                             <TableRow key={request.id}>
                               <TableCell>{request.requester}</TableCell>
@@ -1367,13 +1597,18 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                               </TableCell>
                               <TableCell>{request.day}</TableCell>
                               <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {request.shift} - {shiftInfo?.name}
-                                  </span>
-                                  <span className="text-xs text-gray-600">
-                                    {shiftInfo?.time}
-                                  </span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`h-4 w-4 shrink-0 rounded border ${shiftColor.marker}`}
+                                  />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-medium truncate">
+                                      {shiftInfo.shift_name || request.shift}
+                                    </span>
+                                    <span className="text-xs text-gray-600">
+                                      {shiftInfo.time || "Time not set"}
+                                    </span>
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell>
@@ -1409,7 +1644,12 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                                   request.requester !== currentUser.name && (
                                     <Button
                                       size="sm"
-                                      onClick={() => applyForCover(request.id)}
+                                      onClick={() =>
+                                        applyForCover(
+                                          request.id,
+                                          request.request_type,
+                                        )
+                                      }
                                     >
                                       Accept Cover
                                     </Button>
@@ -1547,8 +1787,9 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                   </div>
                   <div>
                     <strong>Shift:</strong>{" "}
-                    {getShiftInfo(selectedShift.shift)?.name} (
-                    {getShiftInfo(selectedShift.shift)?.time})
+                    {getShiftInfo(selectedShift).shift_name ||
+                      selectedShift.shift}{" "}
+                    ({getShiftInfo(selectedShift).time || "Time not set"})
                   </div>
                   <div>
                     <strong>Role:</strong> {selectedShift.role}

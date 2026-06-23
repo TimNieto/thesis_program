@@ -26,7 +26,8 @@ def get_shift_templates(company_id: int = 1):
                 st.shift_name,
                 st.start_time,
                 st.end_time,
-                st.is_active
+                st.is_active,
+                st.color_index
             FROM shift_templates st
             JOIN accounts a
                 ON st.account_id = a.account_id
@@ -58,6 +59,7 @@ def get_shift_templates(company_id: int = 1):
                 "start_time": str(r[6]),
                 "end_time": str(r[7]),
                 "is_active": r[8],
+                "color_index": r[9],
             }
             for r in rows
         ]
@@ -145,6 +147,116 @@ def get_csv_value(row: dict, *keys: str) -> str:
             return str(value).strip()
 
     return ""
+
+
+SHIFT_COLOR_COUNT = 30
+
+
+def clean_color_index(value):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    if 1 <= value <= SHIFT_COLOR_COUNT:
+        return value
+
+    return None
+
+
+def get_next_shift_template_color_index(cursor, company_id: int):
+    """
+    Backend color assignment rule:
+    1. Use colors 1-30 that were never used by this company first.
+    2. After all 30 were historically used, reuse inactive colors.
+    3. If all 30 colors are currently active, return None.
+    """
+
+    cursor.execute("""
+        SELECT DISTINCT color_index
+        FROM shift_templates
+        WHERE company_id = %s
+        AND color_index IS NOT NULL
+    """, (company_id,))
+
+    historical_used = {
+        clean_color_index(row[0])
+        for row in cursor.fetchall()
+    }
+
+    historical_used.discard(None)
+
+    for color_index in range(1, SHIFT_COLOR_COUNT + 1):
+        if color_index not in historical_used:
+            return color_index
+
+    cursor.execute("""
+        SELECT DISTINCT color_index
+        FROM shift_templates
+        WHERE company_id = %s
+        AND is_active = TRUE
+        AND color_index IS NOT NULL
+    """, (company_id,))
+
+    active_used = {
+        clean_color_index(row[0])
+        for row in cursor.fetchall()
+    }
+
+    active_used.discard(None)
+
+    for color_index in range(1, SHIFT_COLOR_COUNT + 1):
+        if color_index not in active_used:
+            return color_index
+
+    return None
+
+
+def get_reactivation_shift_template_color_index(
+    cursor,
+    company_id: int,
+    shift_template_id: int
+):
+    """
+    Reactivated shift keeps its own old color if that color is not currently active.
+    If another active shift already uses it, assign the next available color.
+    """
+
+    cursor.execute("""
+        SELECT color_index
+        FROM shift_templates
+        WHERE company_id = %s
+        AND shift_template_id = %s
+        LIMIT 1
+    """, (
+        company_id,
+        shift_template_id
+    ))
+
+    row = cursor.fetchone()
+
+    existing_color_index = clean_color_index(row[0]) if row else None
+
+    if existing_color_index is not None:
+        cursor.execute("""
+            SELECT 1
+            FROM shift_templates
+            WHERE company_id = %s
+            AND is_active = TRUE
+            AND color_index = %s
+            AND shift_template_id != %s
+            LIMIT 1
+        """, (
+            company_id,
+            existing_color_index,
+            shift_template_id
+        ))
+
+        if not cursor.fetchone():
+            return existing_color_index
+
+    return get_next_shift_template_color_index(cursor, company_id)
+
 
 def resolve_shift_template_account(
     cursor,
@@ -533,6 +645,12 @@ async def import_shift_templates(
                     )
 
             if existing_template_id:
+                color_index = get_reactivation_shift_template_color_index(
+                    cursor,
+                    company_id,
+                    existing_template_id
+                )
+
                 cursor.execute("""
                     UPDATE shift_templates
                     SET
@@ -542,6 +660,7 @@ async def import_shift_templates(
                         fatigue_penalty = 0,
                         difficulty_weight = 0,
                         is_overnight = FALSE,
+                        color_index = %s,
                         updated_at = NOW()
                     WHERE shift_template_id = %s
                     AND company_id = %s
@@ -549,6 +668,7 @@ async def import_shift_templates(
                 """, (
                     start_time_obj,
                     end_time_obj,
+                    color_index,
                     existing_template_id,
                     company_id,
                     account_id
@@ -557,6 +677,11 @@ async def import_shift_templates(
                 reactivated_templates += 1
 
             else:
+                color_index = get_next_shift_template_color_index(
+                    cursor,
+                    company_id
+                )
+
                 cursor.execute("""
                     INSERT INTO shift_templates (
                         company_id,
@@ -567,15 +692,17 @@ async def import_shift_templates(
                         is_active,
                         fatigue_penalty,
                         difficulty_weight,
-                        is_overnight
+                        is_overnight,
+                        color_index
                     )
-                    VALUES (%s, %s, %s, %s, %s, TRUE, 0, 0, FALSE)
+                    VALUES (%s, %s, %s, %s, %s, TRUE, 0, 0, FALSE, %s)
                 """, (
                     company_id,
                     account_id,
                     shift_name,
                     start_time_obj,
-                    end_time_obj
+                    end_time_obj,
+                    color_index
                 ))
 
                 created_templates += 1
@@ -742,6 +869,12 @@ def create_shift_template(payload: dict):
                 )
 
         if existing_template_id:
+            color_index = get_reactivation_shift_template_color_index(
+                cursor,
+                company_id,
+                existing_template_id
+            )
+
             cursor.execute("""
                 UPDATE shift_templates
                 SET
@@ -751,6 +884,7 @@ def create_shift_template(payload: dict):
                     fatigue_penalty = 0,
                     difficulty_weight = 0,
                     is_overnight = FALSE,
+                    color_index = %s,
                     updated_at = NOW()
                 WHERE shift_template_id = %s
                 AND company_id = %s
@@ -764,10 +898,12 @@ def create_shift_template(payload: dict):
                     is_overnight,
                     fatigue_penalty,
                     difficulty_weight,
-                    is_active
+                    is_active,
+                    color_index
             """, (
                 start_time_obj,
                 end_time_obj,
+                color_index,
                 existing_template_id,
                 company_id,
                 account_id
@@ -777,6 +913,11 @@ def create_shift_template(payload: dict):
             message = "Shift template reactivated"
 
         else:
+            color_index = get_next_shift_template_color_index(
+                cursor,
+                company_id
+            )
+
             cursor.execute("""
                 INSERT INTO shift_templates (
                     company_id,
@@ -787,9 +928,10 @@ def create_shift_template(payload: dict):
                     is_active,
                     fatigue_penalty,
                     difficulty_weight,
-                    is_overnight
+                    is_overnight,
+                    color_index
                 )
-                VALUES (%s, %s, %s, %s, %s, TRUE, 0, 0, FALSE)
+                VALUES (%s, %s, %s, %s, %s, TRUE, 0, 0, FALSE, %s)
                 RETURNING
                     shift_template_id,
                     account_id,
@@ -799,13 +941,15 @@ def create_shift_template(payload: dict):
                     is_overnight,
                     fatigue_penalty,
                     difficulty_weight,
-                    is_active
+                    is_active,
+                    color_index
             """, (
                 company_id,
                 account_id,
                 shift_name,
                 start_time_obj,
-                end_time_obj
+                end_time_obj,
+                color_index
             ))
 
             saved = cursor.fetchone()
@@ -826,6 +970,7 @@ def create_shift_template(payload: dict):
             "fatigue_penalty": saved[6],
             "difficulty_weight": saved[7],
             "is_active": saved[8],
+            "color_index": saved[9],
         }
 
     except HTTPException:
@@ -1025,7 +1170,8 @@ def update_shift_template(
                 is_overnight,
                 fatigue_penalty,
                 difficulty_weight,
-                is_active
+                is_active,
+                color_index
         """, (
             account_id,
             shift_name,
@@ -1052,6 +1198,7 @@ def update_shift_template(
             "fatigue_penalty": updated[6],
             "difficulty_weight": updated[7],
             "is_active": updated[8],
+            "color_index": updated[9],
         }
 
     except HTTPException:

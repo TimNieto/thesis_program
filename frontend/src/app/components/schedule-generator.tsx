@@ -47,6 +47,8 @@ interface ShiftAssignment {
   id: string;
   schedule_id?: number;
   shift_id?: number;
+  shift_template_id?: number;
+  color_index?: number | null;
   employee_id?: number | null;
   livestream: string;
   day: string;
@@ -90,6 +92,171 @@ const DAYS = [
   "Friday",
   "Saturday",
   "Sunday",
+];
+
+type ShiftColorClasses = {
+  surface: string;
+  marker: string;
+  text: string;
+};
+
+const DEFAULT_SHIFT_COLOR_CLASSES: ShiftColorClasses = {
+  surface: "bg-gray-50 border-gray-300",
+  marker: "bg-gray-400 border-gray-500",
+  text: "text-gray-700",
+};
+
+const SHIFT_COLOR_PALETTE: ShiftColorClasses[] = [
+  {
+    surface: "bg-blue-50 border-blue-300",
+    marker: "bg-blue-500 border-blue-600",
+    text: "text-blue-700",
+  },
+  {
+    surface: "bg-emerald-50 border-emerald-300",
+    marker: "bg-emerald-500 border-emerald-600",
+    text: "text-emerald-700",
+  },
+  {
+    surface: "bg-orange-50 border-orange-300",
+    marker: "bg-orange-500 border-orange-600",
+    text: "text-orange-700",
+  },
+  {
+    surface: "bg-purple-50 border-purple-300",
+    marker: "bg-purple-500 border-purple-600",
+    text: "text-purple-700",
+  },
+  {
+    surface: "bg-pink-50 border-pink-300",
+    marker: "bg-pink-500 border-pink-600",
+    text: "text-pink-700",
+  },
+  {
+    surface: "bg-cyan-50 border-cyan-300",
+    marker: "bg-cyan-500 border-cyan-600",
+    text: "text-cyan-700",
+  },
+  {
+    surface: "bg-lime-50 border-lime-300",
+    marker: "bg-lime-500 border-lime-600",
+    text: "text-lime-700",
+  },
+  {
+    surface: "bg-amber-50 border-amber-300",
+    marker: "bg-amber-500 border-amber-600",
+    text: "text-amber-700",
+  },
+  {
+    surface: "bg-rose-50 border-rose-300",
+    marker: "bg-rose-500 border-rose-600",
+    text: "text-rose-700",
+  },
+  {
+    surface: "bg-indigo-50 border-indigo-300",
+    marker: "bg-indigo-500 border-indigo-600",
+    text: "text-indigo-700",
+  },
+  {
+    surface: "bg-teal-50 border-teal-300",
+    marker: "bg-teal-500 border-teal-600",
+    text: "text-teal-700",
+  },
+  {
+    surface: "bg-yellow-50 border-yellow-300",
+    marker: "bg-yellow-500 border-yellow-600",
+    text: "text-yellow-700",
+  },
+  {
+    surface: "bg-fuchsia-50 border-fuchsia-300",
+    marker: "bg-fuchsia-500 border-fuchsia-600",
+    text: "text-fuchsia-700",
+  },
+  {
+    surface: "bg-sky-50 border-sky-300",
+    marker: "bg-sky-500 border-sky-600",
+    text: "text-sky-700",
+  },
+  {
+    surface: "bg-violet-50 border-violet-300",
+    marker: "bg-violet-500 border-violet-600",
+    text: "text-violet-700",
+  },
+  {
+    surface: "bg-red-50 border-red-300",
+    marker: "bg-red-500 border-red-600",
+    text: "text-red-700",
+  },
+  {
+    surface: "bg-green-50 border-green-300",
+    marker: "bg-green-500 border-green-600",
+    text: "text-green-700",
+  },
+  {
+    surface: "bg-blue-100 border-blue-400",
+    marker: "bg-blue-600 border-blue-700",
+    text: "text-blue-800",
+  },
+  {
+    surface: "bg-emerald-100 border-emerald-400",
+    marker: "bg-emerald-600 border-emerald-700",
+    text: "text-emerald-800",
+  },
+  {
+    surface: "bg-orange-100 border-orange-400",
+    marker: "bg-orange-600 border-orange-700",
+    text: "text-orange-800",
+  },
+  {
+    surface: "bg-purple-100 border-purple-400",
+    marker: "bg-purple-600 border-purple-700",
+    text: "text-purple-800",
+  },
+  {
+    surface: "bg-pink-100 border-pink-400",
+    marker: "bg-pink-600 border-pink-700",
+    text: "text-pink-800",
+  },
+  {
+    surface: "bg-cyan-100 border-cyan-400",
+    marker: "bg-cyan-600 border-cyan-700",
+    text: "text-cyan-800",
+  },
+  {
+    surface: "bg-lime-100 border-lime-400",
+    marker: "bg-lime-600 border-lime-700",
+    text: "text-lime-800",
+  },
+  {
+    surface: "bg-amber-100 border-amber-400",
+    marker: "bg-amber-600 border-amber-700",
+    text: "text-amber-800",
+  },
+  {
+    surface: "bg-rose-100 border-rose-400",
+    marker: "bg-rose-600 border-rose-700",
+    text: "text-rose-800",
+  },
+  {
+    surface: "bg-indigo-100 border-indigo-400",
+    marker: "bg-indigo-600 border-indigo-700",
+    text: "text-indigo-800",
+  },
+  {
+    surface: "bg-teal-100 border-teal-400",
+    marker: "bg-teal-600 border-teal-700",
+    text: "text-teal-800",
+  },
+  {
+    surface: "bg-yellow-100 border-yellow-400",
+    marker: "bg-yellow-600 border-yellow-700",
+    text: "text-yellow-800",
+  },
+  {
+    surface: "bg-fuchsia-100 border-fuchsia-400",
+    marker: "bg-fuchsia-600 border-fuchsia-700",
+    text: "text-fuchsia-800",
+  },
 ];
 
 export function ScheduleGenerator({
@@ -393,6 +560,8 @@ export function ScheduleGenerator({
                     id: `${livestream}-${day}-${shift}-${roleKey}-${emp.schedule_id || emp.employee_id}`,
                     schedule_id: emp.schedule_id,
                     shift_id: emp.shift_id,
+                    shift_template_id: emp.shift_template_id,
+                    color_index: emp.color_index ?? null,
                     employee_id: emp.employee_id,
                     livestream,
                     day,
@@ -907,6 +1076,9 @@ export function ScheduleGenerator({
                 transformed.push({
                   id: String(idCounter++),
                   shift_id: emp.shift_id,
+                  shift_template_id:
+                    emp.shift_template_id ?? shift.shift_template_id,
+                  color_index: emp.color_index ?? shift.color_index ?? null,
                   employee_id: emp.employee_id,
                   schedule_id: emp.schedule_id,
                   livestream,
@@ -1024,42 +1196,18 @@ export function ScheduleGenerator({
     }
   };
 
-  const getShiftColor = (shift: string) => {
-    switch (shift) {
-      case "AM":
-        return "bg-blue-100 border-blue-300";
+  const getShiftColorClasses = (colorIndex?: number | null) => {
+    const parsedColorIndex = Number(colorIndex);
 
-      case "NN":
-        return "bg-yellow-100 border-yellow-300";
-
-      case "PM":
-        return "bg-orange-100 border-orange-300";
-
-      case "GY":
-        return "bg-purple-100 border-purple-300";
-
-      default:
-        return "bg-gray-100 border-gray-300";
+    if (
+      !Number.isInteger(parsedColorIndex) ||
+      parsedColorIndex < 1 ||
+      parsedColorIndex > SHIFT_COLOR_PALETTE.length
+    ) {
+      return DEFAULT_SHIFT_COLOR_CLASSES;
     }
-  };
 
-  const getShiftTextColor = (shift: string) => {
-    switch (shift) {
-      case "AM":
-        return "text-blue-700";
-
-      case "NN":
-        return "text-yellow-700";
-
-      case "PM":
-        return "text-orange-700";
-
-      case "GY":
-        return "text-purple-700";
-
-      default:
-        return "text-gray-700";
-    }
+    return SHIFT_COLOR_PALETTE[parsedColorIndex - 1];
   };
 
   const getVisibleShifts = (livestream: string) => {
@@ -1077,11 +1225,18 @@ export function ScheduleGenerator({
       ),
     );
 
-    return savedShiftNames.map((shiftName) => ({
-      shift_name: shiftName,
-      start_time: "",
-      end_time: "",
-    }));
+    return savedShiftNames.map((shiftName) => {
+      const assignment = assignments.find(
+        (a) => a.livestream === livestream && a.shift === shiftName,
+      );
+
+      return {
+        shift_name: shiftName,
+        start_time: "",
+        end_time: "",
+        color_index: assignment?.color_index ?? null,
+      };
+    });
   };
 
   const getRoleRowsForShift = (livestream: string, shiftName: string) => {
@@ -1194,38 +1349,32 @@ export function ScheduleGenerator({
       <Card>
         <CardContent className="pt-6">
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            {Array.from(
-              shiftTemplates
-                .reduce((map, shift) => {
-                  const key = normalizeKey(shift.shift_name);
+            {shiftTemplates.map((shift) => {
+              const shiftColor = getShiftColorClasses(shift.color_index);
 
-                  if (!map.has(key)) {
-                    map.set(key, shift);
-                  }
-
-                  return map;
-                }, new Map<string, any>())
-                .values(),
-            ).map((shift) => (
-              <div key={shift.shift_name} className="flex items-center gap-2">
+              return (
                 <div
-                  className={`w-10 h-10 rounded border-2 ${getShiftColor(shift.shift_name)} flex items-center justify-center`}
+                  key={`${shift.account_id}-${shift.shift_template_id}`}
+                  className="flex items-center gap-2 min-w-0"
                 >
-                  <span
-                    className={`font-semibold text-xs ${getShiftTextColor(shift.shift_name)}`}
-                  >
-                    {shift.shift_name}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-sm font-medium">{shift.shift_name}</div>
-                  <div className="text-xs text-gray-600">
-                    {shift.start_time.slice(0, 5)} -{" "}
-                    {shift.end_time.slice(0, 5)}
+                  <div
+                    className={`w-10 h-10 shrink-0 rounded border-2 ${shiftColor.marker}`}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {shift.shift_name}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {shift.account_name}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {shift.start_time.slice(0, 5)} -{" "}
+                      {shift.end_time.slice(0, 5)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -1315,14 +1464,21 @@ export function ScheduleGenerator({
                                 key={`${livestream}-${shift.shift_name}-empty`}
                               >
                                 <td
-                                  className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
+                                  className={`border border-gray-300 p-3 ${getShiftColorClasses(shift.color_index).surface}`}
                                 >
-                                  <div className="font-semibold text-sm">
-                                    {shift.shift_name}
-                                  </div>
-                                  <div className="text-xs text-gray-600">
-                                    {shift.start_time.slice(0, 5)} -{" "}
-                                    {shift.end_time.slice(0, 5)}
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div
+                                      className={`w-8 h-8 shrink-0 rounded border-2 ${getShiftColorClasses(shift.color_index).marker}`}
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-sm truncate">
+                                        {shift.shift_name}
+                                      </div>
+                                      <div className="text-xs text-gray-600">
+                                        {shift.start_time.slice(0, 5)} -{" "}
+                                        {shift.end_time.slice(0, 5)}
+                                      </div>
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="border border-gray-300 bg-gray-50 p-2 text-center text-sm text-gray-400">
@@ -1351,24 +1507,14 @@ export function ScheduleGenerator({
                                     {roleIndex === 0 && (
                                       <td
                                         rowSpan={roleRowsForShift.length}
-                                        className={`border border-gray-300 p-3 ${getShiftColor(shift.shift_name)}`}
+                                        className={`border border-gray-300 p-3 ${getShiftColorClasses(shift.color_index).surface}`}
                                       >
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
                                           <div
-                                            className={`w-10 h-10 rounded border-2 ${getShiftColor(
-                                              shift.shift_name,
-                                            )} flex items-center justify-center`}
-                                          >
-                                            <span
-                                              className={`font-semibold text-sm ${getShiftTextColor(
-                                                shift.shift_name,
-                                              )}`}
-                                            >
-                                              {shift.shift_name}
-                                            </span>
-                                          </div>
-                                          <div>
-                                            <div className="font-semibold text-sm">
+                                            className={`w-10 h-10 shrink-0 rounded border-2 ${getShiftColorClasses(shift.color_index).marker}`}
+                                          />
+                                          <div className="min-w-0">
+                                            <div className="font-semibold text-sm truncate">
                                               {shift.shift_name}
                                             </div>
                                             <div className="text-xs text-gray-600">
@@ -1410,9 +1556,9 @@ export function ScheduleGenerator({
                                             cellAssignment?.employee_id
                                               ? isAbsent
                                                 ? "bg-gray-200 text-gray-500"
-                                                : getShiftColor(
-                                                    shift.shift_name,
-                                                  )
+                                                : getShiftColorClasses(
+                                                    shift.color_index,
+                                                  ).surface
                                               : "bg-white text-gray-300"
                                           } ${
                                             isClickable &&
@@ -1439,9 +1585,9 @@ export function ScheduleGenerator({
                                                 className={`font-medium text-sm ${
                                                   isAbsent
                                                     ? "text-gray-500 line-through"
-                                                    : getShiftTextColor(
-                                                        shift.shift_name,
-                                                      )
+                                                    : getShiftColorClasses(
+                                                        shift.color_index,
+                                                      ).text
                                                 }`}
                                               >
                                                 {cellAssignment.employee}

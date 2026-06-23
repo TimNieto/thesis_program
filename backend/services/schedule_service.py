@@ -16,7 +16,8 @@ def fetch_shift_templates(cursor, company_id: int):
             a.account_name,
             st.shift_name,
             st.start_time,
-            st.end_time
+            st.end_time,
+            st.color_index
         FROM shift_templates st
         JOIN accounts a
             ON st.account_id = a.account_id
@@ -39,6 +40,7 @@ def fetch_shift_templates(cursor, company_id: int):
             "shift_name": r[3],
             "start_time": r[4],
             "end_time": r[5],
+            "color_index": r[6],
         }
         for r in rows
     ]
@@ -355,7 +357,8 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
             st.fatigue_penalty,
             st.difficulty_weight,
             st.is_overnight,
-            a.account_id
+            a.account_id,
+            st.color_index
         FROM shifts s
         JOIN accounts a
             ON s.account_id = a.account_id
@@ -406,6 +409,7 @@ def fetch_shifts(cursor, company_id: int, gy_fatigue_penalty=20):
             ),
             "difficulty_weight": r[8],
             "is_overnight": is_fatigue_sensitive,
+            "color_index": r[11],
             "staffing_requirements": staffing_requirements_map.get((r[3], r[10]), [])
         })
 
@@ -717,6 +721,8 @@ def group_schedule(assignments, active_roles):
         schedule[account][day][shift][role].append({
             "schedule_id": a.get("schedule_id"),
             "shift_id": a.get("shift_id"),
+            "shift_template_id": a.get("shift_template_id"),
+            "color_index": a.get("color_index"),
             "employee_id": a.get("employee_id"),
             "employee_name": a.get("employee_name") or "",
             "slot_index": slot_index,
@@ -786,12 +792,24 @@ def generate_weekly_schedule(company_id: int):
             for e in employees
         }
 
+        shift_lookup = {
+            shift["shift_id"]: shift
+            for shift in shifts
+        }
+
         for a in result["assignments"]:
             emp_id = a["employee_id"]
+
             a["employee_name"] = employee_lookup.get(
                 emp_id,
                 f"Employee {emp_id}"
             )
+
+            shift_data = shift_lookup.get(a.get("shift_id"))
+
+            if shift_data:
+                a["shift_template_id"] = shift_data.get("shift_template_id")
+                a["color_index"] = shift_data.get("color_index")
 
         active_roles = fetch_active_staffing_roles(cursor, company_id)
 
@@ -871,7 +889,9 @@ def get_generated_schedule(
                     WHEN ab.absence_id IS NOT NULL
                     THEN TRUE
                     ELSE FALSE
-                END AS is_absent
+                END AS is_absent,
+                st.shift_template_id,
+                st.color_index
             FROM generated_schedule g
 
             JOIN shifts s
@@ -926,7 +946,9 @@ def get_generated_schedule(
                 "employee_name": r[6] if r[6] else "",
                 "role": r[7],
                 "slot_index": r[8],
-                "is_absent": bool(r[9])
+                "is_absent": bool(r[9]),
+                "shift_template_id": r[10],
+                "color_index": r[11],
             }
             for r in rows
         ]
