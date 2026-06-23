@@ -175,7 +175,7 @@ export function EmployeeProfile({
               id="name"
               value={name}
               disabled
-              className="bg-gray-50 cursor-not-allowed"
+              className="bg-gray-50 cursor-not-allowed disabled:opacity-100 disabled:text-black disabled:[-webkit-text-fill-color:black]"
             />
           </div>
 
@@ -190,7 +190,7 @@ export function EmployeeProfile({
               type="email"
               value={email}
               disabled
-              className="bg-gray-50 cursor-not-allowed"
+              className="bg-gray-50 cursor-not-allowed disabled:opacity-100 disabled:text-black disabled:[-webkit-text-fill-color:black]"
             />
             <p className="text-sm text-gray-500">
               Email cannot be changed after account creation
@@ -222,7 +222,7 @@ export function EmployeeProfile({
               id="role"
               value={role}
               disabled
-              className="bg-gray-50 cursor-not-allowed"
+              className="bg-gray-50 cursor-not-allowed disabled:opacity-100 disabled:text-black disabled:[-webkit-text-fill-color:black]"
             />
             <p className="text-sm text-gray-500">
               Role is managed by administrators
