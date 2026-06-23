@@ -1233,6 +1233,8 @@ def get_requests(employee_id: int):
                 cr.status,
                 cr.request_type,
                 cr.created_at,
+                st.shift_template_id,
+                st.color_index,
                 CASE
                     WHEN ect.employee_id IS NOT NULL
                     THEN TRUE
@@ -1297,7 +1299,9 @@ def get_requests(employee_id: int):
                 "status": r[9],
                 "request_type": r[10],
                 "created_at": str(r[11]),
-                "is_targeted": r[12],
+                "shift_template_id": r[12],
+                "color_index": r[13],
+                "is_targeted": r[14],
             }
             for r in rows
         ]
@@ -1332,7 +1336,9 @@ def get_all_requests(company_id: int | None = None):
                 cr.reason,
                 cr.status,
                 cr.request_type,
-                cr.created_at
+                cr.created_at,
+                st.shift_template_id,
+                st.color_index
             FROM coverage_requests cr
             JOIN employees requester
                 ON cr.requested_by = requester.employee_id
@@ -1375,6 +1381,8 @@ def get_all_requests(company_id: int | None = None):
                 "status": r[9],
                 "request_type": r[10],
                 "created_at": str(r[11]),
+                "shift_template_id": r[12],
+                "color_index": r[13],
                 "is_targeted": False,
             }
             for r in rows
@@ -1930,7 +1938,9 @@ def get_shift_applications(company_id: int | None = None):
                 sa.status,
                 cr.coverage_request_id,
                 gs.schedule_id,
-                applicant.employee_id
+                applicant.employee_id,
+                st.shift_template_id,
+                st.color_index
             FROM shift_applications sa
             JOIN employees applicant
                 ON sa.applicant_id = applicant.employee_id
@@ -1976,6 +1986,8 @@ def get_shift_applications(company_id: int | None = None):
                 "coverage_request_id": r[9],
                 "schedule_id": r[10],
                 "employee_id": r[11],
+                "shift_template_id": r[12],
+                "color_index": r[13],
             }
             for r in rows
         ]

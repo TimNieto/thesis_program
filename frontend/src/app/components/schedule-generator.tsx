@@ -102,159 +102,159 @@ type ShiftColorClasses = {
 
 const DEFAULT_SHIFT_COLOR_CLASSES: ShiftColorClasses = {
   surface: "bg-gray-50 border-gray-300",
-  marker: "bg-gray-400 border-gray-500",
+  marker: "bg-gray-100 border-gray-500",
   text: "text-gray-700",
 };
 
 const SHIFT_COLOR_PALETTE: ShiftColorClasses[] = [
   {
     surface: "bg-blue-50 border-blue-300",
-    marker: "bg-blue-500 border-blue-600",
+    marker: "bg-blue-100 border-blue-500",
     text: "text-blue-700",
   },
   {
     surface: "bg-emerald-50 border-emerald-300",
-    marker: "bg-emerald-500 border-emerald-600",
+    marker: "bg-emerald-100 border-emerald-500",
     text: "text-emerald-700",
   },
   {
     surface: "bg-orange-50 border-orange-300",
-    marker: "bg-orange-500 border-orange-600",
+    marker: "bg-orange-100 border-orange-500",
     text: "text-orange-700",
   },
   {
     surface: "bg-purple-50 border-purple-300",
-    marker: "bg-purple-500 border-purple-600",
+    marker: "bg-purple-100 border-purple-500",
     text: "text-purple-700",
   },
   {
     surface: "bg-pink-50 border-pink-300",
-    marker: "bg-pink-500 border-pink-600",
+    marker: "bg-pink-100 border-pink-500",
     text: "text-pink-700",
   },
   {
     surface: "bg-cyan-50 border-cyan-300",
-    marker: "bg-cyan-500 border-cyan-600",
+    marker: "bg-cyan-100 border-cyan-500",
     text: "text-cyan-700",
   },
   {
     surface: "bg-lime-50 border-lime-300",
-    marker: "bg-lime-500 border-lime-600",
+    marker: "bg-lime-100 border-lime-500",
     text: "text-lime-700",
   },
   {
     surface: "bg-amber-50 border-amber-300",
-    marker: "bg-amber-500 border-amber-600",
+    marker: "bg-amber-100 border-amber-500",
     text: "text-amber-700",
   },
   {
     surface: "bg-rose-50 border-rose-300",
-    marker: "bg-rose-500 border-rose-600",
+    marker: "bg-rose-100 border-rose-500",
     text: "text-rose-700",
   },
   {
     surface: "bg-indigo-50 border-indigo-300",
-    marker: "bg-indigo-500 border-indigo-600",
+    marker: "bg-indigo-100 border-indigo-500",
     text: "text-indigo-700",
   },
   {
     surface: "bg-teal-50 border-teal-300",
-    marker: "bg-teal-500 border-teal-600",
+    marker: "bg-teal-100 border-teal-500",
     text: "text-teal-700",
   },
   {
     surface: "bg-yellow-50 border-yellow-300",
-    marker: "bg-yellow-500 border-yellow-600",
+    marker: "bg-yellow-100 border-yellow-500",
     text: "text-yellow-700",
   },
   {
     surface: "bg-fuchsia-50 border-fuchsia-300",
-    marker: "bg-fuchsia-500 border-fuchsia-600",
+    marker: "bg-fuchsia-100 border-fuchsia-500",
     text: "text-fuchsia-700",
   },
   {
     surface: "bg-sky-50 border-sky-300",
-    marker: "bg-sky-500 border-sky-600",
+    marker: "bg-sky-100 border-sky-500",
     text: "text-sky-700",
   },
   {
     surface: "bg-violet-50 border-violet-300",
-    marker: "bg-violet-500 border-violet-600",
+    marker: "bg-violet-100 border-violet-500",
     text: "text-violet-700",
   },
   {
     surface: "bg-red-50 border-red-300",
-    marker: "bg-red-500 border-red-600",
+    marker: "bg-red-100 border-red-500",
     text: "text-red-700",
   },
   {
     surface: "bg-green-50 border-green-300",
-    marker: "bg-green-500 border-green-600",
+    marker: "bg-green-100 border-green-500",
     text: "text-green-700",
   },
   {
     surface: "bg-blue-100 border-blue-400",
-    marker: "bg-blue-600 border-blue-700",
+    marker: "bg-blue-50 border-blue-600",
     text: "text-blue-800",
   },
   {
     surface: "bg-emerald-100 border-emerald-400",
-    marker: "bg-emerald-600 border-emerald-700",
+    marker: "bg-emerald-50 border-emerald-600",
     text: "text-emerald-800",
   },
   {
     surface: "bg-orange-100 border-orange-400",
-    marker: "bg-orange-600 border-orange-700",
+    marker: "bg-orange-50 border-orange-600",
     text: "text-orange-800",
   },
   {
     surface: "bg-purple-100 border-purple-400",
-    marker: "bg-purple-600 border-purple-700",
+    marker: "bg-purple-50 border-purple-600",
     text: "text-purple-800",
   },
   {
     surface: "bg-pink-100 border-pink-400",
-    marker: "bg-pink-600 border-pink-700",
+    marker: "bg-pink-50 border-pink-600",
     text: "text-pink-800",
   },
   {
     surface: "bg-cyan-100 border-cyan-400",
-    marker: "bg-cyan-600 border-cyan-700",
+    marker: "bg-cyan-50 border-cyan-600",
     text: "text-cyan-800",
   },
   {
     surface: "bg-lime-100 border-lime-400",
-    marker: "bg-lime-600 border-lime-700",
+    marker: "bg-lime-50 border-lime-600",
     text: "text-lime-800",
   },
   {
     surface: "bg-amber-100 border-amber-400",
-    marker: "bg-amber-600 border-amber-700",
+    marker: "bg-amber-50 border-amber-600",
     text: "text-amber-800",
   },
   {
     surface: "bg-rose-100 border-rose-400",
-    marker: "bg-rose-600 border-rose-700",
+    marker: "bg-rose-50 border-rose-600",
     text: "text-rose-800",
   },
   {
     surface: "bg-indigo-100 border-indigo-400",
-    marker: "bg-indigo-600 border-indigo-700",
+    marker: "bg-indigo-50 border-indigo-600",
     text: "text-indigo-800",
   },
   {
     surface: "bg-teal-100 border-teal-400",
-    marker: "bg-teal-600 border-teal-700",
+    marker: "bg-teal-50 border-teal-600",
     text: "text-teal-800",
   },
   {
     surface: "bg-yellow-100 border-yellow-400",
-    marker: "bg-yellow-600 border-yellow-700",
+    marker: "bg-yellow-50 border-yellow-600",
     text: "text-yellow-800",
   },
   {
     surface: "bg-fuchsia-100 border-fuchsia-400",
-    marker: "bg-fuchsia-600 border-fuchsia-700",
+    marker: "bg-fuchsia-50 border-fuchsia-600",
     text: "text-fuchsia-800",
   },
 ];
@@ -1210,6 +1210,79 @@ export function ScheduleGenerator({
     return SHIFT_COLOR_PALETTE[parsedColorIndex - 1];
   };
 
+  const formatShiftTime = (value: any) => {
+    return String(value || "").slice(0, 5);
+  };
+
+  const getShiftTimeRangeKey = (shift: any) => {
+    const startTime = formatShiftTime(shift?.start_time);
+    const endTime = formatShiftTime(shift?.end_time);
+
+    if (!startTime || !endTime) {
+      return "";
+    }
+
+    return `${startTime}|${endTime}`;
+  };
+
+  const getGroupedShiftLegendItems = () => {
+    const groups = new Map<
+      string,
+      {
+        key: string;
+        start_time: string;
+        end_time: string;
+        color_index: number | null;
+        shift_names: Set<string>;
+      }
+    >();
+
+    shiftTemplates.forEach((shift) => {
+      const key = getShiftTimeRangeKey(shift);
+
+      if (!key) {
+        return;
+      }
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          start_time: formatShiftTime(shift.start_time),
+          end_time: formatShiftTime(shift.end_time),
+          color_index: shift.color_index ?? null,
+          shift_names: new Set<string>(),
+        });
+      }
+
+      const group = groups.get(key);
+
+      if (!group) {
+        return;
+      }
+
+      if (group.color_index === null && shift.color_index !== null) {
+        group.color_index = shift.color_index;
+      }
+
+      if (shift.shift_name) {
+        group.shift_names.add(String(shift.shift_name).trim());
+      }
+    });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        shift_names: Array.from(group.shift_names).sort(),
+      }))
+      .sort((a, b) => {
+        if (a.start_time !== b.start_time) {
+          return a.start_time.localeCompare(b.start_time);
+        }
+
+        return a.end_time.localeCompare(b.end_time);
+      });
+  };
+
   const getVisibleShifts = (livestream: string) => {
     const accountShifts = getShiftTemplatesForAccount(livestream);
 
@@ -1348,13 +1421,13 @@ export function ScheduleGenerator({
       {/* Shift Legend */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            {shiftTemplates.map((shift) => {
-              const shiftColor = getShiftColorClasses(shift.color_index);
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {getGroupedShiftLegendItems().map((shiftGroup) => {
+              const shiftColor = getShiftColorClasses(shiftGroup.color_index);
 
               return (
                 <div
-                  key={`${shift.account_id}-${shift.shift_template_id}`}
+                  key={shiftGroup.key}
                   className="flex items-center gap-2 min-w-0"
                 >
                   <div
@@ -1362,14 +1435,10 @@ export function ScheduleGenerator({
                   />
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {shift.shift_name}
-                    </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {shift.account_name}
+                      {shiftGroup.shift_names.join(" / ") || "Shift"}
                     </div>
                     <div className="text-xs text-gray-600">
-                      {shift.start_time.slice(0, 5)} -{" "}
-                      {shift.end_time.slice(0, 5)}
+                      {shiftGroup.start_time} - {shiftGroup.end_time}
                     </div>
                   </div>
                 </div>

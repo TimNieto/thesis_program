@@ -164,39 +164,99 @@ def clean_color_index(value):
     return None
 
 
-def get_next_shift_template_color_index(cursor, company_id: int):
+def get_existing_time_range_color_index(
+    cursor,
+    company_id: int,
+    start_time,
+    end_time
+):
     """
-    Backend color assignment rule:
-    1. Use colors 1-30 that were never used by this company first.
-    2. After all 30 were historically used, reuse inactive colors.
-    3. If all 30 colors are currently active, return None.
+    Color rule:
+    same company_id + same start_time + same end_time = same color_index.
+    Shift name does not matter.
+    Account does not matter.
     """
 
     cursor.execute("""
-        SELECT DISTINCT color_index
+        SELECT color_index
         FROM shift_templates
         WHERE company_id = %s
+        AND start_time = %s
+        AND end_time = %s
         AND color_index IS NOT NULL
-    """, (company_id,))
+        ORDER BY
+            is_active DESC,
+            updated_at DESC NULLS LAST,
+            shift_template_id ASC
+        LIMIT 1
+    """, (
+        company_id,
+        start_time,
+        end_time
+    ))
 
-    historical_used = {
-        clean_color_index(row[0])
-        for row in cursor.fetchall()
-    }
+    row = cursor.fetchone()
 
-    historical_used.discard(None)
+    if not row:
+        return None
 
-    for color_index in range(1, SHIFT_COLOR_COUNT + 1):
-        if color_index not in historical_used:
-            return color_index
+    return clean_color_index(row[0])
 
+
+def color_used_by_other_active_time_range(
+    cursor,
+    company_id: int,
+    color_index,
+    start_time,
+    end_time
+):
+    color_index = clean_color_index(color_index)
+
+    if color_index is None:
+        return False
+
+    cursor.execute("""
+        SELECT 1
+        FROM shift_templates
+        WHERE company_id = %s
+        AND is_active = TRUE
+        AND color_index = %s
+        AND NOT (
+            start_time = %s
+            AND end_time = %s
+        )
+        LIMIT 1
+    """, (
+        company_id,
+        color_index,
+        start_time,
+        end_time
+    ))
+
+    return cursor.fetchone() is not None
+
+
+def get_next_time_range_color_index(
+    cursor,
+    company_id: int,
+    start_time,
+    end_time
+):
     cursor.execute("""
         SELECT DISTINCT color_index
         FROM shift_templates
         WHERE company_id = %s
         AND is_active = TRUE
         AND color_index IS NOT NULL
-    """, (company_id,))
+        AND NOT (
+            start_time = %s
+            AND end_time = %s
+        )
+    """, (
+        company_id,
+        start_time,
+        end_time
+    ))
 
     active_used = {
         clean_color_index(row[0])
@@ -212,50 +272,64 @@ def get_next_shift_template_color_index(cursor, company_id: int):
     return None
 
 
-def get_reactivation_shift_template_color_index(
+def get_shift_time_range_color_index(
     cursor,
     company_id: int,
-    shift_template_id: int
+    start_time,
+    end_time
+):
+    existing_color_index = get_existing_time_range_color_index(
+        cursor,
+        company_id,
+        start_time,
+        end_time
+    )
+
+    if (
+        existing_color_index is not None
+        and not color_used_by_other_active_time_range(
+            cursor,
+            company_id,
+            existing_color_index,
+            start_time,
+            end_time
+        )
+    ):
+        return existing_color_index
+
+    return get_next_time_range_color_index(
+        cursor,
+        company_id,
+        start_time,
+        end_time
+    )
+
+
+def sync_shift_time_range_color_index(
+    cursor,
+    company_id: int,
+    start_time,
+    end_time,
+    color_index
 ):
     """
-    Reactivated shift keeps its own old color if that color is not currently active.
-    If another active shift already uses it, assign the next available color.
+    Force every template in the same company/time range to share one color.
     """
 
     cursor.execute("""
-        SELECT color_index
-        FROM shift_templates
+        UPDATE shift_templates
+        SET
+            color_index = %s,
+            updated_at = NOW()
         WHERE company_id = %s
-        AND shift_template_id = %s
-        LIMIT 1
+        AND start_time = %s
+        AND end_time = %s
     """, (
+        color_index,
         company_id,
-        shift_template_id
+        start_time,
+        end_time
     ))
-
-    row = cursor.fetchone()
-
-    existing_color_index = clean_color_index(row[0]) if row else None
-
-    if existing_color_index is not None:
-        cursor.execute("""
-            SELECT 1
-            FROM shift_templates
-            WHERE company_id = %s
-            AND is_active = TRUE
-            AND color_index = %s
-            AND shift_template_id != %s
-            LIMIT 1
-        """, (
-            company_id,
-            existing_color_index,
-            shift_template_id
-        ))
-
-        if not cursor.fetchone():
-            return existing_color_index
-
-    return get_next_shift_template_color_index(cursor, company_id)
 
 
 def resolve_shift_template_account(
@@ -644,13 +718,14 @@ async def import_shift_templates(
                         )
                     )
 
-            if existing_template_id:
-                color_index = get_reactivation_shift_template_color_index(
-                    cursor,
-                    company_id,
-                    existing_template_id
-                )
+            color_index = get_shift_time_range_color_index(
+                cursor,
+                company_id,
+                start_time_obj,
+                end_time_obj
+            )
 
+            if existing_template_id:
                 cursor.execute("""
                     UPDATE shift_templates
                     SET
@@ -677,11 +752,6 @@ async def import_shift_templates(
                 reactivated_templates += 1
 
             else:
-                color_index = get_next_shift_template_color_index(
-                    cursor,
-                    company_id
-                )
-
                 cursor.execute("""
                     INSERT INTO shift_templates (
                         company_id,
@@ -706,6 +776,14 @@ async def import_shift_templates(
                 ))
 
                 created_templates += 1
+
+            sync_shift_time_range_color_index(
+                cursor,
+                company_id,
+                start_time_obj,
+                end_time_obj,
+                color_index
+            )
 
             imported_active_ranges.append({
                 "account_id": account_id,
@@ -868,13 +946,14 @@ def create_shift_template(payload: dict):
                     detail=f"Shift '{shift_name}' overlaps with '{existing_name}' under account '{account_name}'"
                 )
 
-        if existing_template_id:
-            color_index = get_reactivation_shift_template_color_index(
-                cursor,
-                company_id,
-                existing_template_id
-            )
+        color_index = get_shift_time_range_color_index(
+            cursor,
+            company_id,
+            start_time_obj,
+            end_time_obj
+        )
 
+        if existing_template_id:
             cursor.execute("""
                 UPDATE shift_templates
                 SET
@@ -913,11 +992,6 @@ def create_shift_template(payload: dict):
             message = "Shift template reactivated"
 
         else:
-            color_index = get_next_shift_template_color_index(
-                cursor,
-                company_id
-            )
-
             cursor.execute("""
                 INSERT INTO shift_templates (
                     company_id,
@@ -954,6 +1028,14 @@ def create_shift_template(payload: dict):
 
             saved = cursor.fetchone()
             message = "Shift template created"
+
+        sync_shift_time_range_color_index(
+            cursor,
+            company_id,
+            start_time_obj,
+            end_time_obj,
+            color_index
+        )
 
         conn.commit()
 
@@ -1151,6 +1233,13 @@ def update_shift_template(
                     detail=f"Shift '{shift_name}' overlaps with '{existing_name}' under account '{account_name}'"
                 )
 
+        color_index = get_shift_time_range_color_index(
+            cursor,
+            company_id,
+            start_time_obj,
+            end_time_obj
+        )
+
         cursor.execute("""
             UPDATE shift_templates
             SET
@@ -1158,6 +1247,7 @@ def update_shift_template(
                 shift_name = %s,
                 start_time = %s,
                 end_time = %s,
+                color_index = %s,
                 updated_at = NOW()
             WHERE shift_template_id = %s
             AND company_id = %s
@@ -1177,11 +1267,20 @@ def update_shift_template(
             shift_name,
             start_time_obj,
             end_time_obj,
+            color_index,
             shift_template_id,
             company_id
         ))
 
         updated = cursor.fetchone()
+
+        sync_shift_time_range_color_index(
+            cursor,
+            company_id,
+            start_time_obj,
+            end_time_obj,
+            color_index
+        )
 
         conn.commit()
 
