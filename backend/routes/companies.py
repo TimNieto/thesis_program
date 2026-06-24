@@ -12,12 +12,54 @@ def hash_password(password: str) -> str:
     return bcrypt.hash(password)
 
 
-def ensure_company_settings(cursor, company_id: int):
+def ensure_company_settings(
+    cursor,
+    company_id: int,
+    company_type: str = "Live Selling"
+):
+    company_type_key = str(company_type or "Live Selling").strip()
+
+    company_type_defaults = {
+        "Live Selling": {
+            "max_working_days": 7,
+            "min_rest_period_hours": 8,
+            "max_daily_work_hours": 24,
+            "max_shifts_per_day": 2,
+            "max_shifts_per_week": 7,
+            "allow_double_shifts": False,
+            "fairness_weight": 2,
+            "absence_replacement_mode": "Automatic",
+            "gy_fatigue_penalty": 20,
+            "absence_tolerance": 50,
+            "max_absences_per_month": 3,
+        },
+        "BPO": {
+            "max_working_days": 6,
+            "min_rest_period_hours": 8,
+            "max_daily_work_hours": 12,
+            "max_shifts_per_day": 1,
+            "max_shifts_per_week": 6,
+            "allow_double_shifts": False,
+            "fairness_weight": 2,
+            "absence_replacement_mode": "Manual",
+            "gy_fatigue_penalty": 20,
+            "absence_tolerance": 50,
+            "max_absences_per_month": 3,
+        },
+    }
+
+    # Retail / Healthcare / Manufacturing can use Live Selling defaults for now.
+    settings = company_type_defaults.get(
+        company_type_key,
+        company_type_defaults["Live Selling"]
+    )
+
     cursor.execute("""
         INSERT INTO company_settings (
             company_id,
             max_working_days,
             min_rest_period_hours,
+            max_daily_work_hours,
             max_shifts_per_day,
             max_shifts_per_week,
             allow_double_shifts,
@@ -25,12 +67,28 @@ def ensure_company_settings(cursor, company_id: int):
             absence_replacement_mode,
             enable_in_app_notifications,
             gy_fatigue_penalty,
-            absence_tolerance
+            absence_tolerance,
+            max_absences_per_month
         )
-        VALUES (%s, 7, 8, 2, 7, FALSE, 2, 'Automatic', TRUE, 20, 50)
+        VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s, %s, %s
+        )
         ON CONFLICT (company_id)
         DO NOTHING
-    """, (company_id,))
+    """, (
+        company_id,
+        settings["max_working_days"],
+        settings["min_rest_period_hours"],
+        settings["max_daily_work_hours"],
+        settings["max_shifts_per_day"],
+        settings["max_shifts_per_week"],
+        settings["allow_double_shifts"],
+        settings["fairness_weight"],
+        settings["absence_replacement_mode"],
+        settings["gy_fatigue_penalty"],
+        settings["absence_tolerance"],
+        settings["max_absences_per_month"],
+    ))
 
 
 def create_default_company_data(cursor, company_id: int):
@@ -312,6 +370,9 @@ def create_company(payload: dict):
 
             company_id = cursor.fetchone()[0]
 
+            # Reactivation should not apply company-type presets.
+            # Existing company settings must remain unchanged.
+
             ensure_company_settings(cursor, company_id)
 
             create_default_company_data(cursor, company_id)
@@ -341,7 +402,7 @@ def create_company(payload: dict):
 
         company_id = cursor.fetchone()[0]
 
-        ensure_company_settings(cursor, company_id)
+        ensure_company_settings(cursor, company_id, company_type)
 
         create_default_company_data(cursor, company_id)
 

@@ -518,6 +518,20 @@ def total_daily_hours_error(
     employee_id: int,
     target_schedule_id: int
 ):
+    
+    cursor.execute("""
+        SELECT COALESCE(max_daily_work_hours, 24)
+        FROM company_settings
+        WHERE company_id = %s
+        LIMIT 1
+    """, (company_id,))
+
+    limit_row = cursor.fetchone()
+    max_daily_work_hours = int(limit_row[0] if limit_row else 24)
+
+    if max_daily_work_hours <= 0:
+        return None
+
     cursor.execute("""
         WITH target_shift AS (
             SELECT
@@ -617,10 +631,11 @@ def total_daily_hours_error(
     existing_hours = float(row[1] or 0)
     total_hours = existing_hours + target_hours
 
-    if total_hours >= 24:
+    if total_hours >= max_daily_work_hours:
         return (
             f"Employee would reach {total_hours:.2f} total shift hours "
-            "on the same day. Daily total must stay below 24 hours."
+            f"on the same day. Daily total must stay below "
+            f"{max_daily_work_hours} hours."
         )
 
     return None
@@ -633,7 +648,8 @@ def get_company_settings(cursor, company_id: int):
             max_shifts_per_day,
             max_shifts_per_week,
             allow_double_shifts,
-            min_rest_period_hours
+            min_rest_period_hours,
+            max_daily_work_hours
         FROM company_settings
         WHERE company_id = %s
         LIMIT 1
@@ -648,6 +664,7 @@ def get_company_settings(cursor, company_id: int):
             "max_shifts_per_week": 7,
             "allow_double_shifts": False,
             "min_rest_period_hours": 8,
+            "max_daily_work_hours": 24,
         }
 
     return {
@@ -656,6 +673,7 @@ def get_company_settings(cursor, company_id: int):
         "max_shifts_per_week": row[2],
         "allow_double_shifts": row[3],
         "min_rest_period_hours": row[4],
+        "max_daily_work_hours": row[5],
     }
 
 

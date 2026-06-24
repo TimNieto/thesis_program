@@ -54,6 +54,7 @@ def get_settings(company_id: int = 1):
                 c.company_type,
                 cs.max_working_days,
                 cs.min_rest_period_hours,
+                cs.max_daily_work_hours,
                 cs.max_shifts_per_day,
                 cs.max_shifts_per_week,
                 cs.allow_double_shifts,
@@ -83,15 +84,16 @@ def get_settings(company_id: int = 1):
             "company_type": row[1],
             "max_working_days": row[2],
             "min_rest_period_hours": row[3],
-            "max_shifts_per_day": row[4],
-            "max_shifts_per_week": row[5],
-            "allow_double_shifts": row[6],
-            "fairness_weight": row[7],
-            "absence_replacement_mode": row[8],
-            "enable_in_app_notifications": row[9],
-            "gy_fatigue_penalty": row[10],
-            "absence_tolerance": row[11],
-            "max_absences_per_month": row[12],
+            "max_daily_work_hours": row[4],
+            "max_shifts_per_day": row[5],
+            "max_shifts_per_week": row[6],
+            "allow_double_shifts": row[7],
+            "fairness_weight": row[8],
+            "absence_replacement_mode": row[9],
+            "enable_in_app_notifications": row[10],
+            "gy_fatigue_penalty": row[11],
+            "absence_tolerance": row[12],
+            "max_absences_per_month": row[13],
             "company_id": company_id
         }
 
@@ -158,6 +160,15 @@ def update_settings(payload: dict):
 
         min_rest_period_hours = max(0, min(24, min_rest_period_hours))
 
+        max_daily_work_hours = payload.get("max_daily_work_hours", 24)
+
+        try:
+            max_daily_work_hours = int(max_daily_work_hours)
+        except (TypeError, ValueError):
+            max_daily_work_hours = 24
+
+        max_daily_work_hours = max(0, min(48, max_daily_work_hours))
+
         company_type = str(payload.get("company_type", "")).strip()
 
         if not company_type:
@@ -184,6 +195,7 @@ def update_settings(payload: dict):
             SET
                 max_working_days = %s,
                 min_rest_period_hours = %s,
+                max_daily_work_hours = %s,
                 max_shifts_per_day = %s,
                 max_shifts_per_week = %s,
                 allow_double_shifts = %s,
@@ -198,6 +210,7 @@ def update_settings(payload: dict):
         """, (
             payload["max_working_days"],
             min_rest_period_hours,
+            max_daily_work_hours,
             payload["max_shifts_per_day"],
             payload["max_shifts_per_week"],
             payload["allow_double_shifts"],

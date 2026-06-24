@@ -499,9 +499,20 @@ export function ScheduleGenerator({
     shift: string;
     role: string;
     assignmentId?: string;
+    slotIndex?: number;
   } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showMarkAbsentConfirm, setShowMarkAbsentConfirm] = useState(false);
+
+  const [pendingAssignmentWarning, setPendingAssignmentWarning] = useState<{
+    scheduleId: number;
+    employeeId: number;
+    employeeName: string;
+    warnings: { type?: string; message?: string }[];
+  } | null>(null);
+
+  const [assignmentWarningLoading, setAssignmentWarningLoading] = useState(false);
+  
   const [employeeName, setEmployeeName] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
@@ -687,12 +698,20 @@ export function ScheduleGenerator({
     shift: string,
     role: string,
     assignmentId?: string,
+    slotIndex?: number,
   ) => {
     const existing = assignmentId
       ? assignments.find((a) => a.id === assignmentId)
       : null;
 
-    setSelectedCell({ livestream, day, shift, role, assignmentId });
+    setSelectedCell({
+      livestream,
+      day,
+      shift,
+      role,
+      assignmentId,
+      slotIndex,
+    });
     setEmployeeName(existing?.employee || "");
     setSelectedEmployeeId(
       existing?.employee_id ? String(existing.employee_id) : "",
@@ -703,6 +722,7 @@ export function ScheduleGenerator({
   const updatePublishedAssignment = async (
     scheduleId: number,
     employeeId: number | null,
+    confirmWarnings: boolean = false,
   ) => {
     const res = await fetch(
       `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/employee`,
@@ -715,6 +735,7 @@ export function ScheduleGenerator({
           company_id: companyId,
           employee_id: employeeId,
           updated_by: currentUserId,
+          confirm_warnings: confirmWarnings,
         }),
       },
     );
@@ -722,6 +743,19 @@ export function ScheduleGenerator({
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
+
+      if (
+        res.status === 409 &&
+        data?.detail?.type === "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED"
+      ) {
+        const error: any = new Error(data.detail.message);
+        error.type = "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED";
+        error.warnings = data.detail.warnings || [];
+        error.scheduleId = data.detail.schedule_id;
+        error.employeeId = data.detail.employee_id;
+        throw error;
+      }
+
       if (
         data?.detail?.type === "MANUAL_ASSIGNMENT_BLOCKED" &&
         Array.isArray(data.detail.errors)
@@ -745,6 +779,90 @@ export function ScheduleGenerator({
     }
 
     return data;
+  };
+
+  const ensurePublishedScheduleSlot = async () => {
+    if (!selectedCell) {
+      throw new Error("No selected slot");
+    }
+
+    const shiftTemplate = getShiftTemplateForAccount(
+      selectedCell.livestream,
+      selectedCell.shift,
+    );
+
+    if (!shiftTemplate?.shift_template_id) {
+      throw new Error("Shift template not found for this slot");
+    }
+
+    const dayIndex = DAYS.indexOf(selectedCell.day);
+
+    if (dayIndex < 0) {
+      throw new Error("Invalid selected day");
+    }
+
+    const res = await fetch(
+      "https://backend-production-6e75.up.railway.app/generated-schedule/ensure-slot",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_id: companyId,
+          shift_template_id: shiftTemplate.shift_template_id,
+          shift_date: formatDate(weekDates[dayIndex]),
+          role_key: selectedCell.role,
+          slot_index: selectedCell.slotIndex ?? 0,
+        }),
+      },
+    );
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(data?.detail || "Failed to create schedule slot");
+    }
+
+    return data;
+  };
+
+
+    const confirmAssignmentWarning = async () => {
+    if (!pendingAssignmentWarning) return;
+
+    setAssignmentWarningLoading(true);
+
+    try {
+      const result = await updatePublishedAssignment(
+        pendingAssignmentWarning.scheduleId,
+        pendingAssignmentWarning.employeeId,
+        true,
+      );
+
+      if (result?.requires_employee_approval) {
+        toast.info(
+          "Assignment request sent. The employee must approve before the schedule changes.",
+        );
+      } else {
+        toast.success("Assignment updated");
+      }
+
+      await loadSchedule();
+
+      setPendingAssignmentWarning(null);
+      setIsDialogOpen(false);
+      setEmployeeName("");
+      setSelectedEmployeeId("");
+      setSelectedCell(null);
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to confirm assignment",
+      );
+    } finally {
+      setAssignmentWarningLoading(false);
+    }
   };
 
   const markPublishedAssignmentAbsent = async (scheduleId: number) => {
@@ -882,7 +1000,7 @@ export function ScheduleGenerator({
       toast.error("Please select an employee");
       return;
     }
-    
+
 
     const selectedEmployee = employees.find(
       (emp) => emp.id === Number(selectedEmployeeId),
@@ -894,6 +1012,8 @@ export function ScheduleGenerator({
     }
 
     const existing = getAssignment();
+
+    
 
     if (scheduleMode === "saved" && existing?.schedule_id) {
       try {
@@ -937,6 +1057,18 @@ export function ScheduleGenerator({
         return;
       } catch (err) {
         console.error(err);
+        if ((err as any)?.type === "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED") {
+          setIsDialogOpen(false);
+
+          setPendingAssignmentWarning({
+            scheduleId: (err as any).scheduleId,
+            employeeId: (err as any).employeeId,
+            employeeName: selectedEmployee.name,
+            warnings: (err as any).warnings || [],
+          });
+
+          return;
+        }
 
         toast.error(
           err instanceof Error ? err.message : "Failed to update assignment",
@@ -945,6 +1077,56 @@ export function ScheduleGenerator({
         return;
       }
     }
+
+    
+    if (scheduleMode === "saved" && !existing) {
+      try {
+        const slot = await ensurePublishedScheduleSlot();
+
+        const result = await updatePublishedAssignment(
+          slot.schedule_id,
+          selectedEmployee.id,
+        );
+
+        if (result?.requires_employee_approval) {
+          toast.info(
+            "Assignment request sent. The employee must approve before the schedule changes.",
+          );
+        } else {
+          toast.success("Assignment updated");
+        }
+
+        await loadSchedule();
+
+        setIsDialogOpen(false);
+        setEmployeeName("");
+        setSelectedEmployeeId("");
+        setSelectedCell(null);
+        return;
+      } catch (err) {
+        console.error(err);
+
+        if ((err as any)?.type === "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED") {
+          setIsDialogOpen(false);
+
+          setPendingAssignmentWarning({
+            scheduleId: (err as any).scheduleId,
+            employeeId: (err as any).employeeId,
+            employeeName: selectedEmployee.name,
+            warnings: (err as any).warnings || [],
+          });
+
+          return;
+        }
+
+        toast.error(
+          err instanceof Error ? err.message : "Failed to assign empty slot",
+        );
+
+        return;
+      }
+    }
+
 
     if (existing) {
       setAssignments(
@@ -1737,6 +1919,7 @@ export function ScheduleGenerator({
                                               shift.shift_name,
                                               roleKey,
                                               cellAssignment?.id,
+                                              slotIndex,
                                             )
                                           }
                                         >
@@ -1916,6 +2099,67 @@ export function ScheduleGenerator({
           </TabsContent>
         )}
       </Tabs>
+
+
+      {/* Manual Assignment Warning Dialog */}
+      <Dialog
+        open={Boolean(pendingAssignmentWarning)}
+        onOpenChange={(open) => {
+          if (!open && !assignmentWarningLoading) {
+            setPendingAssignmentWarning(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assignment Warning</DialogTitle>
+            <DialogDescription>
+              This assignment has policy warnings. Review them before sending the
+              approval request to the employee.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4">
+            {pendingAssignmentWarning?.employeeName && (
+              <div className="text-sm">
+                <strong>Employee:</strong> {pendingAssignmentWarning.employeeName}
+              </div>
+            )}
+
+            <div className="rounded-md border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900 space-y-2">
+              {(pendingAssignmentWarning?.warnings || []).map((warning, index) => (
+                <div key={`${warning.type || "warning"}-${index}`}>
+                  <strong>{warning.type || "Warning"}:</strong>{" "}
+                  {warning.message || "This assignment has a warning."}
+                </div>
+              ))}
+            </div>
+
+            <p className="text-sm font-medium">
+              Do you want to continue and send this assignment request?
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              disabled={assignmentWarningLoading}
+              onClick={() => setPendingAssignmentWarning(null)}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              disabled={assignmentWarningLoading}
+              onClick={confirmAssignmentWarning}
+            >
+              {assignmentWarningLoading ? "Sending..." : "Send Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Assignment Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>

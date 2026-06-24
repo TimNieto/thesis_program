@@ -61,6 +61,7 @@ export function CompanySettings({
   const [maxConsecutiveWorkingDays, setMaxConsecutiveWorkingDays] =
     useState("6");
   const [minRestPeriod, setMinRestPeriod] = useState("8");
+  const [maxDailyWorkHours, setMaxDailyWorkHours] = useState("24");
   const [doubleShiftAllowance, setDoubleShiftAllowance] = useState(true);
 
   // Scheduling Behavior
@@ -105,6 +106,8 @@ export function CompanySettings({
       setMaxConsecutiveWorkingDays(String(data.max_working_days));
 
       setMinRestPeriod(String(data.min_rest_period_hours ?? 8));
+
+      setMaxDailyWorkHours(String(data.max_daily_work_hours ?? 24));
 
       setMaxShiftsPerEmployee(String(data.max_shifts_per_week));
 
@@ -181,6 +184,7 @@ export function CompanySettings({
             company_type: companyType,
             max_working_days: Number(maxConsecutiveWorkingDays),
             min_rest_period_hours: Number(minRestPeriod),
+            max_daily_work_hours: Number(maxDailyWorkHours),
             max_shifts_per_day: Number(shiftsPerDay),
             max_shifts_per_week: Number(maxShiftsPerEmployee),
             allow_double_shifts: doubleShiftAllowance,
@@ -404,6 +408,22 @@ export function CompanySettings({
                   />
                   <p className="text-xs text-gray-500">In hours</p>
                 </div>
+
+                <div className="space-y-2">
+                <Label htmlFor="maxDailyWorkHours">Max Daily Work Hours</Label>
+                <Input
+                  id="maxDailyWorkHours"
+                  type="number"
+                  min="0"
+                  max="48"
+                  value={maxDailyWorkHours}
+                  onChange={(e) => setMaxDailyWorkHours(e.target.value)}
+                  placeholder="24"
+                />
+                <p className="text-xs text-gray-500">
+                  Hard block if an employee reaches this many total shift hours in one day.
+                </p>
+              </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between pt-6">

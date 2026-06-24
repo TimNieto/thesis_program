@@ -2956,6 +2956,185 @@ def save_schedule(payload: dict = Body(...)):
         cursor.close()
         conn.close()
 
+
+@router.post("/generated-schedule/ensure-slot")
+def ensure_generated_schedule_slot(payload: dict = Body(...)):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+        shift_template_id = payload.get("shift_template_id")
+        shift_date_raw = payload.get("shift_date")
+        role_key = payload.get("role_key")
+        slot_index = payload.get("slot_index", 0)
+
+        if not company_id:
+            raise HTTPException(status_code=400, detail="company_id is required")
+
+        if not shift_template_id:
+            raise HTTPException(status_code=400, detail="shift_template_id is required")
+
+        if not shift_date_raw:
+            raise HTTPException(status_code=400, detail="shift_date is required")
+
+        if not role_key:
+            raise HTTPException(status_code=400, detail="role_key is required")
+
+        company_id = int(company_id)
+        shift_template_id = int(shift_template_id)
+        shift_date = parse_ymd(shift_date_raw, "shift_date")
+        role_key = str(role_key).strip().lower().replace(" ", "_")
+        slot_index = int(slot_index or 0)
+
+        cursor.execute("""
+            SELECT account_id
+            FROM shift_templates
+            WHERE company_id = %s
+            AND shift_template_id = %s
+            AND is_active = TRUE
+            LIMIT 1
+        """, (
+            company_id,
+            shift_template_id
+        ))
+
+        template_row = cursor.fetchone()
+
+        if not template_row:
+            raise HTTPException(
+                status_code=404,
+                detail="Active shift template not found"
+            )
+
+        account_id = template_row[0]
+
+        cursor.execute("""
+            SELECT shift_id
+            FROM shifts
+            WHERE company_id = %s
+            AND shift_template_id = %s
+            AND account_id = %s
+            AND shift_date = %s
+            LIMIT 1
+        """, (
+            company_id,
+            shift_template_id,
+            account_id,
+            shift_date
+        ))
+
+        shift_row = cursor.fetchone()
+
+        if not shift_row:
+            cursor.execute("""
+                INSERT INTO shifts (
+                    company_id,
+                    account_id,
+                    shift_template_id,
+                    shift_date
+                )
+                VALUES (%s, %s, %s, %s)
+                RETURNING shift_id
+            """, (
+                company_id,
+                account_id,
+                shift_template_id,
+                shift_date
+            ))
+
+            shift_id = cursor.fetchone()[0]
+        else:
+            shift_id = shift_row[0]
+
+        cursor.execute("""
+            SELECT role_id
+            FROM roles
+            WHERE company_id = %s
+            AND LOWER(role_key) = LOWER(%s)
+            AND is_active = TRUE
+            LIMIT 1
+        """, (
+            company_id,
+            role_key
+        ))
+
+        role_row = cursor.fetchone()
+
+        if not role_row:
+            raise HTTPException(
+                status_code=404,
+                detail="Active role not found for this slot"
+            )
+
+        role_id = role_row[0]
+
+        cursor.execute("""
+            SELECT schedule_id
+            FROM generated_schedule
+            WHERE company_id = %s
+            AND shift_id = %s
+            AND role_id = %s
+            AND slot_index = %s
+            AND is_archived = FALSE
+            LIMIT 1
+        """, (
+            company_id,
+            shift_id,
+            role_id,
+            slot_index
+        ))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            schedule_id = existing[0]
+        else:
+            cursor.execute("""
+                INSERT INTO generated_schedule (
+                    shift_id,
+                    employee_id,
+                    role_id,
+                    slot_index,
+                    is_archived,
+                    company_id
+                )
+                VALUES (%s, NULL, %s, %s, FALSE, %s)
+                RETURNING schedule_id
+            """, (
+                shift_id,
+                role_id,
+                slot_index,
+                company_id
+            ))
+
+            schedule_id = cursor.fetchone()[0]
+
+        conn.commit()
+
+        return {
+            "schedule_id": schedule_id,
+            "shift_id": shift_id,
+            "role_id": role_id,
+            "slot_index": slot_index
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("ENSURE GENERATED SCHEDULE SLOT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
 @router.patch("/generated-schedule/{schedule_id}/employee")
 def update_generated_schedule_employee(
     schedule_id: int,
@@ -3018,6 +3197,20 @@ def update_generated_schedule_employee(
 
         target = validation["target"]
         warnings = validation["warnings"]
+
+        confirm_warnings = bool(payload.get("confirm_warnings", False))
+
+        if warnings and not confirm_warnings:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "type": "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED",
+                    "message": "This assignment has policy warnings.",
+                    "warnings": warnings,
+                    "schedule_id": schedule_id,
+                    "employee_id": employee_id,
+                }
+            )
 
         # No hard block means this assignment is allowed to be requested.
         # All manual assignments require employee approval.
