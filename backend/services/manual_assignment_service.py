@@ -1580,7 +1580,8 @@ def apply_manual_assignment_request(
     cursor,
     request_id: int,
     company_id: int,
-    employee_id: int
+    employee_id: int,
+    employee_response_note=None
 ):
     cursor.execute("""
         SELECT
@@ -1651,12 +1652,14 @@ def apply_manual_assignment_request(
         UPDATE manual_assignment_requests
         SET
             status = 'accepted',
+            employee_response_note = %s,
             responded_at = NOW(),
             applied_at = NOW(),
             updated_at = NOW()
         WHERE manual_assignment_request_id = %s
         AND company_id = %s
     """, (
+        employee_response_note,
         request_id,
         company_id
     ))
@@ -1679,7 +1682,8 @@ def reject_manual_assignment_request(
     cursor,
     request_id: int,
     company_id: int,
-    employee_id: int
+    employee_id: int,
+    employee_response_note=None
 ):
     cursor.execute("""
         SELECT
@@ -1710,11 +1714,13 @@ def reject_manual_assignment_request(
         UPDATE manual_assignment_requests
         SET
             status = 'rejected',
+            employee_response_note = %s,
             responded_at = NOW(),
             updated_at = NOW()
         WHERE manual_assignment_request_id = %s
         AND company_id = %s
     """, (
+        employee_response_note,
         request_id,
         company_id
     ))
