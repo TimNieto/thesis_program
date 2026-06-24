@@ -814,7 +814,6 @@ export function SuperAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* Confirm Remove Company Dialog */}
       <Dialog
         open={companyToRemove !== null}
@@ -824,7 +823,7 @@ export function SuperAdmin() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Remove Company?</DialogTitle>
             <DialogDescription>
@@ -833,20 +832,25 @@ export function SuperAdmin() {
           </DialogHeader>
 
           {companyToRemove && (
-            <div className="space-y-2 py-4 text-sm">
-              <div>
-                <strong>Company:</strong> {companyToRemove.name}
-              </div>
-              <div>
-                <strong>Type:</strong> {companyToRemove.type || "—"}
-              </div>
-              <div>
-                <strong>Employees:</strong> {companyToRemove.employeeCount}
+            <div className="rounded-lg border bg-gray-50 p-4 text-sm">
+              <div className="grid grid-cols-[90px_1fr] gap-y-2">
+                <span className="font-medium text-gray-600">Company</span>
+                <span className="text-gray-900">{companyToRemove.name}</span>
+
+                <span className="font-medium text-gray-600">Type</span>
+                <span className="text-gray-900">
+                  {companyToRemove.type || "—"}
+                </span>
+
+                <span className="font-medium text-gray-600">Employees</span>
+                <span className="text-gray-900">
+                  {companyToRemove.employeeCount}
+                </span>
               </div>
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setCompanyToRemove(null)}>
               Cancel
             </Button>

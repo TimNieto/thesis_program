@@ -5729,7 +5729,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Remove Holiday?</DialogTitle>
             <DialogDescription>
@@ -5738,17 +5738,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogHeader>
 
           {holidayToRemove && (
-            <div className="space-y-2 py-4 text-sm">
-              <div>
-                <strong>Name:</strong> {holidayToRemove.name}
-              </div>
-              <div>
-                <strong>Date:</strong> {holidayToRemove.date}
+            <div className="rounded-lg border bg-gray-50 p-4 text-sm">
+              <div className="grid grid-cols-[70px_1fr] gap-y-2">
+                <span className="font-medium text-gray-600">Name</span>
+                <span className="text-gray-900">{holidayToRemove.name}</span>
+
+                <span className="font-medium text-gray-600">Date</span>
+                <span className="text-gray-900">{holidayToRemove.date}</span>
               </div>
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setHolidayToRemove(null)}>
               Cancel
             </Button>
@@ -5759,7 +5760,6 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* Confirm Remove Assignment Dialog */}
       <Dialog
         open={assignmentToRemove !== null}
