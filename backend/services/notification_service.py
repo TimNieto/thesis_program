@@ -95,7 +95,7 @@ def notify_absence_limit_if_exceeded(
         absence_date = date.fromisoformat(absence_date)
 
     cursor.execute("""
-        SELECT COALESCE(absence_tolerance, 0)
+        SELECT COALESCE(max_absences_per_month, 0)
         FROM company_settings
         WHERE company_id = %s
         LIMIT 1

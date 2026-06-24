@@ -61,7 +61,8 @@ def get_settings(company_id: int = 1):
                 cs.absence_replacement_mode,
                 cs.enable_in_app_notifications,
                 cs.gy_fatigue_penalty,
-                cs.absence_tolerance
+                cs.absence_tolerance,
+                cs.max_absences_per_month
             FROM company_settings cs
             JOIN companies c
                 ON cs.company_id = c.company_id
@@ -90,6 +91,7 @@ def get_settings(company_id: int = 1):
             "enable_in_app_notifications": row[9],
             "gy_fatigue_penalty": row[10],
             "absence_tolerance": row[11],
+            "max_absences_per_month": row[12],
             "company_id": company_id
         }
 
@@ -138,6 +140,15 @@ def update_settings(payload: dict):
 
         absence_tolerance = max(0, min(100, absence_tolerance))
 
+        max_absences_per_month = payload.get("max_absences_per_month", 3)
+
+        try:
+            max_absences_per_month = int(max_absences_per_month)
+        except (TypeError, ValueError):
+            max_absences_per_month = 3
+
+        max_absences_per_month = max(0, min(31, max_absences_per_month))
+
         min_rest_period_hours = payload.get("min_rest_period_hours", 8)
 
         try:
@@ -181,6 +192,7 @@ def update_settings(payload: dict):
                 enable_in_app_notifications = %s,
                 gy_fatigue_penalty = %s,
                 absence_tolerance = %s,
+                max_absences_per_month = %s,
                 updated_at = NOW()
             WHERE company_id = %s
         """, (
@@ -194,6 +206,7 @@ def update_settings(payload: dict):
             payload.get("enable_in_app_notifications", True),
             gy_fatigue_penalty,
             absence_tolerance,
+            max_absences_per_month,
             company_id
         ))
 

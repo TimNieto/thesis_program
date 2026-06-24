@@ -107,6 +107,8 @@ export function CompanySettings({
 
       setMaxShiftsPerEmployee(String(data.max_shifts_per_week));
 
+      setMaxAbsencePerEmployee(String(data.max_absences_per_month ?? 3));
+
       setShiftsPerDay(String(data.max_shifts_per_day));
 
       setDoubleShiftAllowance(data.allow_double_shifts);
@@ -187,6 +189,7 @@ export function CompanySettings({
             fairness_weight: Number(fairnessWeight),
             gy_fatigue_penalty: Number(gyPenalty),
             absence_tolerance: Number(absenceTolerance),
+            max_absences_per_month: Number(maxAbsencePerEmployee),
             absence_replacement_mode: absenceReplacementMode,
             enable_in_app_notifications: inAppNotifications,
             updated_by: currentUser.id,
@@ -361,6 +364,8 @@ export function CompanySettings({
                   <Input
                     id="maxAbsence"
                     type="number"
+                    min="0"
+                    max="31"
                     value={maxAbsencePerEmployee}
                     onChange={(e) => setMaxAbsencePerEmployee(e.target.value)}
                     placeholder="Enter max absences"

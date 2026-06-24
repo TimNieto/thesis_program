@@ -156,7 +156,7 @@ def get_general_report(company_id: int, period: str = "this-week"):
         total_absences = cursor.fetchone()[0] or 0
 
         cursor.execute("""
-            SELECT COALESCE(absence_tolerance, 0)
+            SELECT COALESCE(max_absences_per_month, 0)
             FROM company_settings
             WHERE company_id = %s
             LIMIT 1
@@ -431,7 +431,7 @@ def get_employee_report(company_id: int, period: str = "this-week"):
         cursor.execute("""
             SELECT
                 max_shifts_per_week,
-                COALESCE(absence_tolerance, 0)
+                COALESCE(max_absences_per_month, 0)
             FROM company_settings
             WHERE company_id = %s
             LIMIT 1
