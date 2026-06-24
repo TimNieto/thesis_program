@@ -152,6 +152,7 @@ export function SuperAdmin() {
 
   // Company Management States
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
+  const [companyToRemove, setCompanyToRemove] = useState<Company | null>(null);
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newCompanyType, setNewCompanyType] = useState("Live Selling");
 
@@ -200,18 +201,31 @@ export function SuperAdmin() {
   };
 
   // Remove Company
-  const handleRemoveCompany = async (id: string, name: string) => {
-    const confirmed = confirm(
-      `Are you sure you want to remove "${name}"? This will deactivate the company but keep its records.`,
-    );
+  const handleRemoveCompany = (id: string, name: string) => {
+    const company = companies.find((item) => item.id === id);
 
-    if (!confirmed) {
+    setCompanyToRemove(
+      company || {
+        id,
+        name,
+        type: "",
+        employeeCount: 0,
+        status: "Active",
+        createdDate: "",
+      },
+    );
+  };
+
+  const confirmRemoveCompany = async () => {
+    if (!companyToRemove) {
       return;
     }
 
+    const company = companyToRemove;
+
     try {
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/companies/${id}`,
+        `https://backend-production-6e75.up.railway.app/companies/${company.id}`,
         {
           method: "DELETE",
         },
@@ -225,12 +239,14 @@ export function SuperAdmin() {
 
       await fetchCompanies();
 
-      if (selectedCompany?.id === id) {
+      if (selectedCompany?.id === company.id) {
         setSelectedCompany(null);
         setActiveTab("companies");
       }
 
-      toast.success(`Company "${name}" removed`);
+      setCompanyToRemove(null);
+
+      toast.success(`Company "${company.name}" removed`);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to remove company",
@@ -747,7 +763,6 @@ export function SuperAdmin() {
           </Card>
         </TabsContent>
       </Tabs>
-
       {/* Add Company Dialog */}
       <Dialog open={isAddCompanyOpen} onOpenChange={setIsAddCompanyOpen}>
         <DialogContent>
@@ -796,6 +811,49 @@ export function SuperAdmin() {
               Cancel
             </Button>
             <Button onClick={handleAddCompany}>Add Company</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Remove Company Dialog */}
+      <Dialog
+        open={companyToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCompanyToRemove(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Company?</DialogTitle>
+            <DialogDescription>
+              This will deactivate the company but keep its records.
+            </DialogDescription>
+          </DialogHeader>
+
+          {companyToRemove && (
+            <div className="space-y-2 py-4 text-sm">
+              <div>
+                <strong>Company:</strong> {companyToRemove.name}
+              </div>
+              <div>
+                <strong>Type:</strong> {companyToRemove.type || "—"}
+              </div>
+              <div>
+                <strong>Employees:</strong> {companyToRemove.employeeCount}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompanyToRemove(null)}>
+              Cancel
+            </Button>
+
+            <Button variant="destructive" onClick={confirmRemoveCompany}>
+              Remove Company
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -394,6 +394,12 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<number | null>(null);
 
+  const [holidayToRemove, setHolidayToRemove] = useState<Holiday | null>(null);
+
+  const [assignmentToRemove, setAssignmentToRemove] = useState<string | null>(
+    null,
+  );
+
   const [accountDepartmentToDeactivate, setAccountDepartmentToDeactivate] =
     useState<AccountDepartmentRow | null>(null);
 
@@ -838,23 +844,32 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
   };
 
-  const handleRemoveHoliday = async (id: string) => {
+  const handleRemoveHoliday = (id: string) => {
     if (!currentUser.company_id) {
       toast.error("No company selected");
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to remove this holiday?",
-    );
+    const holiday = holidays.find((item) => item.id === id);
 
-    if (!confirmed) {
+    if (!holiday) {
+      toast.error("Holiday not found");
       return;
     }
 
+    setHolidayToRemove(holiday);
+  };
+
+  const confirmRemoveHoliday = async () => {
+    if (!currentUser.company_id || !holidayToRemove) {
+      return;
+    }
+
+    const holiday = holidayToRemove;
+
     try {
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/holidays/${id}?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/holidays/${holiday.id}?company_id=${currentUser.company_id}`,
         {
           method: "DELETE",
         },
@@ -865,6 +880,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       if (!res.ok) {
         throw new Error(data?.detail || "Failed to remove holiday");
       }
+
+      setHolidayToRemove(null);
 
       await fetchHolidays();
 
@@ -2863,10 +2880,18 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
   // Remove Assignment
   const handleRemoveAssignment = (id: string) => {
-    if (confirm("Are you sure you want to remove this assignment?")) {
-      setAssignments(assignments.filter((a) => a.id !== id));
-      toast.success("Assignment removed");
+    setAssignmentToRemove(id);
+  };
+
+  const confirmRemoveAssignment = () => {
+    if (!assignmentToRemove) {
+      return;
     }
+
+    setAssignments(assignments.filter((a) => a.id !== assignmentToRemove));
+    setAssignmentToRemove(null);
+
+    toast.success("Assignment removed");
   };
 
   const handleDeactivateEmployeeAssignment = async (employeeRoleId: number) => {
@@ -5692,6 +5717,77 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             </Button>
 
             <Button onClick={confirmRequiredCountUpdate}>Confirm Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Confirm Remove Holiday Dialog */}
+      <Dialog
+        open={holidayToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setHolidayToRemove(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Holiday?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove this holiday?
+            </DialogDescription>
+          </DialogHeader>
+
+          {holidayToRemove && (
+            <div className="space-y-2 py-4 text-sm">
+              <div>
+                <strong>Name:</strong> {holidayToRemove.name}
+              </div>
+              <div>
+                <strong>Date:</strong> {holidayToRemove.date}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHolidayToRemove(null)}>
+              Cancel
+            </Button>
+
+            <Button variant="destructive" onClick={confirmRemoveHoliday}>
+              Remove Holiday
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Remove Assignment Dialog */}
+      <Dialog
+        open={assignmentToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAssignmentToRemove(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Assignment?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove this assignment?
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAssignmentToRemove(null)}
+            >
+              Cancel
+            </Button>
+
+            <Button variant="destructive" onClick={confirmRemoveAssignment}>
+              Remove Assignment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
