@@ -728,6 +728,13 @@ export function ScheduleGenerator({
         throw new Error(data.detail.errors.join("\n"));
       }
 
+      if (data?.detail?.type === "MANUAL_ASSIGNMENT_REQUEST_ALREADY_EXISTS") {
+        throw new Error(
+          data.detail.message ||
+            "A pending assignment request already exists for this employee and shift.",
+        );
+      }
+
       const message =
         typeof data?.detail === "string"
           ? data.detail

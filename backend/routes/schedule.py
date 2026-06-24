@@ -2909,6 +2909,23 @@ def update_generated_schedule_employee(
             admin_note
         )
 
+        if request["already_exists"]:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "type": "MANUAL_ASSIGNMENT_REQUEST_ALREADY_EXISTS",
+                    "message": (
+                        "A pending assignment request already exists for "
+                        "this employee and shift."
+                    ),
+                    "manual_assignment_request_id": request[
+                        "manual_assignment_request_id"
+                    ],
+                    "schedule_id": schedule_id,
+                    "employee_id": employee_id,
+                }
+            )
+
         conn.commit()
 
         return {
@@ -2921,7 +2938,7 @@ def update_generated_schedule_employee(
             "manual_assignment_request_id": request[
                 "manual_assignment_request_id"
             ],
-            "already_exists": request["already_exists"],
+            "already_exists": False,
             "schedule_id": schedule_id,
             "employee_id": employee_id,
             "warning_conditions": warnings,
