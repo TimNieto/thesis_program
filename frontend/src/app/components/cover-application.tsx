@@ -105,6 +105,46 @@ interface LeaveRequest {
   submittedAt: string;
 }
 
+interface ManualAssignmentRequest {
+  id: string;
+  manual_assignment_request_id: number;
+  schedule_id: number;
+
+  requested_by_employee_id: number;
+  requested_by_name: string;
+
+  target_employee_id: number;
+  target_employee_name: string;
+
+  previous_employee_id?: number | null;
+  previous_employee_name?: string | null;
+
+  livestream: string;
+  day: string;
+  shift: string;
+  role: string;
+
+  shift_template_id?: number | null;
+  color_index?: number | null;
+
+  status:
+    | "pending"
+    | "accepted"
+    | "rejected"
+    | "cancelled"
+    | "expired"
+    | "failed";
+
+  warning_conditions: {
+    type?: string;
+    message?: string;
+  }[];
+
+  admin_note?: string | null;
+  employee_response_note?: string | null;
+  requested_at?: string | null;
+}
+
 interface CoverApplicationProps {
   currentUser: {
     employee_id: number;
@@ -301,6 +341,9 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const [applications, setApplications] = useState<ShiftApplication[]>([]);
   const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
   const [coverRequests, setCoverRequests] = useState<CoverRequest[]>([]);
+  const [assignmentRequests, setAssignmentRequests] = useState<
+    ManualAssignmentRequest[]
+  >([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [myShifts, setMyShifts] = useState<any[]>([]);
@@ -435,6 +478,81 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
   };
 
+  const fetchManualAssignmentRequests = async () => {
+    try {
+      if (!currentUser.company_id) {
+        setAssignmentRequests([]);
+        return;
+      }
+
+      const endpoint =
+        role === "admin"
+          ? `https://backend-production-6e75.up.railway.app/manual-assignment-requests?company_id=${currentUser.company_id}`
+          : `https://backend-production-6e75.up.railway.app/manual-assignment-requests/employee/${currentUser.employee_id}?company_id=${currentUser.company_id}`;
+
+      const res = await fetch(endpoint);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to load assignment requests");
+      }
+
+      setAssignmentRequests(
+        data.map((r: any) => ({
+          id: String(r.id || r.manual_assignment_request_id),
+          manual_assignment_request_id: Number(
+            r.manual_assignment_request_id || r.id,
+          ),
+          schedule_id: Number(r.schedule_id),
+
+          requested_by_employee_id: Number(r.requested_by_employee_id),
+          requested_by_name: r.requested_by_name || "Admin",
+
+          target_employee_id: Number(r.target_employee_id),
+          target_employee_name: r.target_employee_name || "Employee",
+
+          previous_employee_id: r.previous_employee_id
+            ? Number(r.previous_employee_id)
+            : null,
+          previous_employee_name: r.previous_employee_name || null,
+
+          livestream: r.account_name || r.livestream || "",
+
+          day: r.shift_date
+            ? new Date(r.shift_date).toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              })
+            : "",
+
+          shift: r.shift_name || r.shift || "",
+
+          shift_template_id: r.shift_template_id
+            ? Number(r.shift_template_id)
+            : null,
+
+          color_index: r.color_index ?? null,
+
+          role: String(r.role_name || r.role_key || "").replace(/_/g, " "),
+
+          status: r.status,
+
+          warning_conditions: Array.isArray(r.warning_conditions)
+            ? r.warning_conditions
+            : [],
+
+          admin_note: r.admin_note || null,
+          employee_response_note: r.employee_response_note || null,
+          requested_at: r.requested_at || null,
+        })),
+      );
+    } catch (err) {
+      console.error("Failed to load assignment requests", err);
+      setAssignmentRequests([]);
+    }
+  };
+
   const fetchCompanySettings = async () => {
     try {
       if (!currentUser.company_id) return;
@@ -560,6 +678,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       fetchEmployees();
       fetchApplications();
       fetchCoverRequests();
+      fetchManualAssignmentRequests();
       fetchShiftTemplates();
 
       if (role !== "admin") {
@@ -573,6 +692,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       processAutomaticCoverRequests().then(() => {
         fetchCoverRequests();
         fetchApplications();
+        fetchManualAssignmentRequests();
         fetchMyShifts();
       });
     }, 60000);
@@ -618,6 +738,20 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           (shift) =>
             !pendingCoverRequestScheduleIds.has(Number(shift.schedule_id)),
         );
+
+  const pendingAssignmentRequestCount = assignmentRequests.filter(
+    (request) => request.status === "pending",
+  ).length;
+
+  const formatAssignmentWarnings = (request: ManualAssignmentRequest) => {
+    if (!request.warning_conditions.length) {
+      return "None";
+    }
+
+    return request.warning_conditions
+      .map((warning) => warning.message || warning.type || "Warning")
+      .join(" | ");
+  };
 
   const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
 
@@ -906,6 +1040,94 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
   };
 
+  const respondToAssignmentRequest = async (
+    requestId: number,
+    action: "accept" | "reject",
+  ) => {
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/manual-assignment-requests/${requestId}/${action}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            employee_id: currentUser.employee_id,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : `Failed to ${action} assignment request`,
+        );
+      }
+
+      toast.success(
+        action === "accept"
+          ? "Assignment request accepted"
+          : "Assignment request rejected",
+      );
+
+      fetchManualAssignmentRequests();
+      fetchMyShifts();
+    } catch (err) {
+      console.error(err);
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update assignment request",
+      );
+    }
+  };
+
+  const cancelAssignmentRequest = async (requestId: number) => {
+    try {
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app/manual-assignment-requests/${requestId}/cancel`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            cancelled_by: currentUser.employee_id,
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : "Failed to cancel assignment request",
+        );
+      }
+
+      toast.success("Assignment request cancelled");
+
+      fetchManualAssignmentRequests();
+    } catch (err) {
+      console.error(err);
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to cancel assignment request",
+      );
+    }
+  };
+
   const updateLeaveStatus = async (
     requestId: string,
     status: "approved" | "rejected",
@@ -959,16 +1181,18 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants = {
+    const variants: Record<string, "default" | "secondary" | "destructive"> = {
       approved: "default",
+      accepted: "default",
       denied: "destructive",
+      rejected: "destructive",
+      failed: "destructive",
       pending: "secondary",
+      cancelled: "secondary",
+      expired: "secondary",
     };
-    return (
-      <Badge variant={variants[status as keyof typeof variants] as any}>
-        {status}
-      </Badge>
-    );
+
+    return <Badge variant={variants[status] || "secondary"}>{status}</Badge>;
   };
 
   const normalizeKey = (value: any) =>
@@ -1112,7 +1336,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           className={
             role === "admin"
               ? "grid w-full max-w-xs grid-cols-1"
-              : "grid w-full max-w-2xl grid-cols-3"
+              : "grid w-full max-w-4xl grid-cols-4"
           }
         >
           {role !== "admin" && (
@@ -1121,12 +1345,24 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                 <CalendarIcon className="size-4" />
                 Available Shifts
               </TabsTrigger>
+
               <TabsTrigger value="myshifts" className="gap-2">
                 <UserX className="size-4" />
                 My Shifts
               </TabsTrigger>
+
+              <TabsTrigger value="assignment-requests" className="gap-2">
+                <Clock className="size-4" />
+                Assignment Requests
+                {pendingAssignmentRequestCount > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {pendingAssignmentRequestCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </>
           )}
+
           <TabsTrigger value="requests" className="gap-2">
             <ClipboardList className="size-4" />
             All Requests
@@ -1416,7 +1652,115 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
             </Card>
           </TabsContent>
         )}
+        {/* Assignment Requests Tab - Only visible for non-admin users */}
+        {role !== "admin" && (
+          <TabsContent value="assignment-requests" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="size-5" />
+                  Assignment Requests
+                </CardTitle>
+                <CardDescription>
+                  Review admin assignment requests before they are added to your
+                  schedule.
+                </CardDescription>
+              </CardHeader>
 
+              <CardContent>
+                {assignmentRequests.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Livestream</TableHead>
+                          <TableHead>Day</TableHead>
+                          <TableHead>Shift</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Warnings</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+
+                      <TableBody>
+                        {assignmentRequests.map((request) => {
+                          const shiftInfo = getShiftInfo(request);
+
+                          return (
+                            <TableRow key={request.id}>
+                              <TableCell>{request.livestream}</TableCell>
+                              <TableCell>{request.day}</TableCell>
+                              <TableCell>
+                                <div className="font-medium">
+                                  {request.shift}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {shiftInfo.time || "Time not set"}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={getRoleBadgeColor(request.role)}
+                                >
+                                  {request.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="max-w-md text-xs text-gray-600">
+                                {formatAssignmentWarnings(request)}
+                              </TableCell>
+                              <TableCell>
+                                {getStatusBadge(request.status)}
+                              </TableCell>
+                              <TableCell>
+                                {request.status === "pending" ? (
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        respondToAssignmentRequest(
+                                          request.manual_assignment_request_id,
+                                          "accept",
+                                        )
+                                      }
+                                    >
+                                      Accept
+                                    </Button>
+
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() =>
+                                        respondToAssignmentRequest(
+                                          request.manual_assignment_request_id,
+                                          "reject",
+                                        )
+                                      }
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-500">
+                                    No action
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 py-4">
+                    No assignment requests found
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
         {/* All Requests Tab */}
         <TabsContent value="requests" className="space-y-6">
           {/* Shift Applications Table */}
@@ -1668,7 +2012,101 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               )}
             </CardContent>
           </Card>
+          {/* Assignment Requests Table */}
+          {role === "admin" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="size-5" />
+                  Assignment Requests
+                </CardTitle>
+                <CardDescription>
+                  View manual assignment approval requests sent to employees
+                </CardDescription>
+              </CardHeader>
 
+              <CardContent>
+                {assignmentRequests.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Employee</TableHead>
+                          <TableHead>Livestream</TableHead>
+                          <TableHead>Day</TableHead>
+                          <TableHead>Shift</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Warnings</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+
+                      <TableBody>
+                        {assignmentRequests.map((request) => {
+                          const shiftInfo = getShiftInfo(request);
+
+                          return (
+                            <TableRow key={request.id}>
+                              <TableCell>
+                                {request.target_employee_name}
+                              </TableCell>
+                              <TableCell>{request.livestream}</TableCell>
+                              <TableCell>{request.day}</TableCell>
+                              <TableCell>
+                                <div className="font-medium">
+                                  {request.shift}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {shiftInfo.time || "Time not set"}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={getRoleBadgeColor(request.role)}
+                                >
+                                  {request.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="max-w-md text-xs text-gray-600">
+                                {formatAssignmentWarnings(request)}
+                              </TableCell>
+                              <TableCell>
+                                {getStatusBadge(request.status)}
+                              </TableCell>
+                              <TableCell>
+                                {request.status === "pending" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      cancelAssignmentRequest(
+                                        request.manual_assignment_request_id,
+                                      )
+                                    }
+                                  >
+                                    Cancel Request
+                                  </Button>
+                                ) : (
+                                  <span className="text-sm text-gray-500">
+                                    No action
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 py-4">
+                    No assignment requests found
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
           {/* Leave Requests Table */}
           <Card>
             <CardHeader>

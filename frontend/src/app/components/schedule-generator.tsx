@@ -504,15 +504,6 @@ export function ScheduleGenerator({
   const [employeeName, setEmployeeName] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
-  const [pendingRestOverride, setPendingRestOverride] = useState<{
-    scheduleId: number;
-    employeeId: number;
-    employeeName: string;
-    message: string;
-  } | null>(null);
-
-const [restOverrideLoading, setRestOverrideLoading] = useState(false);
-
   const [scheduleWeekOffset, setScheduleWeekOffset] = useState<0 | 1>(0);
   const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
   const selectedWeekDates = getWeekDates(scheduleWeekOffset);
@@ -711,7 +702,6 @@ const [restOverrideLoading, setRestOverrideLoading] = useState(false);
   const updatePublishedAssignment = async (
     scheduleId: number,
     employeeId: number | null,
-    forceRestOverride: boolean = false,
   ) => {
     const res = await fetch(
       `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/employee`,
@@ -724,7 +714,6 @@ const [restOverrideLoading, setRestOverrideLoading] = useState(false);
           company_id: companyId,
           employee_id: employeeId,
           updated_by: currentUserId,
-          force_rest_override: forceRestOverride,
         }),
       },
     );
@@ -732,58 +721,22 @@ const [restOverrideLoading, setRestOverrideLoading] = useState(false);
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
+      if (
+        data?.detail?.type === "MANUAL_ASSIGNMENT_BLOCKED" &&
+        Array.isArray(data.detail.errors)
+      ) {
+        throw new Error(data.detail.errors.join("\n"));
+      }
+
       const message =
         typeof data?.detail === "string"
           ? data.detail
           : data?.detail?.message || "Failed to update assignment";
 
-      if (
-        res.status === 409 &&
-        data?.detail?.type === "REST_PERIOD_WARNING"
-      ) {
-        const error: any = new Error(message);
-        error.type = "REST_PERIOD_WARNING";
-        throw error;
-      }
-
       throw new Error(message);
     }
 
     return data;
-  };
-
-  const confirmRestOverride = async () => {
-    if (!pendingRestOverride) return;
-
-    setRestOverrideLoading(true);
-
-    try {
-      await updatePublishedAssignment(
-        pendingRestOverride.scheduleId,
-        pendingRestOverride.employeeId,
-        true,
-      );
-
-      toast.success("Assignment updated with rest-period override");
-
-      await loadSchedule();
-
-      setPendingRestOverride(null);
-      setIsDialogOpen(false);
-      setEmployeeName("");
-      setSelectedEmployeeId("");
-      setSelectedCell(null);
-    } catch (err) {
-      console.error(err);
-
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Failed to override rest-period warning",
-      );
-    } finally {
-      setRestOverrideLoading(false);
-    }
   };
 
   const markPublishedAssignmentAbsent = async (scheduleId: number) => {
@@ -870,15 +823,26 @@ const [restOverrideLoading, setRestOverrideLoading] = useState(false);
 
     const existing = getAssignment();
 
-    if (
-      scheduleMode === "saved" &&
-      existing?.schedule_id
-    ) {
+    if (scheduleMode === "saved" && existing?.schedule_id) {
       try {
-        await updatePublishedAssignment(
+        const result = await updatePublishedAssignment(
           existing.schedule_id,
           selectedEmployee.id,
         );
+
+        if (result?.requires_employee_approval) {
+          toast.info(
+            "Assignment request sent. The employee must approve before the schedule changes.",
+          );
+
+          await loadSchedule();
+
+          setIsDialogOpen(false);
+          setEmployeeName("");
+          setSelectedEmployeeId("");
+          setSelectedCell(null);
+          return;
+        }
 
         setAssignments(
           assignments.map((a) =>
@@ -901,29 +865,12 @@ const [restOverrideLoading, setRestOverrideLoading] = useState(false);
         return;
       } catch (err) {
         console.error(err);
-        if ((err as any)?.type === "REST_PERIOD_WARNING") {
-          setIsDialogOpen(false);
 
-          setPendingRestOverride({
-            scheduleId: existing.schedule_id,
-            employeeId: selectedEmployee.id,
-            employeeName: selectedEmployee.name,
-            message:
-              err instanceof Error
-                ? err.message
-                : "This assignment violates the minimum rest period.",
-          });
+        toast.error(
+          err instanceof Error ? err.message : "Failed to update assignment",
+        );
 
-          return;
-        }
-
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Failed to update assignment"
-      );
-
-      return;
+        return;
       }
     }
 
@@ -990,10 +937,7 @@ const [restOverrideLoading, setRestOverrideLoading] = useState(false);
 
     const existing = getAssignment();
 
-    if (
-      scheduleMode === "saved" &&
-      existing?.schedule_id
-    ) {
+    if (scheduleMode === "saved" && existing?.schedule_id) {
       try {
         await updatePublishedAssignment(existing.schedule_id, null);
 
@@ -1900,58 +1844,6 @@ const [restOverrideLoading, setRestOverrideLoading] = useState(false);
           </TabsContent>
         )}
       </Tabs>
-
-      {/* Rest Period Warning Dialog */}
-      <Dialog
-        open={Boolean(pendingRestOverride)}
-        onOpenChange={(open) => {
-          if (!open && !restOverrideLoading) {
-            setPendingRestOverride(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Minimum Rest Period Warning</DialogTitle>
-
-            <DialogDescription>
-              This assignment does not meet the configured minimum rest period.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="rounded-md border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900 space-y-3">
-            <p>{pendingRestOverride?.message}</p>
-
-            {pendingRestOverride?.employeeName && (
-              <p>
-                <strong>Employee:</strong> {pendingRestOverride.employeeName}
-              </p>
-            )}
-
-            <p className="font-medium">
-              Do you want to assign this employee anyway?
-            </p>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              disabled={restOverrideLoading}
-              onClick={() => setPendingRestOverride(null)}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              disabled={restOverrideLoading}
-              onClick={confirmRestOverride}
-            >
-              {restOverrideLoading ? "Assigning..." : "Assign Anyway"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Assignment Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>

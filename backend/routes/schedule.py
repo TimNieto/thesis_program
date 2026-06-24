@@ -7,6 +7,11 @@ from db.database import get_connection
 from services.notification_service import create_notification
 from datetime import datetime, timedelta
 from services.role_service import get_company_admin_employee_ids
+from services.manual_assignment_service import (
+    validate_manual_assignment_override,
+    create_manual_assignment_request,
+    apply_schedule_assignment_update,
+)
 
 router = APIRouter()
 
@@ -2829,12 +2834,7 @@ def update_generated_schedule_employee(
         company_id = payload.get("company_id")
         employee_id = payload.get("employee_id")
         updated_by = payload.get("updated_by")
-
-        force_rest_override = bool(
-            payload.get("force_rest_override", False)
-        )
-
-        rest_warning = None
+        admin_note = payload.get("admin_note")
 
         if not company_id:
             raise HTTPException(
@@ -2842,170 +2842,90 @@ def update_generated_schedule_employee(
                 detail="company_id is required"
             )
 
-        cursor.execute("""
-            SELECT
-                gs.schedule_id,
-                gs.employee_id,
-                s.shift_date
-            FROM generated_schedule gs
-            JOIN shifts s
-                ON gs.shift_id = s.shift_id
-                AND gs.company_id = s.company_id
-            WHERE gs.schedule_id = %s
-            AND gs.company_id = %s
-            AND gs.is_archived = FALSE
-            LIMIT 1
-        """, (
-            schedule_id,
-            company_id
-        ))
-
-        schedule_row = cursor.fetchone()
-
-        if not schedule_row:
-            raise HTTPException(
-                status_code=404,
-                detail="Active schedule row not found"
-            )
-
-        old_employee_id = schedule_row[1]
-
-        if employee_id is not None:
-            cursor.execute("""
-                SELECT employee_id
-                FROM employees
-                WHERE employee_id = %s
-                AND company_id = %s
-                AND employment_status = 'Active'
-                LIMIT 1
-            """, (
-                employee_id,
-                company_id
-            ))
-
-            if not cursor.fetchone():
-                raise HTTPException(
-                    status_code=404,
-                    detail="Employee not found or inactive"
-                )
-            
-            conflict_error = schedule_time_conflict_error(
+        # Remove assignment remains immediate.
+        # Employee approval is only needed when assigning a target employee.
+        if employee_id is None:
+            applied = apply_schedule_assignment_update(
                 cursor,
-                int(employee_id),
+                int(company_id),
                 schedule_id,
-                company_id
+                None,
+                updated_by=updated_by
             )
 
-            if conflict_error:
-                raise HTTPException(
-                    status_code=400,
-                    detail=conflict_error
-                )
-            
-            rest_warning = schedule_rest_period_warning(
-                cursor,
-                int(employee_id),
-                schedule_id,
-                company_id
-            )
+            conn.commit()
 
-            if rest_warning and not force_rest_override:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "type": "REST_PERIOD_WARNING",
-                        "message": rest_warning
-                    }
-                )
+            return {
+                "message": "Schedule assignment removed",
+                "schedule_id": schedule_id,
+                "employee_id": None,
+                "previous_employee_id": applied["previous_employee_id"],
+                "requires_employee_approval": False,
+            }
 
-        # Void cover data only for this one schedule slot.
-        cursor.execute("""
-            SELECT coverage_request_id
-            FROM coverage_requests
-            WHERE company_id = %s
-            AND schedule_id = %s
-            AND is_archived = FALSE
-        """, (
+        employee_id = int(employee_id)
+        company_id = int(company_id)
+
+        validation = validate_manual_assignment_override(
+            cursor,
             company_id,
-            schedule_id
-        ))
-
-        coverage_request_ids = [
-            row[0]
-            for row in cursor.fetchall()
-        ]
-
-        if coverage_request_ids:
-            archive_cover_history_for_schedule_ids(
-                cursor,
-                company_id,
-                [schedule_id],
-                "manual_override"
-            )
-
-            
-            cursor.execute("""
-                DELETE FROM emergency_cover_targets
-                WHERE company_id = %s
-                AND coverage_request_id = ANY(%s::int[])
-            """, (
-                company_id,
-                coverage_request_ids
-            ))
-
-            cursor.execute("""
-                DELETE FROM shift_applications
-                WHERE company_id = %s
-                AND coverage_request_id = ANY(%s::int[])
-            """, (
-                company_id,
-                coverage_request_ids
-            ))
-
-            cursor.execute("""
-                DELETE FROM coverage_requests
-                WHERE company_id = %s
-                AND coverage_request_id = ANY(%s::int[])
-            """, (
-                company_id,
-                coverage_request_ids
-            ))
-
-        cursor.execute("""
-            UPDATE generated_schedule
-            SET employee_id = %s
-            WHERE schedule_id = %s
-            AND company_id = %s
-            AND is_archived = FALSE
-        """, (
-            employee_id,
             schedule_id,
-            company_id
-        ))
+            employee_id
+        )
 
-        if employee_id:
-            create_notification(
+        if validation["hard_blocks"]:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "type": "MANUAL_ASSIGNMENT_BLOCKED",
+                    "message": "Manual assignment is blocked.",
+                    "errors": validation["hard_blocks"]
+                }
+            )
+
+        target = validation["target"]
+        warnings = validation["warnings"]
+
+        # If there are warning conditions, do not assign yet.
+        # Create employee approval request instead.
+        if warnings:
+            request = create_manual_assignment_request(
                 cursor,
+                company_id,
+                schedule_id,
+                int(updated_by) if updated_by else employee_id,
                 employee_id,
-                "Schedule Assignment Updated",
-                "You were assigned to a schedule slot.",
-                "schedule",
-                company_id=company_id,
-                sender_employee_id=updated_by,
-                related_id=schedule_id
+                target["previous_employee_id"],
+                warnings,
+                admin_note
             )
 
-        if old_employee_id and old_employee_id != employee_id:
-            create_notification(
-                cursor,
-                old_employee_id,
-                "Schedule Assignment Updated",
-                "You were removed from a schedule slot.",
-                "schedule",
-                company_id=company_id,
-                sender_employee_id=updated_by,
-                related_id=schedule_id
-            )
+            conn.commit()
+
+            return {
+                "message": (
+                    "Employee approval required before this assignment "
+                    "can be applied."
+                ),
+                "type": "MANUAL_ASSIGNMENT_APPROVAL_REQUIRED",
+                "requires_employee_approval": True,
+                "manual_assignment_request_id": request[
+                    "manual_assignment_request_id"
+                ],
+                "already_exists": request["already_exists"],
+                "schedule_id": schedule_id,
+                "employee_id": employee_id,
+                "warning_conditions": warnings,
+            }
+
+        # No hard block and no warning: assign immediately.
+        applied = apply_schedule_assignment_update(
+            cursor,
+            company_id,
+            schedule_id,
+            employee_id,
+            updated_by=updated_by
+        )
 
         conn.commit()
 
@@ -3013,12 +2933,21 @@ def update_generated_schedule_employee(
             "message": "Schedule assignment updated",
             "schedule_id": schedule_id,
             "employee_id": employee_id,
-            "warning": rest_warning
+            "previous_employee_id": applied["previous_employee_id"],
+            "requires_employee_approval": False,
+            "warning_conditions": [],
         }
 
     except HTTPException:
         conn.rollback()
         raise
+
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
 
     except Exception as e:
         conn.rollback()
