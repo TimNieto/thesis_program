@@ -503,6 +503,16 @@ export function ScheduleGenerator({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+
+  const [pendingRestOverride, setPendingRestOverride] = useState<{
+    scheduleId: number;
+    employeeId: number;
+    employeeName: string;
+    message: string;
+  } | null>(null);
+
+const [restOverrideLoading, setRestOverrideLoading] = useState(false);
+
   const [scheduleWeekOffset, setScheduleWeekOffset] = useState<0 | 1>(0);
   const [weekDates, setWeekDates] = useState<Date[]>(getWeekDates(0));
   const selectedWeekDates = getWeekDates(scheduleWeekOffset);
@@ -719,26 +729,61 @@ export function ScheduleGenerator({
       },
     );
 
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
 
     if (!res.ok) {
+      const message =
+        typeof data?.detail === "string"
+          ? data.detail
+          : data?.detail?.message || "Failed to update assignment";
+
       if (
         res.status === 409 &&
         data?.detail?.type === "REST_PERIOD_WARNING"
       ) {
-        const error: any = new Error(data.detail.message);
+        const error: any = new Error(message);
         error.type = "REST_PERIOD_WARNING";
         throw error;
       }
 
-      throw new Error(
-        typeof data?.detail === "string"
-          ? data.detail
-          : "Failed to update assignment"
-      );
+      throw new Error(message);
     }
 
     return data;
+  };
+
+  const confirmRestOverride = async () => {
+    if (!pendingRestOverride) return;
+
+    setRestOverrideLoading(true);
+
+    try {
+      await updatePublishedAssignment(
+        pendingRestOverride.scheduleId,
+        pendingRestOverride.employeeId,
+        true,
+      );
+
+      toast.success("Assignment updated with rest-period override");
+
+      await loadSchedule();
+
+      setPendingRestOverride(null);
+      setIsDialogOpen(false);
+      setEmployeeName("");
+      setSelectedEmployeeId("");
+      setSelectedCell(null);
+    } catch (err) {
+      console.error(err);
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to override rest-period warning",
+      );
+    } finally {
+      setRestOverrideLoading(false);
+    }
   };
 
   const markPublishedAssignmentAbsent = async (scheduleId: number) => {
@@ -848,7 +893,7 @@ export function ScheduleGenerator({
           ),
         );
 
-        toast.success("This week's assignment updated");
+        toast.success("Assignment updated");
         setIsDialogOpen(false);
         setEmployeeName("");
         setSelectedEmployeeId("");
@@ -857,39 +902,20 @@ export function ScheduleGenerator({
       } catch (err) {
         console.error(err);
         if ((err as any)?.type === "REST_PERIOD_WARNING") {
-        const confirmed = window.confirm(
-          `${(err as Error).message}\n\nDo you want to assign anyway?`
-        );
-
-        if (!confirmed) {
-          return;
-        }
-
-        try {
-          await updatePublishedAssignment(
-            existing.schedule_id,
-            selectedEmployee.id,
-            true
-          );
-
-          toast.success("Assignment updated with rest-period override");
-          await loadSchedule();
-
           setIsDialogOpen(false);
-          setEmployeeName("");
-          setSelectedEmployeeId("");
-          setSelectedCell(null);
-          return;
-        } catch (retryErr) {
-          console.error(retryErr);
-          toast.error(
-            retryErr instanceof Error
-              ? retryErr.message
-              : "Failed to update assignment"
-          );
+
+          setPendingRestOverride({
+            scheduleId: existing.schedule_id,
+            employeeId: selectedEmployee.id,
+            employeeName: selectedEmployee.name,
+            message:
+              err instanceof Error
+                ? err.message
+                : "This assignment violates the minimum rest period.",
+          });
+
           return;
         }
-      }
 
       toast.error(
         err instanceof Error
@@ -1874,6 +1900,57 @@ export function ScheduleGenerator({
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Rest Period Warning Dialog */}
+      <Dialog
+        open={Boolean(pendingRestOverride)}
+        onOpenChange={(open) => {
+          if (!open && !restOverrideLoading) {
+            setPendingRestOverride(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Minimum Rest Period Warning</DialogTitle>
+
+            <DialogDescription>
+              This assignment does not meet the configured minimum rest period.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900 space-y-3">
+            <p>{pendingRestOverride?.message}</p>
+
+            {pendingRestOverride?.employeeName && (
+              <p>
+                <strong>Employee:</strong> {pendingRestOverride.employeeName}
+              </p>
+            )}
+
+            <p className="font-medium">
+              Do you want to assign this employee anyway?
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              disabled={restOverrideLoading}
+              onClick={() => setPendingRestOverride(null)}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              disabled={restOverrideLoading}
+              onClick={confirmRestOverride}
+            >
+              {restOverrideLoading ? "Assigning..." : "Assign Anyway"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Assignment Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
