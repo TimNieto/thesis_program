@@ -745,7 +745,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
   const formatAssignmentWarnings = (request: ManualAssignmentRequest) => {
     if (!request.warning_conditions.length) {
-      return "None";
+      return "";
     }
 
     return request.warning_conditions

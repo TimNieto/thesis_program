@@ -2886,56 +2886,45 @@ def update_generated_schedule_employee(
         target = validation["target"]
         warnings = validation["warnings"]
 
-        # If there are warning conditions, do not assign yet.
-        # Create employee approval request instead.
-        if warnings:
-            request = create_manual_assignment_request(
-                cursor,
-                company_id,
-                schedule_id,
-                int(updated_by) if updated_by else employee_id,
-                employee_id,
-                target["previous_employee_id"],
-                warnings,
-                admin_note
-            )
-
-            conn.commit()
-
-            return {
-                "message": (
-                    "Employee approval required before this assignment "
-                    "can be applied."
-                ),
-                "type": "MANUAL_ASSIGNMENT_APPROVAL_REQUIRED",
-                "requires_employee_approval": True,
-                "manual_assignment_request_id": request[
-                    "manual_assignment_request_id"
-                ],
-                "already_exists": request["already_exists"],
-                "schedule_id": schedule_id,
-                "employee_id": employee_id,
-                "warning_conditions": warnings,
-            }
-
-        # No hard block and no warning: assign immediately.
-        applied = apply_schedule_assignment_update(
+        # No hard block means this assignment is allowed to be requested.
+        # All manual assignments require employee approval.
+        #
+        # Valid assignment:
+        #   warnings = []
+        #   employee approval request is created
+        #   no warning is shown in the UI
+        #
+        # Warning assignment:
+        #   warnings = [...]
+        #   employee approval request is created
+        #   warnings are shown in the UI
+        request = create_manual_assignment_request(
             cursor,
             company_id,
             schedule_id,
+            int(updated_by) if updated_by else employee_id,
             employee_id,
-            updated_by=updated_by
+            target["previous_employee_id"],
+            warnings,
+            admin_note
         )
 
         conn.commit()
 
         return {
-            "message": "Schedule assignment updated",
+            "message": (
+                "Employee approval required before this assignment "
+                "can be applied."
+            ),
+            "type": "MANUAL_ASSIGNMENT_APPROVAL_REQUIRED",
+            "requires_employee_approval": True,
+            "manual_assignment_request_id": request[
+                "manual_assignment_request_id"
+            ],
+            "already_exists": request["already_exists"],
             "schedule_id": schedule_id,
             "employee_id": employee_id,
-            "previous_employee_id": applied["previous_employee_id"],
-            "requires_employee_approval": False,
-            "warning_conditions": [],
+            "warning_conditions": warnings,
         }
 
     except HTTPException:
