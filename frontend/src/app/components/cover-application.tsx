@@ -753,6 +753,23 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       .join(" | ");
   };
 
+  const renderAssignmentWarnings = (request: ManualAssignmentRequest) => {
+    const warningText = formatAssignmentWarnings(request);
+
+    if (!warningText) {
+      return null;
+    }
+
+    return (
+      <div
+        title={warningText}
+        className="max-w-[320px] whitespace-normal break-words text-xs leading-relaxed text-amber-700"
+      >
+        {warningText}
+      </div>
+    );
+  };
+
   const [isCoverDialogOpen, setIsCoverDialogOpen] = useState(false);
 
   const [selectedShift, setSelectedShift] = useState<{
@@ -1670,7 +1687,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               <CardContent>
                 {assignmentRequests.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="table-fixed min-w-[1000px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Livestream</TableHead>
@@ -1706,13 +1723,13 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                                   {request.role}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="max-w-md text-xs text-gray-600">
-                                {formatAssignmentWarnings(request)}
+                              <TableCell className="w-[340px] max-w-[340px] align-top">
+                                {renderAssignmentWarnings(request)}
                               </TableCell>
                               <TableCell>
                                 {getStatusBadge(request.status)}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="w-[170px] whitespace-nowrap align-top">
                                 {request.status === "pending" ? (
                                   <div className="flex gap-2">
                                     <Button
@@ -2028,7 +2045,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
               <CardContent>
                 {assignmentRequests.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="table-fixed min-w-[1000px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Employee</TableHead>
@@ -2068,13 +2085,13 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
                                   {request.role}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="max-w-md text-xs text-gray-600">
-                                {formatAssignmentWarnings(request)}
+                              <TableCell className="w-[340px] max-w-[340px] align-top">
+                                {renderAssignmentWarnings(request)}
                               </TableCell>
                               <TableCell>
                                 {getStatusBadge(request.status)}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="w-[170px] whitespace-nowrap align-top">
                                 {request.status === "pending" ? (
                                   <Button
                                     size="sm"
