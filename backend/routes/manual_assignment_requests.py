@@ -164,57 +164,122 @@ def get_manual_assignment_requests(
 
 
 @router.get("/manual-assignment-requests/employee/{employee_id}")
-def get_employee_manual_assignment_requests(
-    employee_id: int,
-    company_id: int | None = None,
-    status: str | None = None
-):
+def get_employee_manual_assignment_requests(employee_id: int, company_id: int):
     conn = get_connection()
     cursor = conn.cursor()
 
     try:
-        if not company_id:
-            cursor.execute("""
-                SELECT company_id
-                FROM employees
-                WHERE employee_id = %s
-                AND employment_status = 'Active'
-                LIMIT 1
-            """, (employee_id,))
+        cursor.execute("""
+            SELECT
+                mar.manual_assignment_request_id,
+                mar.schedule_id,
 
-            employee = cursor.fetchone()
+                mar.requested_by_employee_id,
+                requested_by.full_name AS requested_by_name,
 
-            if not employee:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Employee not found"
-                )
+                mar.target_employee_id,
+                target_employee.full_name AS target_employee_name,
 
-            company_id = employee[0]
+                mar.previous_employee_id,
+                previous_employee.full_name AS previous_employee_name,
 
-        params = [
+                a.account_name,
+                s.shift_date,
+
+                st.shift_template_id,
+                st.shift_name,
+                st.color_index,
+
+                r.role_key,
+                r.role_name,
+
+                mar.status,
+                mar.warning_conditions,
+                mar.requested_at
+
+            FROM manual_assignment_requests mar
+
+            LEFT JOIN generated_schedule gs
+                ON mar.schedule_id = gs.schedule_id
+                AND mar.company_id = gs.company_id
+
+            LEFT JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+
+            LEFT JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+
+            LEFT JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
+
+            LEFT JOIN roles r
+                ON gs.role_id = r.role_id
+                AND gs.company_id = r.company_id
+
+            LEFT JOIN employees requested_by
+                ON mar.requested_by_employee_id = requested_by.employee_id
+                AND mar.company_id = requested_by.company_id
+
+            LEFT JOIN employees target_employee
+                ON mar.target_employee_id = target_employee.employee_id
+                AND mar.company_id = target_employee.company_id
+
+            LEFT JOIN employees previous_employee
+                ON mar.previous_employee_id = previous_employee.employee_id
+                AND mar.company_id = previous_employee.company_id
+
+            WHERE mar.company_id = %s
+            AND mar.target_employee_id = %s
+            ORDER BY mar.requested_at DESC
+        """, (
             company_id,
             employee_id
-        ]
+        ))
 
-        where = """
-            AND mar.company_id = %s
-            AND mar.target_employee_id = %s
-        """
-
-        if status:
-            where += " AND mar.status = %s"
-            params.append(status)
-
-        cursor.execute(
-            manual_assignment_request_select_sql(where),
-            tuple(params)
-        )
+        rows = cursor.fetchall()
 
         return [
-            map_manual_assignment_request(row)
-            for row in cursor.fetchall()
+            {
+                "manual_assignment_request_id": row[0],
+                "id": row[0],
+                "schedule_id": row[1],
+
+                "requested_by_employee_id": row[2],
+                "requested_by_name": row[3] or "Admin",
+
+                "target_employee_id": row[4],
+                "target_employee_name": row[5] or "Employee",
+
+                "previous_employee_id": row[6],
+                "previous_employee_name": row[7],
+
+                "account_name": row[8],
+                "shift_date": row[9],
+
+                "shift_template_id": row[10],
+                "shift_name": row[11],
+                "color_index": row[12],
+
+                "role_key": row[13],
+                "role_name": row[14],
+
+                "status": row[15],
+                "warning_conditions": normalize_warning_conditions(row[16]),
+                "requested_at": row[17],
+            }
+            for row in rows
         ]
+
+    except Exception as e:
+        print("GET EMPLOYEE MANUAL ASSIGNMENT REQUESTS ERROR:", repr(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load assignment requests: {str(e)}"
+        )
 
     finally:
         cursor.close()
