@@ -472,6 +472,7 @@ def fetch_company_settings(cursor, company_id: int):
     cursor.execute("""
         SELECT
             max_working_days,
+            min_rest_period_hours,
             max_shifts_per_day,
             max_shifts_per_week,
             allow_double_shifts,
@@ -490,12 +491,13 @@ def fetch_company_settings(cursor, company_id: int):
 
     return {
         "max_working_days": row[0],
-        "max_shifts_per_day": row[1],
-        "max_shifts_per_week": row[2],
-        "allow_double_shifts": row[3],
-        "fairness_weight": row[4],
-        "gy_fatigue_penalty": row[5] or 20,
-        "absence_tolerance": row[6] if row[6] is not None else 50
+        "min_rest_period_hours": row[1] if row[1] is not None else 8,
+        "max_shifts_per_day": row[2],
+        "max_shifts_per_week": row[3],
+        "allow_double_shifts": row[4],
+        "fairness_weight": row[5],
+        "gy_fatigue_penalty": row[6] or 20,
+        "absence_tolerance": row[7] if row[7] is not None else 50
     }
 
 

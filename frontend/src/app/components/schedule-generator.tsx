@@ -701,6 +701,7 @@ export function ScheduleGenerator({
   const updatePublishedAssignment = async (
     scheduleId: number,
     employeeId: number | null,
+    forceRestOverride: boolean = false,
   ) => {
     const res = await fetch(
       `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/employee`,
@@ -713,6 +714,7 @@ export function ScheduleGenerator({
           company_id: companyId,
           employee_id: employeeId,
           updated_by: currentUserId,
+          force_rest_override: forceRestOverride,
         }),
       },
     );
@@ -720,7 +722,20 @@ export function ScheduleGenerator({
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.detail || "Failed to update assignment");
+      if (
+        res.status === 409 &&
+        data?.detail?.type === "REST_PERIOD_WARNING"
+      ) {
+        const error: any = new Error(data.detail.message);
+        error.type = "REST_PERIOD_WARNING";
+        throw error;
+      }
+
+      throw new Error(
+        typeof data?.detail === "string"
+          ? data.detail
+          : "Failed to update assignment"
+      );
     }
 
     return data;
@@ -811,7 +826,6 @@ export function ScheduleGenerator({
     const existing = getAssignment();
 
     if (
-      scheduleWeekOffset === 0 &&
       scheduleMode === "saved" &&
       existing?.schedule_id
     ) {
@@ -842,8 +856,48 @@ export function ScheduleGenerator({
         return;
       } catch (err) {
         console.error(err);
-        toast.error("Failed to update this week's assignment");
-        return;
+        if ((err as any)?.type === "REST_PERIOD_WARNING") {
+        const confirmed = window.confirm(
+          `${(err as Error).message}\n\nDo you want to assign anyway?`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          await updatePublishedAssignment(
+            existing.schedule_id,
+            selectedEmployee.id,
+            true
+          );
+
+          toast.success("Assignment updated with rest-period override");
+          await loadSchedule();
+
+          setIsDialogOpen(false);
+          setEmployeeName("");
+          setSelectedEmployeeId("");
+          setSelectedCell(null);
+          return;
+        } catch (retryErr) {
+          console.error(retryErr);
+          toast.error(
+            retryErr instanceof Error
+              ? retryErr.message
+              : "Failed to update assignment"
+          );
+          return;
+        }
+      }
+
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update assignment"
+      );
+
+      return;
       }
     }
 
@@ -911,7 +965,6 @@ export function ScheduleGenerator({
     const existing = getAssignment();
 
     if (
-      scheduleWeekOffset === 0 &&
       scheduleMode === "saved" &&
       existing?.schedule_id
     ) {

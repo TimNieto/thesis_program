@@ -356,6 +356,9 @@ def validate_individual_constraints(
         cleaned_assignment["shift_date"] = shift["shift_date"]
         cleaned_assignment["shift_type"] = shift["shift_type"]
         cleaned_assignment["account"] = shift["account"]
+        cleaned_assignment["start_time"] = shift.get("start_time")
+        cleaned_assignment["end_time"] = shift.get("end_time")
+        cleaned_assignment["is_overnight"] = bool(shift.get("is_overnight", False))
 
         replay_assignment(context, cleaned_assignment)
         valid_assignments.append(cleaned_assignment)
@@ -381,7 +384,10 @@ def make_assignment(employee, shift, role, slot_index=0):
         "employee_name": employee["full_name"],
         "role": role,
         "slot_index": slot_index,
-        "relaxation_level": "ga_optimized"
+        "relaxation_level": "ga_optimized",
+        "start_time": shift.get("start_time"),
+        "end_time": shift.get("end_time"),
+        "is_overnight": bool(shift.get("is_overnight", False))
     }
 
 

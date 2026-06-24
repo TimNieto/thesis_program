@@ -103,6 +103,8 @@ export function CompanySettings({
 
       setMaxConsecutiveWorkingDays(String(data.max_working_days));
 
+      setMinRestPeriod(String(data.min_rest_period_hours ?? 8));
+
       setMaxShiftsPerEmployee(String(data.max_shifts_per_week));
 
       setShiftsPerDay(String(data.max_shifts_per_day));
@@ -178,6 +180,7 @@ export function CompanySettings({
             company_name: companyName,
             company_type: companyType,
             max_working_days: Number(maxConsecutiveWorkingDays),
+            min_rest_period_hours: Number(minRestPeriod),
             max_shifts_per_day: Number(shiftsPerDay),
             max_shifts_per_week: Number(maxShiftsPerEmployee),
             allow_double_shifts: doubleShiftAllowance,

@@ -558,6 +558,162 @@ def schedule_time_conflict_error(
 
     return None
 
+def schedule_rest_period_warning(
+    cursor,
+    employee_id: int,
+    target_schedule_id: int,
+    company_id: int
+):
+    cursor.execute("""
+        WITH settings AS (
+            SELECT
+                COALESCE(min_rest_period_hours, 0) AS min_rest_hours
+            FROM company_settings
+            WHERE company_id = %s
+            LIMIT 1
+        ),
+
+        target_shift AS (
+            SELECT
+                gs.schedule_id,
+                s.shift_date,
+                st.start_time,
+                st.end_time,
+                (s.shift_date + st.start_time) AS target_start_at,
+                (
+                    s.shift_date
+                    + st.end_time
+                    + CASE
+                        WHEN st.end_time <= st.start_time
+                        THEN INTERVAL '1 day'
+                        ELSE INTERVAL '0 day'
+                      END
+                ) AS target_end_at
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
+            WHERE gs.schedule_id = %s
+            AND gs.company_id = %s
+            AND gs.is_archived = FALSE
+            LIMIT 1
+        ),
+
+        existing_assignments AS (
+            SELECT
+                gs.schedule_id,
+                a.account_name,
+                st.shift_name,
+                s.shift_date,
+                st.start_time,
+                st.end_time,
+                (s.shift_date + st.start_time) AS existing_start_at,
+                (
+                    s.shift_date
+                    + st.end_time
+                    + CASE
+                        WHEN st.end_time <= st.start_time
+                        THEN INTERVAL '1 day'
+                        ELSE INTERVAL '0 day'
+                      END
+                ) AS existing_end_at
+            FROM generated_schedule gs
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+            JOIN shift_templates st
+                ON s.shift_template_id = st.shift_template_id
+                AND s.company_id = st.company_id
+                AND s.account_id = st.account_id
+            JOIN accounts a
+                ON s.account_id = a.account_id
+                AND s.company_id = a.company_id
+            CROSS JOIN target_shift target
+            WHERE gs.company_id = %s
+            AND gs.employee_id = %s
+            AND gs.is_archived = FALSE
+            AND gs.schedule_id <> %s
+            AND s.shift_date BETWEEN
+                target.shift_date - INTERVAL '1 day'
+                AND target.shift_date + INTERVAL '1 day'
+        ),
+
+        rest_checks AS (
+            SELECT
+                ea.account_name,
+                ea.shift_name,
+                ea.shift_date,
+                ea.start_time,
+                ea.end_time,
+                settings.min_rest_hours,
+
+                CASE
+                    WHEN ea.existing_end_at <= target.target_start_at
+                    THEN target.target_start_at - ea.existing_end_at
+
+                    WHEN target.target_end_at <= ea.existing_start_at
+                    THEN ea.existing_start_at - target.target_end_at
+
+                    ELSE INTERVAL '0 hours'
+                END AS rest_gap
+            FROM existing_assignments ea
+            CROSS JOIN target_shift target
+            CROSS JOIN settings
+            WHERE settings.min_rest_hours > 0
+
+            -- Do not handle actual overlap here.
+            -- Actual overlap is already a hard error in schedule_time_conflict_error().
+            AND NOT (
+                ea.existing_start_at < target.target_end_at
+                AND ea.existing_end_at > target.target_start_at
+            )
+        )
+
+        SELECT
+            account_name,
+            shift_name,
+            shift_date,
+            start_time,
+            end_time,
+            min_rest_hours,
+            ROUND(EXTRACT(EPOCH FROM rest_gap) / 3600.0, 2) AS rest_hours
+        FROM rest_checks
+        WHERE rest_gap < (min_rest_hours * INTERVAL '1 hour')
+        ORDER BY rest_gap ASC
+        LIMIT 1
+    """, (
+        company_id,
+        target_schedule_id,
+        company_id,
+        company_id,
+        employee_id,
+        target_schedule_id
+    ))
+
+    row = cursor.fetchone()
+
+    if not row:
+        return None
+
+    account_name = row[0]
+    shift_name = row[1]
+    shift_date = row[2]
+    start_time = row[3]
+    end_time = row[4]
+    min_rest_hours = row[5]
+    rest_hours = row[6]
+
+    return (
+        f"This assignment gives the employee only {rest_hours} hours of rest. "
+        f"The required minimum is {min_rest_hours} hours. "
+        f"Nearby shift: {account_name} / {shift_name} on {shift_date} "
+        f"({start_time} - {end_time})."
+    )
+
 
 def get_week_bounds_for_shift(cursor, coverage_request_id: int):
     cursor.execute("""
@@ -2674,6 +2830,12 @@ def update_generated_schedule_employee(
         employee_id = payload.get("employee_id")
         updated_by = payload.get("updated_by")
 
+        force_rest_override = bool(
+            payload.get("force_rest_override", False)
+        )
+
+        rest_warning = None
+
         if not company_id:
             raise HTTPException(
                 status_code=400,
@@ -2738,6 +2900,22 @@ def update_generated_schedule_employee(
                 raise HTTPException(
                     status_code=400,
                     detail=conflict_error
+                )
+            
+            rest_warning = schedule_rest_period_warning(
+                cursor,
+                int(employee_id),
+                schedule_id,
+                company_id
+            )
+
+            if rest_warning and not force_rest_override:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "type": "REST_PERIOD_WARNING",
+                        "message": rest_warning
+                    }
                 )
 
         # Void cover data only for this one schedule slot.
@@ -2834,7 +3012,8 @@ def update_generated_schedule_employee(
         return {
             "message": "Schedule assignment updated",
             "schedule_id": schedule_id,
-            "employee_id": employee_id
+            "employee_id": employee_id,
+            "warning": rest_warning
         }
 
     except HTTPException:

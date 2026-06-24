@@ -17,6 +17,7 @@ def ensure_company_settings(cursor, company_id: int):
         INSERT INTO company_settings (
             company_id,
             max_working_days,
+            min_rest_period_hours,
             max_shifts_per_day,
             max_shifts_per_week,
             allow_double_shifts,
@@ -26,7 +27,7 @@ def ensure_company_settings(cursor, company_id: int):
             gy_fatigue_penalty,
             absence_tolerance
         )
-        VALUES (%s, 7, 2, 7, FALSE, 2, 'Automatic', TRUE, 20, 50)
+        VALUES (%s, 7, 8, 2, 7, FALSE, 2, 'Automatic', TRUE, 20, 50)
         ON CONFLICT (company_id)
         DO NOTHING
     """, (company_id,))

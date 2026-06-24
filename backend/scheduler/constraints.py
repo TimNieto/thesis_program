@@ -161,6 +161,88 @@ def already_assigned_same_time(employee_id, shift, context):
 
     return False
 
+def to_time(value):
+    if value is None:
+        return None
+
+    if hasattr(value, "hour") and hasattr(value, "minute"):
+        return value
+
+    value = str(value).strip()
+
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(value, fmt).time()
+        except ValueError:
+            pass
+
+    return None
+
+
+def shift_start_end_at(shift):
+    shift_date = to_date(shift["shift_date"])
+    start_time = to_time(shift.get("start_time"))
+    end_time = to_time(shift.get("end_time"))
+
+    if not start_time or not end_time:
+        return None, None
+
+    start_at = datetime.combine(shift_date, start_time)
+    end_at = datetime.combine(shift_date, end_time)
+
+    if end_at <= start_at:
+        end_at += timedelta(days=1)
+
+    return start_at, end_at
+
+
+def violates_time_overlap_or_min_rest(employee_id, shift, context):
+    assignments = context["context_assignments_by_employee"].get(
+        employee_id,
+        []
+    )
+
+    candidate_start, candidate_end = shift_start_end_at(shift)
+
+    # Fallback to old behavior if time data is missing.
+    if not candidate_start or not candidate_end:
+        return already_assigned_same_time(employee_id, shift, context)
+
+    try:
+        min_rest_hours = int(
+            context["settings"].get("min_rest_period_hours") or 0
+        )
+    except (TypeError, ValueError):
+        min_rest_hours = 0
+
+    for assignment in assignments:
+        existing_start, existing_end = shift_start_end_at(assignment)
+
+        if not existing_start or not existing_end:
+            continue
+
+        # Hard block actual overlap.
+        if existing_start < candidate_end and existing_end > candidate_start:
+            return True
+
+        # Hard block insufficient rest.
+        if min_rest_hours > 0:
+            if existing_end <= candidate_start:
+                rest_hours = (
+                    candidate_start - existing_end
+                ).total_seconds() / 3600
+            elif candidate_end <= existing_start:
+                rest_hours = (
+                    existing_start - candidate_end
+                ).total_seconds() / 3600
+            else:
+                rest_hours = 0
+
+            if rest_hours < min_rest_hours:
+                return True
+
+    return False
+
 def assigned_count_same_day(employee_id, shift, context):
     count = 0
 
@@ -196,7 +278,7 @@ def is_valid_candidate(employee, shift, role, context):
     if already_assigned(employee_id, shift_id, context):
         return False
     
-    if already_assigned_same_time(employee_id, shift, context):
+    if violates_time_overlap_or_min_rest(employee_id, shift, context):
         return False
     
     allow_double_shifts = context["settings"].get("allow_double_shifts", False)
