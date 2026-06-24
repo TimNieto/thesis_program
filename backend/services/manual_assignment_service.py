@@ -1458,8 +1458,7 @@ def create_manual_assignment_request(
     requested_by_employee_id: int,
     target_employee_id: int,
     previous_employee_id,
-    warning_conditions: list,
-    admin_note: str | None = None
+    warning_conditions: list
 ):
     cursor.execute("""
         SELECT
@@ -1521,10 +1520,9 @@ def create_manual_assignment_request(
             target_employee_id,
             previous_employee_id,
             status,
-            warning_conditions,
-            admin_note
+            warning_conditions
         )
-        VALUES (%s, %s, %s, %s, %s, 'pending', %s::jsonb, %s)
+        VALUES (%s, %s, %s, %s, %s, 'pending', %s::jsonb)
         RETURNING manual_assignment_request_id
     """, (
         company_id,
@@ -1532,8 +1530,7 @@ def create_manual_assignment_request(
         requested_by_employee_id,
         target_employee_id,
         previous_employee_id,
-        json.dumps(warning_conditions),
-        admin_note
+        json.dumps(warning_conditions)
     ))
 
     request_id = cursor.fetchone()[0]
@@ -1565,8 +1562,7 @@ def apply_manual_assignment_request(
     cursor,
     request_id: int,
     company_id: int,
-    employee_id: int,
-    employee_response_note: str | None = None
+    employee_id: int
 ):
     cursor.execute("""
         SELECT
@@ -1613,13 +1609,11 @@ def apply_manual_assignment_request(
             UPDATE manual_assignment_requests
             SET
                 status = 'failed',
-                employee_response_note = %s,
                 responded_at = NOW(),
                 updated_at = NOW()
             WHERE manual_assignment_request_id = %s
             AND company_id = %s
         """, (
-            "Request failed because assignment is no longer valid.",
             request_id,
             company_id
         ))
@@ -1639,14 +1633,12 @@ def apply_manual_assignment_request(
         UPDATE manual_assignment_requests
         SET
             status = 'accepted',
-            employee_response_note = %s,
             responded_at = NOW(),
             applied_at = NOW(),
             updated_at = NOW()
         WHERE manual_assignment_request_id = %s
         AND company_id = %s
     """, (
-        employee_response_note,
         request_id,
         company_id
     ))
@@ -1669,8 +1661,7 @@ def reject_manual_assignment_request(
     cursor,
     request_id: int,
     company_id: int,
-    employee_id: int,
-    employee_response_note: str | None = None
+    employee_id: int
 ):
     cursor.execute("""
         SELECT
@@ -1701,13 +1692,11 @@ def reject_manual_assignment_request(
         UPDATE manual_assignment_requests
         SET
             status = 'rejected',
-            employee_response_note = %s,
             responded_at = NOW(),
             updated_at = NOW()
         WHERE manual_assignment_request_id = %s
         AND company_id = %s
     """, (
-        employee_response_note,
         request_id,
         company_id
     ))

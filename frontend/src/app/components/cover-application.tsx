@@ -140,8 +140,6 @@ interface ManualAssignmentRequest {
     message?: string;
   }[];
 
-  admin_note?: string | null;
-  employee_response_note?: string | null;
   requested_at?: string | null;
 }
 
@@ -542,8 +540,6 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
             ? r.warning_conditions
             : [],
 
-          admin_note: r.admin_note || null,
-          employee_response_note: r.employee_response_note || null,
           requested_at: r.requested_at || null,
         })),
       );

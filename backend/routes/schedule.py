@@ -2834,7 +2834,6 @@ def update_generated_schedule_employee(
         company_id = payload.get("company_id")
         employee_id = payload.get("employee_id")
         updated_by = payload.get("updated_by")
-        admin_note = payload.get("admin_note")
 
         if not company_id:
             raise HTTPException(
@@ -2905,8 +2904,7 @@ def update_generated_schedule_employee(
             int(updated_by) if updated_by else employee_id,
             employee_id,
             target["previous_employee_id"],
-            warnings,
-            admin_note
+            warnings
         )
 
         if request["already_exists"]:
