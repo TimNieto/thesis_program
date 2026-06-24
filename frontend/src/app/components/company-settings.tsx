@@ -78,6 +78,7 @@ export function CompanySettings({
   const [absenceTolerance, setAbsenceTolerance] = useState("50");
   const [accountPolicies, setAccountPolicies] = useState<any[]>([]);
   const [savingChanges, setSavingChanges] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   const isReadOnly = currentUser.role === "super-admin";
 
@@ -153,20 +154,17 @@ export function CompanySettings({
     }
   };
 
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = () => {
     if (isReadOnly) {
       toast.info("Super admin can only view company settings");
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to save all company setting changes?",
-    );
+    setShowSaveConfirm(true);
+  };
 
-    if (!confirmed) {
-      return;
-    }
-
+  const confirmSaveChanges = async () => {
+    setShowSaveConfirm(false);
     setSavingChanges(true);
 
     try {
@@ -695,7 +693,34 @@ export function CompanySettings({
           </Card>
         )}
       </div>
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader>
+              <CardTitle>Save Company Settings?</CardTitle>
+              <CardDescription>
+                This will apply all company setting changes.
+              </CardDescription>
+            </CardHeader>
 
+            <CardContent>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSaveConfirm(false)}
+                  disabled={savingChanges}
+                >
+                  Cancel
+                </Button>
+
+                <Button onClick={confirmSaveChanges} disabled={savingChanges}>
+                  {savingChanges ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       {/* Action Bar */}
       {!isReadOnly && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
