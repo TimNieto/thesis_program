@@ -66,6 +66,9 @@ interface GeneralData {
   vacantShifts: number;
 
   totalAbsences: number;
+  maxAbsencesPerMonth: number;
+  activeEmployeeCount: number;
+  employeesOverAbsenceLimit: number;
 
   totalLeaveRequests: number;
   approvedLeaveRequests: number;
@@ -102,6 +105,9 @@ interface EmployeeData {
   deniedCoverApplications: number;
 
   absences: number;
+  maxAbsencesPerMonth: number;
+  absenceStatus: string;
+  isAbsenceLimitExceeded: boolean;
   leaves: number;
 }
 
@@ -120,6 +126,9 @@ export function DataReport({ currentUser }: DataReportProps) {
     vacantShifts: 0,
 
     totalAbsences: 0,
+    maxAbsencesPerMonth: 0,
+    activeEmployeeCount: 0,
+    employeesOverAbsenceLimit: 0,
 
     totalLeaveRequests: 0,
     approvedLeaveRequests: 0,
@@ -156,16 +165,26 @@ export function DataReport({ currentUser }: DataReportProps) {
     }
   };
 
-  const getUtilizationColor = (utilization: number) => {
-    if (utilization >= 90) return "text-green-600";
-    if (utilization >= 70) return "text-yellow-600";
-    return "text-red-600";
-  };
-
   const getUtilizationBadge = (utilization: number) => {
     if (utilization >= 90) return "default";
     if (utilization >= 70) return "secondary";
     return "destructive";
+  };
+
+  const getAbsenceStatusClass = (status: string, isExceeded: boolean) => {
+    if (isExceeded || status === "Exceeded") {
+      return "border-red-200 bg-red-50 text-red-700";
+    }
+
+    if (status === "At Limit") {
+      return "border-orange-200 bg-orange-50 text-orange-700";
+    }
+
+    if (status === "No Limit") {
+      return "border-gray-200 bg-gray-50 text-gray-600";
+    }
+
+    return "border-green-200 bg-green-50 text-green-700";
   };
 
   const fetchReports = async () => {
@@ -229,6 +248,7 @@ export function DataReport({ currentUser }: DataReportProps) {
         "Cover Requests",
         "Cover Applications",
         "Absences",
+        "Absence Status",
         "Leaves",
       ],
       ...filteredEmployeeData.map((emp) => [
@@ -239,6 +259,9 @@ export function DataReport({ currentUser }: DataReportProps) {
         emp.coverageRequests,
         emp.coverApplications,
         emp.absences,
+        emp.maxAbsencesPerMonth > 0
+          ? `${emp.absences}/${emp.maxAbsencesPerMonth} ${emp.absenceStatus}`
+          : `${emp.absences} ${emp.absenceStatus}`,
         emp.leaves,
       ]),
     ];
@@ -433,7 +456,6 @@ export function DataReport({ currentUser }: DataReportProps) {
                         </p>
                       </div>
                     </div>
-
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">
@@ -445,14 +467,43 @@ export function DataReport({ currentUser }: DataReportProps) {
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-bold text-orange-600">
-                          {employeeData.length > 0
+                          {generalData.activeEmployeeCount > 0
                             ? (
-                                generalData.totalAbsences / employeeData.length
+                                generalData.totalAbsences /
+                                generalData.activeEmployeeCount
                               ).toFixed(1)
                             : "0.0"}
                         </p>
                         <p className="text-xs text-gray-500">
                           {generalData.totalAbsences} total absences
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <p className="font-medium">
+                          Employees Over Absence Limit
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Based on max absences per employee
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`text-2xl font-bold ${
+                            generalData.employeesOverAbsenceLimit > 0
+                              ? "text-red-600"
+                              : "text-green-600"
+                          }`}
+                        >
+                          {generalData.employeesOverAbsenceLimit}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {generalData.employeesOverAbsenceLimit} /{" "}
+                          {generalData.activeEmployeeCount} employees
+                          {generalData.maxAbsencesPerMonth > 0
+                            ? ` • Limit ${generalData.maxAbsencesPerMonth}`
+                            : " • No limit"}
                         </p>
                       </div>
                     </div>
@@ -516,6 +567,7 @@ export function DataReport({ currentUser }: DataReportProps) {
                       <TableHead>Cover Requests</TableHead>
                       <TableHead>Cover Applications</TableHead>
                       <TableHead>Absences</TableHead>
+                      <TableHead>Absence Status</TableHead>
                       <TableHead>Leaves</TableHead>
                       <TableHead>Workload</TableHead>
                       <TableHead>Utilization</TableHead>
@@ -561,11 +613,10 @@ export function DataReport({ currentUser }: DataReportProps) {
                             </span>
                           </div>
                         </TableCell>
-
                         <TableCell>
                           <Badge
                             variant={
-                              employee.absences > 2
+                              employee.isAbsenceLimitExceeded
                                 ? "destructive"
                                 : "secondary"
                             }
@@ -573,7 +624,24 @@ export function DataReport({ currentUser }: DataReportProps) {
                             {employee.absences}
                           </Badge>
                         </TableCell>
-
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Badge
+                              variant="outline"
+                              className={getAbsenceStatusClass(
+                                employee.absenceStatus,
+                                employee.isAbsenceLimitExceeded,
+                              )}
+                            >
+                              {employee.maxAbsencesPerMonth > 0
+                                ? `${employee.absences} / ${employee.maxAbsencesPerMonth}`
+                                : `${employee.absences}`}
+                            </Badge>
+                            <span className="text-xs text-gray-500">
+                              {employee.absenceStatus}
+                            </span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant={

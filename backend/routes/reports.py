@@ -156,6 +156,55 @@ def get_general_report(company_id: int, period: str = "this-week"):
         total_absences = cursor.fetchone()[0] or 0
 
         cursor.execute("""
+            SELECT COALESCE(absence_tolerance, 0)
+            FROM company_settings
+            WHERE company_id = %s
+            LIMIT 1
+        """, (company_id,))
+
+        absence_limit_row = cursor.fetchone()
+
+        max_absences_per_month = (
+            int(absence_limit_row[0] or 0)
+            if absence_limit_row
+            else 0
+        )
+
+        cursor.execute("""
+            WITH employee_absences AS (
+                SELECT
+                    e.employee_id,
+                    COUNT(ab.absence_id) AS absence_count
+                FROM employees e
+                LEFT JOIN absences ab
+                    ON ab.employee_id = e.employee_id
+                    AND ab.company_id = e.company_id
+                    AND ab.status = 'approved'
+                    AND ab.date BETWEEN %s AND %s
+                WHERE e.company_id = %s
+                AND e.employment_status = 'Active'
+                GROUP BY e.employee_id
+            )
+
+            SELECT
+                COUNT(*) AS active_employee_count,
+                COUNT(*) FILTER (
+                    WHERE absence_count > %s
+                ) AS employees_over_absence_limit
+            FROM employee_absences
+        """, (
+            start,
+            end,
+            company_id,
+            max_absences_per_month
+        ))
+
+        absence_limit_summary = cursor.fetchone()
+
+        active_employee_count = absence_limit_summary[0] or 0
+        employees_over_absence_limit = absence_limit_summary[1] or 0
+
+        cursor.execute("""
             SELECT COUNT(DISTINCT request_id)
             FROM leaves
             WHERE company_id = %s
@@ -344,6 +393,9 @@ def get_general_report(company_id: int, period: str = "this-week"):
             "vacantShifts": vacant_shifts,
 
             "totalAbsences": total_absences,
+            "maxAbsencesPerMonth": max_absences_per_month,
+            "activeEmployeeCount": active_employee_count,
+            "employeesOverAbsenceLimit": employees_over_absence_limit,
 
             "totalLeaveRequests": total_leave_requests,
             "approvedLeaveRequests": approved_leave_requests,
@@ -377,17 +429,23 @@ def get_employee_report(company_id: int, period: str = "this-week"):
         weeks_in_period = get_weeks_in_period(start, end)
 
         cursor.execute("""
-            SELECT max_shifts_per_week
+            SELECT
+                max_shifts_per_week,
+                COALESCE(absence_tolerance, 0)
             FROM company_settings
             WHERE company_id = %s
             LIMIT 1
         """, (company_id,))
 
         settings_row = cursor.fetchone()
+
         max_shifts_per_week = settings_row[0] if settings_row else 7
+        max_absences_per_month = settings_row[1] if settings_row else 0
 
         if not max_shifts_per_week:
             max_shifts_per_week = 7
+
+        max_absences_per_month = int(max_absences_per_month or 0)
 
         max_workload = int(max_shifts_per_week) * weeks_in_period
 
@@ -682,6 +740,17 @@ def get_employee_report(company_id: int, period: str = "this-week"):
                     1
                 )
 
+            absences = row[11] or 0
+
+            if max_absences_per_month <= 0:
+                absence_status = "No Limit"
+            elif absences > max_absences_per_month:
+                absence_status = "Exceeded"
+            elif absences == max_absences_per_month:
+                absence_status = "At Limit"
+            else:
+                absence_status = "OK"
+
             employees.append({
                 "employee_id": employee_id,
                 "name": name,
@@ -702,7 +771,14 @@ def get_employee_report(company_id: int, period: str = "this-week"):
                 "pendingCoverApplications": row[9] or 0,
                 "deniedCoverApplications": row[10] or 0,
 
-                "absences": row[11] or 0,
+                "absences": absences,
+                "maxAbsencesPerMonth": max_absences_per_month,
+                "absenceStatus": absence_status,
+                "isAbsenceLimitExceeded": (
+                    max_absences_per_month > 0
+                    and absences > max_absences_per_month
+                ),
+
                 "leaves": row[12] or 0,
             })
 
@@ -711,6 +787,7 @@ def get_employee_report(company_id: int, period: str = "this-week"):
             "start": str(start),
             "end": str(end),
             "maxShiftsPerWeekUsed": max_shifts_per_week,
+            "maxAbsencesPerMonth": max_absences_per_month,
             "weeksInPeriod": weeks_in_period,
             "maxWorkload": max_workload,
             "isUtilizationApproximate": period not in ("this-week", "next-week"),

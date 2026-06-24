@@ -4,7 +4,10 @@
 from fastapi import APIRouter, Body, HTTPException
 from services.schedule_service import generate_weekly_schedule, get_generated_schedule
 from db.database import get_connection
-from services.notification_service import create_notification
+from services.notification_service import (
+    create_notification,
+    notify_absence_limit_if_exceeded,
+)
 from datetime import datetime, timedelta
 from services.role_service import get_company_admin_employee_ids
 from services.manual_assignment_service import (
@@ -106,6 +109,14 @@ def record_absence_from_filled_cover(
         shift_id,
         role_id
     ))
+
+    notify_absence_limit_if_exceeded(
+        cursor,
+        company_id,
+        requester_id,
+        shift_date,
+        related_id=schedule_id
+    )
 
 
 def archive_cover_history_for_schedule_ids(
@@ -1090,6 +1101,15 @@ def mark_generated_schedule_absent(
             shift_id,
             role_id
         ))
+
+        notify_absence_limit_if_exceeded(
+            cursor,
+            company_id,
+            employee_id,
+            shift_date,
+            sender_employee_id=marked_by,
+            related_id=schedule_id
+        )
 
         create_notification(
             cursor,
