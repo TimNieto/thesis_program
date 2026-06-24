@@ -1172,6 +1172,120 @@ def mark_generated_schedule_absent(
         cursor.close()
         conn.close()
 
+
+@router.patch("/generated-schedule/{schedule_id}/unmark-absent")
+def unmark_generated_schedule_absent(
+    schedule_id: int,
+    payload: dict = Body(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        company_id = payload.get("company_id")
+
+        if not company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="company_id is required"
+            )
+
+        cursor.execute("""
+            SELECT
+                gs.schedule_id,
+                gs.employee_id,
+                s.shift_date,
+                e.full_name
+            FROM generated_schedule gs
+
+            JOIN shifts s
+                ON gs.shift_id = s.shift_id
+                AND gs.company_id = s.company_id
+
+            JOIN employees e
+                ON gs.employee_id = e.employee_id
+                AND gs.company_id = e.company_id
+
+            WHERE gs.schedule_id = %s
+            AND gs.company_id = %s
+            AND gs.is_archived = FALSE
+            AND e.employment_status = 'Active'
+            LIMIT 1
+        """, (
+            schedule_id,
+            company_id
+        ))
+
+        row = cursor.fetchone()
+
+        if not row:
+            raise HTTPException(
+                status_code=404,
+                detail="Active assigned schedule row not found"
+            )
+
+        (
+            schedule_id,
+            employee_id,
+            shift_date,
+            employee_name
+        ) = row
+
+        today = datetime.today().date()
+        current_week_start = today - timedelta(days=today.weekday())
+        current_week_end = current_week_start + timedelta(days=6)
+
+        if shift_date < current_week_start or shift_date > current_week_end:
+            raise HTTPException(
+                status_code=400,
+                detail="Only this week's schedule can be unmarked absent"
+            )
+
+        cursor.execute("""
+            DELETE FROM absences
+            WHERE company_id = %s
+            AND employee_id = %s
+            AND date = %s
+            RETURNING absence_id
+        """, (
+            company_id,
+            employee_id,
+            shift_date
+        ))
+
+        deleted_row = cursor.fetchone()
+
+        conn.commit()
+
+        return {
+            "message": (
+                "Employee unmarked as absent"
+                if deleted_row
+                else "Employee was not marked absent"
+            ),
+            "schedule_id": schedule_id,
+            "employee_id": employee_id,
+            "employee_name": employee_name,
+            "shift_date": str(shift_date),
+            "is_absent": False
+        }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
+    except Exception as e:
+        conn.rollback()
+        print("UNMARK ABSENT ERROR:", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to unmark employee as absent"
+        )
+
+    finally:
+        cursor.close()
+        conn.close()
+
     
 @router.post("/request-cover/{schedule_id}")
 def request_cover(schedule_id: int, payload: dict):

@@ -501,6 +501,7 @@ export function ScheduleGenerator({
     assignmentId?: string;
   } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showMarkAbsentConfirm, setShowMarkAbsentConfirm] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
@@ -770,7 +771,30 @@ export function ScheduleGenerator({
     return data;
   };
 
-  const handleMarkAbsent = async () => {
+  const unmarkPublishedAssignmentAbsent = async (scheduleId: number) => {
+    const res = await fetch(
+      `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/unmark-absent`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_id: companyId,
+        }),
+      },
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to unmark absent");
+    }
+
+    return data;
+  };
+
+  const handleMarkAbsent = () => {
     const existing = getAssignment();
 
     if (!existing?.schedule_id || !existing.employee_id) {
@@ -788,11 +812,15 @@ export function ScheduleGenerator({
       return;
     }
 
-    const confirmed = window.confirm(
-      `Mark ${existing.employee} as absent for this shift? This will record an uninformed absence and keep the employee visible in the schedule.`,
-    );
+    setShowMarkAbsentConfirm(true);
+  };
 
-    if (!confirmed) {
+  const confirmMarkAbsent = async () => {
+    const existing = getAssignment();
+
+    if (!existing?.schedule_id || !existing.employee_id) {
+      toast.error("No assigned employee selected");
+      setShowMarkAbsentConfirm(false);
       return;
     }
 
@@ -803,6 +831,7 @@ export function ScheduleGenerator({
 
       await loadSchedule();
 
+      setShowMarkAbsentConfirm(false);
       setIsDialogOpen(false);
       setEmployeeName("");
       setSelectedEmployeeId("");
@@ -810,6 +839,41 @@ export function ScheduleGenerator({
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to mark absent");
+    }
+  };
+
+  const handleUnmarkAbsent = async () => {
+    const existing = getAssignment();
+
+    if (!existing?.schedule_id || !existing.employee_id) {
+      toast.error("No assigned employee selected");
+      return;
+    }
+
+    if (!existing.is_absent) {
+      toast.info("Employee is not marked absent");
+      return;
+    }
+
+    if (scheduleWeekOffset !== 0 || scheduleMode !== "saved") {
+      toast.error("Only this week's published schedule can be unmarked absent");
+      return;
+    }
+
+    try {
+      await unmarkPublishedAssignmentAbsent(existing.schedule_id);
+
+      toast.success("Employee unmarked as absent");
+
+      await loadSchedule();
+
+      setIsDialogOpen(false);
+      setEmployeeName("");
+      setSelectedEmployeeId("");
+      setSelectedCell(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to unmark absent");
     }
   };
 
@@ -1930,6 +1994,19 @@ export function ScheduleGenerator({
                 </Button>
               )}
 
+            {selectedCell &&
+              getAssignment()?.employee_id &&
+              scheduleWeekOffset === 0 &&
+              scheduleMode === "saved" &&
+              getAssignment()?.is_absent && (
+                <Button
+                  variant="secondary"
+                  onClick={handleUnmarkAbsent}
+                  className="gap-2"
+                >
+                  Unmark as Absent
+                </Button>
+              )}
             {selectedCell && getAssignment()?.employee_id && (
               <Button
                 variant="destructive"
@@ -1949,6 +2026,57 @@ export function ScheduleGenerator({
               {selectedCell && getAssignment()?.employee_id
                 ? "Update"
                 : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showMarkAbsentConfirm}
+        onOpenChange={setShowMarkAbsentConfirm}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Employee as Absent?</DialogTitle>
+            <DialogDescription>
+              This will record an uninformed absence and keep the employee
+              visible in the schedule.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 py-4 text-sm">
+            <div>
+              <strong>Employee:</strong> {getAssignment()?.employee}
+            </div>
+
+            {selectedCell && (
+              <>
+                <div>
+                  <strong>Livestream:</strong> {selectedCell.livestream}
+                </div>
+                <div>
+                  <strong>Day:</strong> {selectedCell.day}
+                </div>
+                <div>
+                  <strong>Shift:</strong> {selectedCell.shift}
+                </div>
+                <div>
+                  <strong>Role:</strong> {selectedCell.role}
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowMarkAbsentConfirm(false)}
+            >
+              Cancel
+            </Button>
+
+            <Button variant="secondary" onClick={confirmMarkAbsent}>
+              Mark as Absent
             </Button>
           </DialogFooter>
         </DialogContent>
