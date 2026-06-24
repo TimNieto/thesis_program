@@ -882,6 +882,7 @@ export function ScheduleGenerator({
       toast.error("Please select an employee");
       return;
     }
+    
 
     const selectedEmployee = employees.find(
       (emp) => emp.id === Number(selectedEmployeeId),
