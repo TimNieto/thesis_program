@@ -146,6 +146,22 @@ export function DataReport({ currentUser }: DataReportProps) {
   const [employeeData, setEmployeeData] = useState<EmployeeData[]>([]);
   const [loading, setLoading] = useState(false);
 
+  type SortKey =
+  | "name"
+  | "totalShifts"
+  | "coverageRequests"
+  | "coverApplications"
+  | "absences"
+  | "absenceStatus"
+  | "leaves"
+  | "assignedWorkload"
+  | "utilization";
+
+type SortDirection = "asc" | "desc";
+
+const [sortKey, setSortKey] = useState<SortKey>("name");
+const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
   const getTimePeriodLabel = () => {
     switch (timePeriod) {
       case "this-week":
@@ -238,6 +254,52 @@ export function DataReport({ currentUser }: DataReportProps) {
     fetchReports();
   }, [timePeriod, currentUser.company_id]);
 
+  const toggleSort = (key: SortKey) => {
+  if (sortKey === key) {
+    setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+    return;
+  }
+
+  setSortKey(key);
+  setSortDirection("asc");
+};
+
+const getAbsenceStatusRank = (status: string) => {
+  switch (status) {
+    case "Exceeded":
+      return 4;
+    case "At Limit":
+      return 3;
+    case "OK":
+      return 2;
+    case "No Limit":
+      return 1;
+    default:
+      return 0;
+  }
+};
+
+const getSortValue = (employee: EmployeeData, key: SortKey) => {
+  switch (key) {
+    case "name":
+      return employee.name.toLowerCase();
+
+    case "absenceStatus":
+      return getAbsenceStatusRank(employee.absenceStatus);
+
+    case "assignedWorkload":
+      return employee.assignedWorkload;
+
+    default:
+      return employee[key] ?? 0;
+  }
+};
+
+const getSortIcon = (key: SortKey) => {
+  if (sortKey !== key) return "↕";
+  return sortDirection === "asc" ? "↑" : "↓";
+};
+
   const exportReport = () => {
     const rows = [
       [
@@ -284,6 +346,24 @@ export function DataReport({ currentUser }: DataReportProps) {
     selectedEmployee === "all"
       ? employeeData
       : employeeData.filter((emp) => emp.id === selectedEmployee);
+
+  const sortedEmployeeData = [...filteredEmployeeData].sort((a, b) => {
+    const aValue = getSortValue(a, sortKey);
+    const bValue = getSortValue(b, sortKey);
+
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return sortDirection === "asc"
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+
+    const numericA = Number(aValue) || 0;
+    const numericB = Number(bValue) || 0;
+
+    return sortDirection === "asc"
+      ? numericA - numericB
+      : numericB - numericA;
+  });
 
   return (
     <div className="space-y-6">
@@ -562,19 +642,99 @@ export function DataReport({ currentUser }: DataReportProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Employee Name</TableHead>
-                      <TableHead>Total Shifts</TableHead>
-                      <TableHead>Cover Requests</TableHead>
-                      <TableHead>Cover Applications</TableHead>
-                      <TableHead>Absences</TableHead>
-                      <TableHead>Absence Status</TableHead>
-                      <TableHead>Leaves</TableHead>
-                      <TableHead>Workload</TableHead>
-                      <TableHead>Utilization</TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("name")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Employee Name <span>{getSortIcon("name")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("totalShifts")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Total Shifts <span>{getSortIcon("totalShifts")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("coverageRequests")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Cover Requests <span>{getSortIcon("coverageRequests")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("coverApplications")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Cover Applications <span>{getSortIcon("coverApplications")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("absences")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Absences <span>{getSortIcon("absences")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("absenceStatus")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Absence Status <span>{getSortIcon("absenceStatus")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("leaves")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Leaves <span>{getSortIcon("leaves")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("assignedWorkload")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Workload <span>{getSortIcon("assignedWorkload")}</span>
+                        </button>
+                      </TableHead>
+
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("utilization")}
+                          className="flex items-center gap-1 font-semibold"
+                        >
+                          Utilization <span>{getSortIcon("utilization")}</span>
+                        </button>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredEmployeeData.map((employee) => (
+                    {sortedEmployeeData.map((employee) => (
                       <TableRow key={employee.id}>
                         <TableCell className="font-medium">
                           {employee.name}

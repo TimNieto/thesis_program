@@ -1643,6 +1643,16 @@ export function ScheduleGenerator({
 
   const weekLabel = scheduleWeekOffset === 0 ? "This Week" : "Next Week";
 
+  const formatWarningType = (type?: string) => {
+  if (!type) return "Warning";
+
+  return type
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -2126,10 +2136,13 @@ export function ScheduleGenerator({
               </div>
             )}
 
+            
+
+
             <div className="rounded-md border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900 space-y-2">
               {(pendingAssignmentWarning?.warnings || []).map((warning, index) => (
                 <div key={`${warning.type || "warning"}-${index}`}>
-                  <strong>{warning.type || "Warning"}:</strong>{" "}
+                  <strong>{formatWarningType(warning.type)}:</strong>{" "}
                   {warning.message || "This assignment has a warning."}
                 </div>
               ))}
