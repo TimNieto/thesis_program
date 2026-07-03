@@ -181,10 +181,34 @@ const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
     }
   };
 
-  const getUtilizationBadge = (utilization: number) => {
-    if (utilization >= 90) return "default";
-    if (utilization >= 70) return "secondary";
-    return "destructive";
+  const getUtilizationLabel = (utilization: number) => {
+    if (utilization > 100) return "Over Limit";
+    if (utilization >= 90) return "High";
+    if (utilization >= 50) return "Balanced";
+    return "Low";
+  };
+
+  const getUtilizationClassName = (utilization: number) => {
+    if (utilization > 100) {
+      return "border-red-200 bg-red-50 text-red-700";
+    }
+
+    if (utilization >= 90) {
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    }
+
+    if (utilization >= 50) {
+      return "border-green-200 bg-green-50 text-green-700";
+    }
+
+    return "border-gray-200 bg-gray-50 text-gray-700";
+  };
+
+  const getUtilizationBarClassName = (utilization: number) => {
+    if (utilization > 100) return "bg-red-500";
+    if (utilization >= 90) return "bg-amber-500";
+    if (utilization >= 50) return "bg-green-500";
+    return "bg-gray-400";
   };
 
   const getAbsenceStatusClass = (status: string, isExceeded: boolean) => {
@@ -823,28 +847,30 @@ const getSortIcon = (key: SortKey) => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                getUtilizationBadge(employee.utilization) as any
-                              }
-                            >
-                              {employee.utilization.toFixed(1)}%
-                            </Badge>
-                            <div className="w-24 bg-gray-200 rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  employee.utilization >= 90
-                                    ? "bg-green-600"
-                                    : employee.utilization >= 70
-                                      ? "bg-yellow-600"
-                                      : "bg-red-600"
-                                }`}
-                                style={{
-                                  width: `${Math.min(employee.utilization, 100)}%`,
-                                }}
-                              />
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className={getUtilizationClassName(employee.utilization)}
+                              >
+                                {employee.utilization.toFixed(1)}%
+                              </Badge>
+
+                              <div className="w-24 bg-gray-200 rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full ${getUtilizationBarClassName(
+                                    employee.utilization,
+                                  )}`}
+                                  style={{
+                                    width: `${Math.min(employee.utilization, 100)}%`,
+                                  }}
+                                />
+                              </div>
                             </div>
+
+                            <span className="text-xs text-gray-500">
+                              {getUtilizationLabel(employee.utilization)}
+                            </span>
                           </div>
                         </TableCell>
                       </TableRow>
