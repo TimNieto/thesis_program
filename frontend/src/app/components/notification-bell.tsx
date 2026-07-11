@@ -29,7 +29,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
   const fetchNotifications = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/notifications/${employeeId}`,
+        `https://backend-production-6e75.up.railway.app/notifications/${employeeId}`,
       );
 
       if (!res.ok) {
@@ -46,7 +46,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
   const fetchAllNotifications = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/notifications/all/${employeeId}`,
+        `https://backend-production-6e75.up.railway.app/notifications/all/${employeeId}`,
       );
 
       if (!res.ok) {
@@ -64,7 +64,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
   const fetchUnreadCount = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/notifications/${employeeId}/unread-count`,
+        `https://backend-production-6e75.up.railway.app/notifications/${employeeId}/unread-count`,
       );
 
       if (!res.ok) {
@@ -118,7 +118,7 @@ export function NotificationBell({ employeeId }: NotificationBellProps) {
   const markAllAsRead = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/notifications/${employeeId}/read-all`,
+        `https://backend-production-6e75.up.railway.app/notifications/${employeeId}/read-all`,
         {
           method: "PUT",
         },

@@ -355,7 +355,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchMyLeaves = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/leaves/${currentUser.employee_id}`,
+        `https://backend-production-6e75.up.railway.app/leaves/${currentUser.employee_id}`,
       );
 
       const data = await res.json();
@@ -391,7 +391,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/leaves?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/leaves?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -424,8 +424,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     try {
       const endpoint =
         role === "admin"
-          ? `${import.meta.env.VITE_API_URL}/coverage-requests-admin?company_id=${currentUser.company_id}`
-          : `${import.meta.env.VITE_API_URL}/coverage-requests/${currentUser.employee_id}`;
+          ? `https://backend-production-6e75.up.railway.app/coverage-requests-admin?company_id=${currentUser.company_id}`
+          : `https://backend-production-6e75.up.railway.app/coverage-requests/${currentUser.employee_id}`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -485,8 +485,8 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
 
       const endpoint =
         role === "admin"
-          ? `${import.meta.env.VITE_API_URL}/manual-assignment-requests?company_id=${currentUser.company_id}`
-          : `${import.meta.env.VITE_API_URL}/manual-assignment-requests/employee/${currentUser.employee_id}?company_id=${currentUser.company_id}`;
+          ? `https://backend-production-6e75.up.railway.app/manual-assignment-requests?company_id=${currentUser.company_id}`
+          : `https://backend-production-6e75.up.railway.app/manual-assignment-requests/employee/${currentUser.employee_id}?company_id=${currentUser.company_id}`;
 
       const res = await fetch(endpoint);
       const data = await res.json();
@@ -554,7 +554,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       if (!currentUser.company_id) return;
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/settings?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -575,7 +575,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       if (!currentUser.company_id) return;
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/shift-templates?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/shift-templates?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -589,7 +589,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const fetchApplications = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/shift-applications?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/shift-applications?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -641,7 +641,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
 
     fetch(
-      `${import.meta.env.VITE_API_URL}/employees?company_id=${currentUser.company_id}`,
+      `https://backend-production-6e75.up.railway.app/employees?company_id=${currentUser.company_id}`,
     )
       .then((res) => res.json())
       .then((data) => setEmployees(Array.isArray(data) ? data : []))
@@ -651,7 +651,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const processAutomaticCoverRequests = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/coverage-requests/process-automatic?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/coverage-requests/process-automatic?company_id=${currentUser.company_id}`,
         {
           method: "POST",
         },
@@ -821,7 +821,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       const scheduleId = selectedShift.schedule_id;
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/request-cover/${scheduleId}`,
+        `https://backend-production-6e75.up.railway.app/request-cover/${scheduleId}`,
         {
           method: "POST",
           headers: {
@@ -878,21 +878,24 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/leaves`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/leaves",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            employee_id: currentUser.employee_id,
+            from: selectedLeaveDateRange.from.toISOString().split("T")[0],
+            to: (selectedLeaveDateRange.to || selectedLeaveDateRange.from)
+              .toISOString()
+              .split("T")[0],
+            leave_type: standaloneLeaveType,
+            reason: standaloneLeaveReason,
+          }),
         },
-        body: JSON.stringify({
-          employee_id: currentUser.employee_id,
-          from: selectedLeaveDateRange.from.toISOString().split("T")[0],
-          to: (selectedLeaveDateRange.to || selectedLeaveDateRange.from)
-            .toISOString()
-            .split("T")[0],
-          leave_type: standaloneLeaveType,
-          reason: standaloneLeaveReason,
-        }),
-      });
+      );
 
       console.log("STATUS:", res.status);
 
@@ -948,9 +951,12 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
           ? `/shift-applications/${id}/approve`
           : `/shift-applications/${id}/deny`;
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app${endpoint}`,
+        {
+          method: "POST",
+        },
+      );
 
       const data = await res.json().catch(() => null);
 
@@ -987,7 +993,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/coverage-requests/${requestId}/apply`,
+        `https://backend-production-6e75.up.railway.app/coverage-requests/${requestId}/apply`,
         {
           method: "POST",
           headers: {
@@ -1053,7 +1059,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   ) => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/manual-assignment-requests/${requestId}/${action}`,
+        `https://backend-production-6e75.up.railway.app/manual-assignment-requests/${requestId}/${action}`,
         {
           method: "POST",
           headers: {
@@ -1098,7 +1104,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
   const cancelAssignmentRequest = async (requestId: number) => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/manual-assignment-requests/${requestId}/cancel`,
+        `https://backend-production-6e75.up.railway.app/manual-assignment-requests/${requestId}/cancel`,
         {
           method: "POST",
           headers: {
@@ -1146,7 +1152,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/leaves/${requestId}`,
+        `https://backend-production-6e75.up.railway.app/leaves/${requestId}`,
         {
           method: "PATCH",
           headers: {
@@ -1286,7 +1292,7 @@ export function CoverApplication({ currentUser, role }: CoverApplicationProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/generated-schedule?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();

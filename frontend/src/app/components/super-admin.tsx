@@ -109,7 +109,9 @@ export function SuperAdmin() {
 
   const fetchCompanies = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/companies`);
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/companies",
+      );
 
       const data = await res.json();
 
@@ -162,16 +164,19 @@ export function SuperAdmin() {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/companies`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/companies",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_name: newCompanyName.trim(),
+            company_type: newCompanyType,
+          }),
         },
-        body: JSON.stringify({
-          company_name: newCompanyName.trim(),
-          company_type: newCompanyType,
-        }),
-      });
+      );
 
       const data = await res.json();
 
@@ -220,7 +225,7 @@ export function SuperAdmin() {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/companies/${company.id}`,
+        `https://backend-production-6e75.up.railway.app/companies/${company.id}`,
         {
           method: "DELETE",
         },
@@ -253,7 +258,7 @@ export function SuperAdmin() {
   const toggleCompanyStatus = async (id: string) => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/companies/${id}/toggle-status`,
+        `https://backend-production-6e75.up.railway.app/companies/${id}/toggle-status`,
         {
           method: "PUT",
         },
@@ -279,7 +284,7 @@ export function SuperAdmin() {
       setLoadingPermissions(true);
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/permissions?company_id=${companyId}`,
+        `https://backend-production-6e75.up.railway.app/permissions?company_id=${companyId}`,
       );
 
       const data = await res.json();
@@ -324,16 +329,19 @@ export function SuperAdmin() {
     try {
       setSavingPermissions(true);
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/permissions`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/permissions",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: Number(selectedCompany.id),
+            rolePermissions,
+          }),
         },
-        body: JSON.stringify({
-          company_id: Number(selectedCompany.id),
-          rolePermissions,
-        }),
-      });
+      );
 
       const data = await res.json();
 

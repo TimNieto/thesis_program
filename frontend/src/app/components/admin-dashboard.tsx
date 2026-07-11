@@ -460,7 +460,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/employees?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/employees?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -475,7 +475,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
   const fetchShiftTemplates = async () => {
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/shift-templates?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/shift-templates?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -524,7 +524,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/staffing-requirements?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/staffing-requirements?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -552,7 +552,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/accounts?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/accounts?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -571,7 +571,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/account-department-data?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/account-department-data?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -591,7 +591,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/holidays?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/holidays?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -618,7 +618,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/employees/${employeeId}/account-preferences?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/employees/${employeeId}/account-preferences?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json().catch(() => null);
@@ -663,7 +663,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       const rows = await Promise.all(
         activeEmployees.map(async (employee) => {
           const res = await fetch(
-            `${import.meta.env.VITE_API_URL}/employees/${employee.id}/account-preferences?company_id=${currentUser.company_id}`,
+            `https://backend-production-6e75.up.railway.app/employees/${employee.id}/account-preferences?company_id=${currentUser.company_id}`,
           );
 
           const data = await res.json().catch(() => null);
@@ -715,7 +715,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/employees/${preference.employee_id}/account-preferences/unpreferred`,
+        `https://backend-production-6e75.up.railway.app/employees/${preference.employee_id}/account-preferences/unpreferred`,
         {
           method: "PATCH",
           headers: {
@@ -812,17 +812,20 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/holidays`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/holidays",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            holiday_name: newHolidayName.trim(),
+            holiday_date: newHolidayDate,
+          }),
         },
-        body: JSON.stringify({
-          company_id: currentUser.company_id,
-          holiday_name: newHolidayName.trim(),
-          holiday_date: newHolidayDate,
-        }),
-      });
+      );
 
       const data = await res.json().catch(() => null);
 
@@ -866,7 +869,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/holidays/${holiday.id}?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/holidays/${holiday.id}?company_id=${currentUser.company_id}`,
         {
           method: "DELETE",
         },
@@ -898,7 +901,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/import-history?company_id=${currentUser.company_id}&limit=5`,
+        `https://backend-production-6e75.up.railway.app/import-history?company_id=${currentUser.company_id}&limit=5`,
       );
 
       const data = await res.json();
@@ -926,21 +929,24 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
 
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/import-history`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      await fetch(
+        "https://backend-production-6e75.up.railway.app/import-history",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            imported_by_employee_id: currentUser.id,
+            category,
+            file_name: fileName,
+            row_count: rowCount,
+            status,
+            error_message: errorMessage || null,
+          }),
         },
-        body: JSON.stringify({
-          company_id: currentUser.company_id,
-          imported_by_employee_id: currentUser.id,
-          category,
-          file_name: fileName,
-          row_count: rowCount,
-          status,
-          error_message: errorMessage || null,
-        }),
-      });
+      );
 
       await fetchImportHistory();
     } catch (err) {
@@ -1032,10 +1038,13 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       formData.append("company_id", String(currentUser.company_id));
       formData.append("file", file);
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app${endpoint}`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
 
       const data = await res.json().catch(() => null);
 
@@ -1111,13 +1120,16 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
             department_name: newDepartmentName,
           };
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        `https://backend-production-6e75.up.railway.app${endpoint}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+      );
 
       const data = await res.json().catch(() => null);
 
@@ -1151,17 +1163,20 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
         throw new Error("Account name is required");
       }
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/accounts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/accounts",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            company_id: currentUser.company_id,
+            department_name: selectedExistingDepartment,
+            account_name: newAccountName,
+          }),
         },
-        body: JSON.stringify({
-          company_id: currentUser.company_id,
-          department_name: selectedExistingDepartment,
-          account_name: newAccountName,
-        }),
-      });
+      );
 
       const data = await res.json().catch(() => null);
 
@@ -1192,8 +1207,8 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       const isAccount = row.account_id !== null;
 
       const url = isAccount
-        ? `${import.meta.env.VITE_API_URL}/accounts/${row.account_id}?company_id=${currentUser.company_id}`
-        : `${import.meta.env.VITE_API_URL}/departments/${row.department_id}?company_id=${currentUser.company_id}`;
+        ? `https://backend-production-6e75.up.railway.app/accounts/${row.account_id}?company_id=${currentUser.company_id}`
+        : `https://backend-production-6e75.up.railway.app/departments/${row.department_id}?company_id=${currentUser.company_id}`;
 
       const res = await fetch(url, {
         method: "DELETE",
@@ -1235,7 +1250,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       const normalizedRoleName = newRoleName.trim();
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/staffing-roles`,
+        "https://backend-production-6e75.up.railway.app/staffing-roles",
         {
           method: "POST",
           headers: {
@@ -1282,7 +1297,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/staffing-roles/${roleId}?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/staffing-roles/${roleId}?company_id=${currentUser.company_id}`,
         {
           method: "DELETE",
         },
@@ -1349,7 +1364,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/shift-templates`,
+        "https://backend-production-6e75.up.railway.app/shift-templates",
         {
           method: "POST",
           headers: {
@@ -1419,7 +1434,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/staffing-requirements`,
+        "https://backend-production-6e75.up.railway.app/staffing-requirements",
         {
           method: "PUT",
           headers: {
@@ -1486,7 +1501,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/staffing-requirements/${requirement.requirement_id}/required-count`,
+        `https://backend-production-6e75.up.railway.app/staffing-requirements/${requirement.requirement_id}/required-count`,
         {
           method: "PATCH",
           headers: {
@@ -1571,7 +1586,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/staffing-requirements/${requirementId}?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/staffing-requirements/${requirementId}?company_id=${currentUser.company_id}`,
         {
           method: "DELETE",
         },
@@ -1621,7 +1636,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/shift-templates/${shiftTemplateId}?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/shift-templates/${shiftTemplateId}?company_id=${currentUser.company_id}`,
         {
           method: "DELETE",
         },
@@ -1669,7 +1684,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/employee-assignments`,
+        "https://backend-production-6e75.up.railway.app/employee-assignments",
         {
           method: "POST",
           headers: {
@@ -1760,7 +1775,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const roleRes = await fetch(
-        `${import.meta.env.VITE_API_URL}/employees/${selectedEmployeeForRoles.id}/roles`,
+        `https://backend-production-6e75.up.railway.app/employees/${selectedEmployeeForRoles.id}/roles`,
         {
           method: "PUT",
           headers: {
@@ -1783,7 +1798,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
       if (!hasAdminRole) {
         const prefsRes = await fetch(
-          `${import.meta.env.VITE_API_URL}/employees/${selectedEmployeeForRoles.id}/account-preferences`,
+          `https://backend-production-6e75.up.railway.app/employees/${selectedEmployeeForRoles.id}/account-preferences`,
           {
             method: "PUT",
             headers: {
@@ -2740,18 +2755,21 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/employees`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newEmployeeName,
-          nickname: newEmployeeNickname,
-          email: newEmployeeEmail,
-          contactNumber: newEmployeeContactNumber,
-          company_id: currentUser.company_id,
-          created_by: currentUser.id,
-        }),
-      });
+      const res = await fetch(
+        "https://backend-production-6e75.up.railway.app/employees",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: newEmployeeName,
+            nickname: newEmployeeNickname,
+            email: newEmployeeEmail,
+            contactNumber: newEmployeeContactNumber,
+            company_id: currentUser.company_id,
+            created_by: currentUser.id,
+          }),
+        },
+      );
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
@@ -2783,7 +2801,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/employees/${employeeToDelete}`,
+        `https://backend-production-6e75.up.railway.app/employees/${employeeToDelete}`,
         {
           method: "DELETE",
         },
@@ -2883,7 +2901,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const previewRes = await fetch(
-        `${import.meta.env.VITE_API_URL}/employee-assignments/${employeeRoleId}/deactivation-preview?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/employee-assignments/${employeeRoleId}/deactivation-preview?company_id=${currentUser.company_id}`,
       );
 
       const previewData = await previewRes.json().catch(() => null);
@@ -2914,7 +2932,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/employee-assignments/${assignmentToDeactivate}?company_id=${currentUser.company_id}`,
+        `https://backend-production-6e75.up.railway.app/employee-assignments/${assignmentToDeactivate}?company_id=${currentUser.company_id}`,
         {
           method: "DELETE",
         },
@@ -2987,20 +3005,23 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
     );
 
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/availability/global`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      await fetch(
+        "https://backend-production-6e75.up.railway.app/availability/global",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            employee_id: employeeId,
+            company_id: currentUser.company_id,
+            day_of_week: day.toLowerCase(),
+            start_time: startTime,
+            end_time: endTime,
+            is_available: isCurrentlyUnavailable,
+          }),
         },
-        body: JSON.stringify({
-          employee_id: employeeId,
-          company_id: currentUser.company_id,
-          day_of_week: day.toLowerCase(),
-          start_time: startTime,
-          end_time: endTime,
-          is_available: isCurrentlyUnavailable,
-        }),
-      });
+      );
 
       await fetchAvailability();
     } catch (err) {
@@ -3030,7 +3051,7 @@ export function AdminDashboard({ currentUser }: AdminDashboardProps) {
       if (!companyId) return;
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/availability?company_id=${companyId}`,
+        `https://backend-production-6e75.up.railway.app/availability?company_id=${companyId}`,
       );
 
       const data = await res.json();
