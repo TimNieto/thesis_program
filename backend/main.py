@@ -27,7 +27,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://visioncore.up.railway.app",
+        "https://visioncore-scheduler.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
