@@ -290,7 +290,7 @@ export function ScheduleGenerator({
       if (!companyId) return;
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/shift-templates?company_id=${companyId}`,
+        `${import.meta.env.VITE_API_URL}/shift-templates?company_id=${companyId}`,
       );
 
       const data = await res.json();
@@ -310,7 +310,7 @@ export function ScheduleGenerator({
       if (!companyId) return;
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/staffing-requirements?company_id=${companyId}`,
+        `${import.meta.env.VITE_API_URL}/staffing-requirements?company_id=${companyId}`,
       );
 
       const data = await res.json();
@@ -330,7 +330,7 @@ export function ScheduleGenerator({
       if (!companyId) return;
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/accounts?company_id=${companyId}`,
+        `${import.meta.env.VITE_API_URL}/accounts?company_id=${companyId}`,
       );
 
       const data = await res.json();
@@ -354,7 +354,7 @@ export function ScheduleGenerator({
       if (!companyId) return;
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/employees?company_id=${companyId}`,
+        `${import.meta.env.VITE_API_URL}/employees?company_id=${companyId}`,
       );
 
       const data = await res.json();
@@ -374,7 +374,7 @@ export function ScheduleGenerator({
       if (!companyId) return;
 
       const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/finalize-completed-schedules",
+        `${import.meta.env.VITE_API_URL}/finalize-completed-schedules`,
         {
           method: "POST",
           headers: {
@@ -511,8 +511,9 @@ export function ScheduleGenerator({
     warnings: { type?: string; message?: string }[];
   } | null>(null);
 
-  const [assignmentWarningLoading, setAssignmentWarningLoading] = useState(false);
-  
+  const [assignmentWarningLoading, setAssignmentWarningLoading] =
+    useState(false);
+
   const [employeeName, setEmployeeName] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
 
@@ -549,7 +550,7 @@ export function ScheduleGenerator({
       const weekEnd = formatDate(dates[6]);
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/generated-schedule?company_id=${companyId}&week_start=${weekStart}&week_end=${weekEnd}`,
+        `${import.meta.env.VITE_API_URL}/generated-schedule?company_id=${companyId}&week_start=${weekStart}&week_end=${weekEnd}`,
       );
 
       const data = await res.json();
@@ -618,7 +619,7 @@ export function ScheduleGenerator({
       if (!companyId) return;
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/leaves-approved?company_id=${companyId}&start=${formatDate(start)}&end=${formatDate(end)}`,
+        `${import.meta.env.VITE_API_URL}/leaves-approved?company_id=${companyId}&start=${formatDate(start)}&end=${formatDate(end)}`,
       );
 
       const data = await res.json();
@@ -725,7 +726,7 @@ export function ScheduleGenerator({
     confirmWarnings: boolean = false,
   ) => {
     const res = await fetch(
-      `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/employee`,
+      `${import.meta.env.VITE_API_URL}/generated-schedule/${scheduleId}/employee`,
       {
         method: "PATCH",
         headers: {
@@ -743,7 +744,6 @@ export function ScheduleGenerator({
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
-
       if (
         res.status === 409 &&
         data?.detail?.type === "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED"
@@ -802,7 +802,7 @@ export function ScheduleGenerator({
     }
 
     const res = await fetch(
-      "https://backend-production-6e75.up.railway.app/generated-schedule/ensure-slot",
+      `${import.meta.env.VITE_API_URL}/generated-schedule/ensure-slot`,
       {
         method: "POST",
         headers: {
@@ -827,8 +827,7 @@ export function ScheduleGenerator({
     return data;
   };
 
-
-    const confirmAssignmentWarning = async () => {
+  const confirmAssignmentWarning = async () => {
     if (!pendingAssignmentWarning) return;
 
     setAssignmentWarningLoading(true);
@@ -867,7 +866,7 @@ export function ScheduleGenerator({
 
   const markPublishedAssignmentAbsent = async (scheduleId: number) => {
     const res = await fetch(
-      `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/mark-absent`,
+      `${import.meta.env.VITE_API_URL}/generated-schedule/${scheduleId}/mark-absent`,
       {
         method: "PATCH",
         headers: {
@@ -891,7 +890,7 @@ export function ScheduleGenerator({
 
   const unmarkPublishedAssignmentAbsent = async (scheduleId: number) => {
     const res = await fetch(
-      `https://backend-production-6e75.up.railway.app/generated-schedule/${scheduleId}/unmark-absent`,
+      `${import.meta.env.VITE_API_URL}/generated-schedule/${scheduleId}/unmark-absent`,
       {
         method: "PATCH",
         headers: {
@@ -1001,7 +1000,6 @@ export function ScheduleGenerator({
       return;
     }
 
-
     const selectedEmployee = employees.find(
       (emp) => emp.id === Number(selectedEmployeeId),
     );
@@ -1012,8 +1010,6 @@ export function ScheduleGenerator({
     }
 
     const existing = getAssignment();
-
-    
 
     if (scheduleMode === "saved" && existing?.schedule_id) {
       try {
@@ -1057,7 +1053,10 @@ export function ScheduleGenerator({
         return;
       } catch (err) {
         console.error(err);
-        if ((err as any)?.type === "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED") {
+        if (
+          (err as any)?.type ===
+          "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED"
+        ) {
           setIsDialogOpen(false);
 
           setPendingAssignmentWarning({
@@ -1078,7 +1077,6 @@ export function ScheduleGenerator({
       }
     }
 
-    
     if (scheduleMode === "saved" && !existing) {
       try {
         const slot = await ensurePublishedScheduleSlot();
@@ -1106,7 +1104,10 @@ export function ScheduleGenerator({
       } catch (err) {
         console.error(err);
 
-        if ((err as any)?.type === "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED") {
+        if (
+          (err as any)?.type ===
+          "MANUAL_ASSIGNMENT_WARNING_CONFIRMATION_REQUIRED"
+        ) {
           setIsDialogOpen(false);
 
           setPendingAssignmentWarning({
@@ -1126,7 +1127,6 @@ export function ScheduleGenerator({
         return;
       }
     }
-
 
     if (existing) {
       setAssignments(
@@ -1316,7 +1316,7 @@ export function ScheduleGenerator({
       const weekEnd = formatDate(dates[6]);
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/generate-schedule?company_id=${companyId}&week_start=${weekStart}&week_end=${weekEnd}`,
+        `${import.meta.env.VITE_API_URL}/generate-schedule?company_id=${companyId}&week_start=${weekStart}&week_end=${weekEnd}`,
       );
       const data = await res.json();
 
@@ -1438,23 +1438,20 @@ export function ScheduleGenerator({
 
       console.log(payload);
 
-      const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/save-schedule",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            assignments: payload,
-            saved_by: currentUserId,
-            company_id: companyId,
-            week_start: selectedWeekStart,
-            week_end: selectedWeekEnd,
-            force_republish_current_week: false,
-          }),
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/save-schedule`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          assignments: payload,
+          saved_by: currentUserId,
+          company_id: companyId,
+          week_start: selectedWeekStart,
+          week_end: selectedWeekEnd,
+          force_republish_current_week: false,
+        }),
+      });
 
       if (!res.ok) {
         const err = await res.text();
@@ -1644,14 +1641,14 @@ export function ScheduleGenerator({
   const weekLabel = scheduleWeekOffset === 0 ? "This Week" : "Next Week";
 
   const formatWarningType = (type?: string) => {
-  if (!type) return "Warning";
+    if (!type) return "Warning";
 
-  return type
-    .toLowerCase()
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
+    return type
+      .toLowerCase()
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
 
   return (
     <div className="space-y-6">
@@ -2110,7 +2107,6 @@ export function ScheduleGenerator({
         )}
       </Tabs>
 
-
       {/* Manual Assignment Warning Dialog */}
       <Dialog
         open={Boolean(pendingAssignmentWarning)}
@@ -2124,28 +2120,28 @@ export function ScheduleGenerator({
           <DialogHeader>
             <DialogTitle>Assignment Warning</DialogTitle>
             <DialogDescription>
-              This assignment has policy warnings. Review them before sending the
-              approval request to the employee.
+              This assignment has policy warnings. Review them before sending
+              the approval request to the employee.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-4">
             {pendingAssignmentWarning?.employeeName && (
               <div className="text-sm">
-                <strong>Employee:</strong> {pendingAssignmentWarning.employeeName}
+                <strong>Employee:</strong>{" "}
+                {pendingAssignmentWarning.employeeName}
               </div>
             )}
 
-            
-
-
             <div className="rounded-md border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900 space-y-2">
-              {(pendingAssignmentWarning?.warnings || []).map((warning, index) => (
-                <div key={`${warning.type || "warning"}-${index}`}>
-                  <strong>{formatWarningType(warning.type)}:</strong>{" "}
-                  {warning.message || "This assignment has a warning."}
-                </div>
-              ))}
+              {(pendingAssignmentWarning?.warnings || []).map(
+                (warning, index) => (
+                  <div key={`${warning.type || "warning"}-${index}`}>
+                    <strong>{formatWarningType(warning.type)}:</strong>{" "}
+                    {warning.message || "This assignment has a warning."}
+                  </div>
+                ),
+              )}
             </div>
 
             <p className="text-sm font-medium">
@@ -2171,7 +2167,6 @@ export function ScheduleGenerator({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
 
       {/* Assignment Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

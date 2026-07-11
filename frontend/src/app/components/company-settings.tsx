@@ -95,7 +95,7 @@ export function CompanySettings({
   const fetchSettings = async () => {
     try {
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/settings?company_id=${currentUser.company_id}`,
+        `${import.meta.env.VITE_API_URL}/settings?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -139,7 +139,7 @@ export function CompanySettings({
       }
 
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/accounts?company_id=${currentUser.company_id}`,
+        `${import.meta.env.VITE_API_URL}/accounts?company_id=${currentUser.company_id}`,
       );
 
       const data = await res.json();
@@ -171,33 +171,30 @@ export function CompanySettings({
     setSavingChanges(true);
 
     try {
-      const res = await fetch(
-        "https://backend-production-6e75.up.railway.app/settings",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            company_id: currentUser.company_id,
-            company_name: companyName,
-            company_type: companyType,
-            max_working_days: Number(maxConsecutiveWorkingDays),
-            min_rest_period_hours: Number(minRestPeriod),
-            max_daily_work_hours: Number(maxDailyWorkHours),
-            max_shifts_per_day: Number(shiftsPerDay),
-            max_shifts_per_week: Number(maxShiftsPerEmployee),
-            allow_double_shifts: doubleShiftAllowance,
-            fairness_weight: Number(fairnessWeight),
-            gy_fatigue_penalty: Number(gyPenalty),
-            absence_tolerance: Number(absenceTolerance),
-            max_absences_per_month: Number(maxAbsencePerEmployee),
-            absence_replacement_mode: absenceReplacementMode,
-            enable_in_app_notifications: inAppNotifications,
-            updated_by: currentUser.id,
-          }),
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/settings`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          company_id: currentUser.company_id,
+          company_name: companyName,
+          company_type: companyType,
+          max_working_days: Number(maxConsecutiveWorkingDays),
+          min_rest_period_hours: Number(minRestPeriod),
+          max_daily_work_hours: Number(maxDailyWorkHours),
+          max_shifts_per_day: Number(shiftsPerDay),
+          max_shifts_per_week: Number(maxShiftsPerEmployee),
+          allow_double_shifts: doubleShiftAllowance,
+          fairness_weight: Number(fairnessWeight),
+          gy_fatigue_penalty: Number(gyPenalty),
+          absence_tolerance: Number(absenceTolerance),
+          max_absences_per_month: Number(maxAbsencePerEmployee),
+          absence_replacement_mode: absenceReplacementMode,
+          enable_in_app_notifications: inAppNotifications,
+          updated_by: currentUser.id,
+        }),
+      });
 
       if (!res.ok) {
         throw new Error("Failed to save settings");
@@ -211,7 +208,7 @@ export function CompanySettings({
         }
 
         const policyRes = await fetch(
-          `https://backend-production-6e75.up.railway.app/accounts/${accountId}`,
+          `${import.meta.env.VITE_API_URL}/accounts/${accountId}`,
           {
             method: "PUT",
             headers: {
@@ -410,20 +407,23 @@ export function CompanySettings({
                 </div>
 
                 <div className="space-y-2">
-                <Label htmlFor="maxDailyWorkHours">Max Daily Work Hours</Label>
-                <Input
-                  id="maxDailyWorkHours"
-                  type="number"
-                  min="0"
-                  max="48"
-                  value={maxDailyWorkHours}
-                  onChange={(e) => setMaxDailyWorkHours(e.target.value)}
-                  placeholder="24"
-                />
-                <p className="text-xs text-gray-500">
-                  Hard block if an employee reaches this many total shift hours in one day.
-                </p>
-              </div>
+                  <Label htmlFor="maxDailyWorkHours">
+                    Max Daily Work Hours
+                  </Label>
+                  <Input
+                    id="maxDailyWorkHours"
+                    type="number"
+                    min="0"
+                    max="48"
+                    value={maxDailyWorkHours}
+                    onChange={(e) => setMaxDailyWorkHours(e.target.value)}
+                    placeholder="24"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Hard block if an employee reaches this many total shift
+                    hours in one day.
+                  </p>
+                </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between pt-6">

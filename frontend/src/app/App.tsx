@@ -153,7 +153,7 @@ export default function App() {
   const fetchCompanyPermissions = async (companyId: number) => {
     try {
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/permissions?company_id=${companyId}`,
+        `${import.meta.env.VITE_API_URL}/permissions?company_id=${companyId}`,
       );
 
       const data = await res.json();

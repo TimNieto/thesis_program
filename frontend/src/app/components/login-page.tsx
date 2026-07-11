@@ -43,19 +43,16 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
     // Mock authentication - in real app, this would validate against a backend
     try {
-      const response = await fetch(
-        "https://backend-production-6e75.up.railway.app/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: username,
-            password: password,
-          }),
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          email: username,
+          password: password,
+        }),
+      });
 
       const data = await response.json();
 

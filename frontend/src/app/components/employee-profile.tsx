@@ -41,7 +41,7 @@ export function EmployeeProfile({
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    fetch(`https://backend-production-6e75.up.railway.app/employees/${userId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/employees/${userId}`)
       .then((res) => res.json())
       .then((data) => {
         setName(data.name || "");
@@ -67,7 +67,7 @@ export function EmployeeProfile({
 
     try {
       const response = await fetch(
-        `https://backend-production-6e75.up.railway.app/employees/${userId}`,
+        `${import.meta.env.VITE_API_URL}/employees/${userId}`,
         {
           method: "PUT",
           headers: {
@@ -119,7 +119,7 @@ export function EmployeeProfile({
 
     try {
       const res = await fetch(
-        `https://backend-production-6e75.up.railway.app/employees/${userId}/password`,
+        `${import.meta.env.VITE_API_URL}/employees/${userId}/password`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

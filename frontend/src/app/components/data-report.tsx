@@ -147,20 +147,20 @@ export function DataReport({ currentUser }: DataReportProps) {
   const [loading, setLoading] = useState(false);
 
   type SortKey =
-  | "name"
-  | "totalShifts"
-  | "coverageRequests"
-  | "coverApplications"
-  | "absences"
-  | "absenceStatus"
-  | "leaves"
-  | "assignedWorkload"
-  | "utilization";
+    | "name"
+    | "totalShifts"
+    | "coverageRequests"
+    | "coverApplications"
+    | "absences"
+    | "absenceStatus"
+    | "leaves"
+    | "assignedWorkload"
+    | "utilization";
 
-type SortDirection = "asc" | "desc";
+  type SortDirection = "asc" | "desc";
 
-const [sortKey, setSortKey] = useState<SortKey>("name");
-const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const getTimePeriodLabel = () => {
     switch (timePeriod) {
@@ -238,10 +238,10 @@ const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
       const [generalRes, employeeRes] = await Promise.all([
         fetch(
-          `https://backend-production-6e75.up.railway.app/reports/general?company_id=${currentUser.company_id}&period=${timePeriod}`,
+          `${import.meta.env.VITE_API_URL}/reports/general?company_id=${currentUser.company_id}&period=${timePeriod}`,
         ),
         fetch(
-          `https://backend-production-6e75.up.railway.app/reports/employees?company_id=${currentUser.company_id}&period=${timePeriod}`,
+          `${import.meta.env.VITE_API_URL}/reports/employees?company_id=${currentUser.company_id}&period=${timePeriod}`,
         ),
       ]);
 
@@ -279,50 +279,50 @@ const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   }, [timePeriod, currentUser.company_id]);
 
   const toggleSort = (key: SortKey) => {
-  if (sortKey === key) {
-    setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
-    return;
-  }
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
 
-  setSortKey(key);
-  setSortDirection("asc");
-};
+    setSortKey(key);
+    setSortDirection("asc");
+  };
 
-const getAbsenceStatusRank = (status: string) => {
-  switch (status) {
-    case "Exceeded":
-      return 4;
-    case "At Limit":
-      return 3;
-    case "OK":
-      return 2;
-    case "No Limit":
-      return 1;
-    default:
-      return 0;
-  }
-};
+  const getAbsenceStatusRank = (status: string) => {
+    switch (status) {
+      case "Exceeded":
+        return 4;
+      case "At Limit":
+        return 3;
+      case "OK":
+        return 2;
+      case "No Limit":
+        return 1;
+      default:
+        return 0;
+    }
+  };
 
-const getSortValue = (employee: EmployeeData, key: SortKey) => {
-  switch (key) {
-    case "name":
-      return employee.name.toLowerCase();
+  const getSortValue = (employee: EmployeeData, key: SortKey) => {
+    switch (key) {
+      case "name":
+        return employee.name.toLowerCase();
 
-    case "absenceStatus":
-      return getAbsenceStatusRank(employee.absenceStatus);
+      case "absenceStatus":
+        return getAbsenceStatusRank(employee.absenceStatus);
 
-    case "assignedWorkload":
-      return employee.assignedWorkload;
+      case "assignedWorkload":
+        return employee.assignedWorkload;
 
-    default:
-      return employee[key] ?? 0;
-  }
-};
+      default:
+        return employee[key] ?? 0;
+    }
+  };
 
-const getSortIcon = (key: SortKey) => {
-  if (sortKey !== key) return "↕";
-  return sortDirection === "asc" ? "↑" : "↓";
-};
+  const getSortIcon = (key: SortKey) => {
+    if (sortKey !== key) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
+  };
 
   const exportReport = () => {
     const rows = [
@@ -384,9 +384,7 @@ const getSortIcon = (key: SortKey) => {
     const numericA = Number(aValue) || 0;
     const numericB = Number(bValue) || 0;
 
-    return sortDirection === "asc"
-      ? numericA - numericB
-      : numericB - numericA;
+    return sortDirection === "asc" ? numericA - numericB : numericB - numericA;
   });
 
   return (
@@ -692,7 +690,8 @@ const getSortIcon = (key: SortKey) => {
                           onClick={() => toggleSort("coverageRequests")}
                           className="flex items-center gap-1 font-semibold"
                         >
-                          Cover Requests <span>{getSortIcon("coverageRequests")}</span>
+                          Cover Requests{" "}
+                          <span>{getSortIcon("coverageRequests")}</span>
                         </button>
                       </TableHead>
 
@@ -702,7 +701,8 @@ const getSortIcon = (key: SortKey) => {
                           onClick={() => toggleSort("coverApplications")}
                           className="flex items-center gap-1 font-semibold"
                         >
-                          Cover Applications <span>{getSortIcon("coverApplications")}</span>
+                          Cover Applications{" "}
+                          <span>{getSortIcon("coverApplications")}</span>
                         </button>
                       </TableHead>
 
@@ -722,7 +722,8 @@ const getSortIcon = (key: SortKey) => {
                           onClick={() => toggleSort("absenceStatus")}
                           className="flex items-center gap-1 font-semibold"
                         >
-                          Absence Status <span>{getSortIcon("absenceStatus")}</span>
+                          Absence Status{" "}
+                          <span>{getSortIcon("absenceStatus")}</span>
                         </button>
                       </TableHead>
 
@@ -742,7 +743,8 @@ const getSortIcon = (key: SortKey) => {
                           onClick={() => toggleSort("assignedWorkload")}
                           className="flex items-center gap-1 font-semibold"
                         >
-                          Workload <span>{getSortIcon("assignedWorkload")}</span>
+                          Workload{" "}
+                          <span>{getSortIcon("assignedWorkload")}</span>
                         </button>
                       </TableHead>
 
@@ -851,7 +853,9 @@ const getSortIcon = (key: SortKey) => {
                             <div className="flex items-center gap-2">
                               <Badge
                                 variant="outline"
-                                className={getUtilizationClassName(employee.utilization)}
+                                className={getUtilizationClassName(
+                                  employee.utilization,
+                                )}
                               >
                                 {employee.utilization.toFixed(1)}%
                               </Badge>
